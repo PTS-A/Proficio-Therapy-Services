@@ -42,6 +42,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
     addProvider,
     updateProvider,
     deleteProvider,
+    isAdmin,
   } = useCredentialing();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +50,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
   const [activeProfileId, setActiveProfileId] = useState<string | null>(selectedProviderId || providers[0]?.id || null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
+  const [deleteConfirmProvider, setDeleteConfirmProvider] = useState<Provider | null>(null);
 
   // New / Edit Provider Form State
   const [formData, setFormData] = useState({
@@ -304,18 +306,24 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                   <button
                     onClick={() => handleOpenEdit(activeProvider)}
                     className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                    title="Edit Provider"
+                    title={isAdmin ? "Edit Provider Master Record (Administrator Access)" : "Edit Provider Details"}
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm(`Are you sure you want to delete ${activeProvider.firstName} ${activeProvider.lastName}?`)) {
-                        deleteProvider(activeProvider.id);
+                      if (!isAdmin) {
+                        alert("Deleting provider records requires ADMINISTRATOR access level.");
+                        return;
                       }
+                      setDeleteConfirmProvider(activeProvider);
                     }}
-                    className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
-                    title="Delete Provider"
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      isAdmin
+                        ? 'text-rose-500 hover:bg-rose-50'
+                        : 'text-slate-300 hover:text-slate-400 cursor-not-allowed'
+                    }`}
+                    title={isAdmin ? "Delete Provider (Administrator Only)" : "Deleting providers requires Administrator access"}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -603,12 +611,57 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs"
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#2B4C9D] hover:bg-[#223E80] rounded-lg shadow-xs"
                 >
-                  Save Provider Record
+                  {editingProvider ? 'Update Provider Record' : 'Save New Provider Record'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 text-xs">
+            <div className="flex items-center space-x-3 text-red-600 mb-3">
+              <div className="p-2 bg-red-100 rounded-xl">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900">Confirm Provider Removal</h3>
+            </div>
+            
+            <p className="text-slate-600 mb-4">
+              Are you sure you want to permanently delete <strong>{deleteConfirmProvider.firstName} {deleteConfirmProvider.lastName} ({deleteConfirmProvider.credentials})</strong> from the Provider Master Roster?
+            </p>
+            
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] mb-4">
+              <strong>Admin Notice:</strong> This will also remove the provider's linked records and affiliations.
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmProvider(null)}
+                className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 font-semibold hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteProvider(deleteConfirmProvider.id);
+                  setDeleteConfirmProvider(null);
+                  if (activeProfileId === deleteConfirmProvider.id) {
+                    setActiveProfileId(providers.find(p => p.id !== deleteConfirmProvider.id)?.id || null);
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs"
+              >
+                Permanently Delete Provider
+              </button>
+            </div>
           </div>
         </div>
       )}

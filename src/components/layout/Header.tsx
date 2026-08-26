@@ -20,7 +20,12 @@ import {
   Bell,
   RefreshCw,
   Share2,
-  Database
+  Database,
+  UserCog,
+  LogOut,
+  KeyRound,
+  ShieldCheck,
+  User
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -31,6 +36,8 @@ interface HeaderProps {
   onOpenNotificationDrawer: () => void;
   onOpenImportModal: () => void;
   onOpenConfigModal: () => void;
+  onOpenAuthModal?: () => void;
+  onOpenUserManagementModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -41,9 +48,23 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNotificationDrawer,
   onOpenImportModal,
   onOpenConfigModal,
+  onOpenAuthModal,
+  onOpenUserManagementModal,
 }) => {
-  const { currentUser, switchRole, notifications, filters, setFilters, kpis, resetToDefaultData } = useCredentialing();
+  const { 
+    currentUser, 
+    currentAccount, 
+    isAdmin, 
+    logout, 
+    switchRole, 
+    notifications, 
+    filters, 
+    setFilters, 
+    kpis, 
+    resetToDefaultData 
+  } = useCredentialing();
   const [roleDropdownOpen, setRoleDropdownOpen] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -76,6 +97,21 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-4">
+          {/* Active Account Pill */}
+          <div className="hidden sm:flex items-center space-x-1.5 text-[11px] bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700">
+            {isAdmin ? (
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <User className="w-3.5 h-3.5 text-slate-300" />
+            )}
+            <span className="text-slate-300">{currentAccount?.email || 'demo@proficiotherapy.com'}</span>
+            <span className={`text-[9px] font-bold px-1.5 rounded ${
+              isAdmin ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-700 text-slate-300'
+            }`}>
+              {currentAccount?.accessLevel || 'ADMINISTRATOR'}
+            </span>
+          </div>
+
           <div className="flex items-center space-x-2 text-slate-300 text-[11px]">
             <span className="text-[#F5A623] font-medium">Overdue SLA: {kpis.applicationsOverdue}</span>
             <span className="text-slate-600">•</span>
@@ -88,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="text-slate-400 hover:text-white flex items-center space-x-1 transition-colors text-[11px]"
           >
             <RefreshCw className="w-3 h-3" />
-            <span className="hidden md:inline">Reset Demo Data</span>
+            <span className="hidden md:inline">Reset Demo</span>
           </button>
         </div>
       </div>
@@ -121,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   key={disc}
                   onClick={() => handleDisciplineToggle(disc)}
-                  className={`px-2.5 py-1 rounded-md transition-all ${
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                     filters.discipline === disc
                       ? 'bg-white text-[#2B4C9D] shadow-xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
@@ -147,43 +183,102 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* Role Switcher */}
+            {/* Account & Profile Menu */}
             <div className="relative">
               <button
-                id="header-role-dropdown-btn"
-                onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                id="header-user-menu-btn"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
               >
-                <div className="h-5 w-5 rounded-full bg-[#2B4C9D] text-white flex items-center justify-center text-[10px] font-bold">
-                  {currentUser.role[0]}
+                <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+                  isAdmin ? 'bg-[#2B4C9D]' : 'bg-slate-600'
+                }`}>
+                  {(currentAccount?.name || currentUser.name)[0]}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <div className="leading-none text-slate-900 font-bold">{currentUser.role}</div>
-                  <div className="text-[10px] text-slate-500 font-normal truncate max-w-[90px]">{currentUser.name}</div>
+                  <div className="leading-none text-slate-900 font-bold flex items-center space-x-1">
+                    <span>{currentAccount?.name || currentUser.name}</span>
+                    {isAdmin && <ShieldCheck className="w-3 h-3 text-[#2B4C9D]" />}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-normal truncate max-w-[100px]">
+                    {currentAccount?.accessLevel || 'ADMINISTRATOR'}
+                  </div>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               </button>
 
-              {roleDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
-                  <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Role-Based Access Simulation
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <div className="font-bold text-xs text-slate-900">{currentAccount?.name || currentUser.name}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{currentAccount?.email}</div>
+                    <div className="mt-1 flex items-center space-x-1.5">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isAdmin
+                          ? 'bg-[#EEF2FF] text-[#2B4C9D] border border-[#2B4C9D]/30'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {currentAccount?.accessLevel || 'ADMINISTRATOR'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">• {currentUser.role} View</span>
+                    </div>
                   </div>
-                  {roles.map((r) => (
+
+                  {/* Admin Specific Links */}
+                  {isAdmin && (
+                    <div className="py-1 border-b border-slate-100">
+                      {onOpenUserManagementModal && (
+                        <button
+                          onClick={() => {
+                            onOpenUserManagementModal();
+                            setUserMenuOpen(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-xs flex items-center space-x-2 text-slate-700 hover:bg-slate-50 cursor-pointer font-medium"
+                        >
+                          <UserCog className="w-4 h-4 text-[#2B4C9D]" />
+                          <span>Manage Users & Roles</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          onOpenImportModal();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-xs flex items-center space-x-2 text-slate-700 hover:bg-slate-50 cursor-pointer font-medium"
+                      >
+                        <Database className="w-4 h-4 text-emerald-600" />
+                        <span>Excel Spreadsheet Bulk Import</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Account Switching & Auth */}
+                  <div className="py-1">
+                    {onOpenAuthModal && (
+                      <button
+                        onClick={() => {
+                          onOpenAuthModal();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-xs flex items-center space-x-2 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                      >
+                        <KeyRound className="w-4 h-4 text-slate-400" />
+                        <span>Switch Account / Sign In</span>
+                      </button>
+                    )}
+
                     <button
-                      key={r}
                       onClick={() => {
-                        switchRole(r);
-                        setRoleDropdownOpen(false);
+                        logout();
+                        setUserMenuOpen(false);
+                        if (onOpenAuthModal) onOpenAuthModal();
                       }}
-                      className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer ${
-                        currentUser.role === r ? 'bg-[#EEF2FF] text-[#2B4C9D] font-bold' : 'text-slate-700'
-                      }`}
+                      className="w-full px-4 py-2 text-left text-xs flex items-center space-x-2 text-red-600 hover:bg-red-50 cursor-pointer"
                     >
-                      <span>{r} View</span>
-                      {currentUser.role === r && <CheckCircle2 className="w-3.5 h-3.5 text-[#2B4C9D]" />}
+                      <LogOut className="w-4 h-4" />
+                      <span>Log Out</span>
                     </button>
-                  ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -305,13 +400,23 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Admin Tools shortcuts */}
           <div className="flex items-center space-x-1 pl-2 border-l border-slate-200">
+            {isAdmin && onOpenUserManagementModal && (
+              <button
+                onClick={onOpenUserManagementModal}
+                title="User & Account Access Management"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-[#2B4C9D] hover:bg-slate-100 text-xs flex items-center space-x-1 transition-colors cursor-pointer"
+              >
+                <UserCog className="w-3.5 h-3.5" />
+                <span className="hidden xl:inline">Users</span>
+              </button>
+            )}
             <button
               onClick={onOpenImportModal}
-              title="Bulk Import Google Sheets / CSV"
+              title="Bulk Import Excel Spreadsheets / CSV"
               className="p-1.5 rounded-lg text-slate-500 hover:text-[#2B4C9D] hover:bg-slate-100 text-xs flex items-center space-x-1 transition-colors cursor-pointer"
             >
-              <Database className="w-3.5 h-3.5" />
-              <span className="hidden xl:inline">Import</span>
+              <Database className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden xl:inline font-semibold">Import Excel</span>
             </button>
             <button
               onClick={onOpenConfigModal}
@@ -327,3 +432,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

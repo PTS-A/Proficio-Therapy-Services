@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  AccessLevel,
+  AppAccount,
   ApplicationType,
   AuditEntry,
   ChecklistItem,
@@ -20,6 +22,7 @@ import {
   UserRole,
 } from '../types';
 import {
+  INITIAL_ACCOUNTS,
   INITIAL_CREDENTIALING_RECORDS,
   INITIAL_LEGAL_ENTITIES,
   INITIAL_LOCATIONS,
@@ -60,6 +63,17 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 interface CredentialingContextType {
+  // Accounts & Authentication
+  accounts: AppAccount[];
+  currentAccount: AppAccount | null;
+  isAdmin: boolean;
+  login: (email: string, password?: string) => { success: boolean; error?: string };
+  logout: () => void;
+  createAccount: (accData: Omit<AppAccount, 'id' | 'createdAt'>) => { success: boolean; account?: AppAccount; error?: string };
+  updateAccount: (id: string, updates: Partial<AppAccount>) => void;
+  deleteAccount: (id: string) => { success: boolean; error?: string };
+  switchAccount: (accountId: string) => void;
+
   providers: Provider[];
   payers: Payer[];
   entities: LegalEntity[];
@@ -135,12 +149,43 @@ interface CredentialingContextType {
   
   // System Tools
   resetToDefaultData: () => void;
-  importBulkData: (importedRecords: CredentialingRecord[], importedProviders?: Provider[]) => void;
+  importBulkData: (importedRecords: CredentialingRecord[], importedProviders?: Provider[], importedPayers?: Payer[], importedLocations?: Location[]) => void;
 }
 
 const CredentialingContext = createContext<CredentialingContextType | undefined>(undefined);
 
 export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Accounts State
+  const [accounts, setAccounts] = useState<AppAccount[]>(() => {
+    const saved = localStorage.getItem('cred_accounts');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure the demo admin account is always present
+        const hasDemo = parsed.some((a: AppAccount) => a.email.toLowerCase() === 'demo@proficiotherapy.com');
+        if (!hasDemo) {
+          return [INITIAL_ACCOUNTS[0], ...parsed];
+        }
+        return parsed;
+      } catch (e) {
+        return INITIAL_ACCOUNTS;
+      }
+    }
+    return INITIAL_ACCOUNTS;
+  });
+
+  const [currentAccount, setCurrentAccount] = useState<AppAccount | null>(() => {
+    const saved = localStorage.getItem('cred_current_account');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return INITIAL_ACCOUNTS[0]; // Default to Demo Admin for instant demonstration
+      }
+    }
+    return INITIAL_ACCOUNTS[0]; // Default to Demo Admin
+  });
+
   const [providers, setProviders] = useState<Provider[]>(() => {
     const saved = localStorage.getItem('cred_providers');
     return saved ? JSON.parse(saved) : INITIAL_PROVIDERS;
@@ -167,7 +212,20 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [users] = useState<User[]>(INITIAL_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[0]);
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    if (currentAccount) {
+      const match = INITIAL_USERS.find((u) => u.email.toLowerCase() === currentAccount.email.toLowerCase());
+      if (match) return match;
+      return {
+        id: currentAccount.id,
+        name: currentAccount.name,
+        email: currentAccount.email,
+        role: currentAccount.accessLevel === 'ADMINISTRATOR' ? 'Admin' : 'Specialist',
+        accessLevel: currentAccount.accessLevel,
+      };
+    }
+    return INITIAL_USERS[0];
+  });
 
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
     const saved = localStorage.getItem('cred_notifications');
@@ -184,7 +242,21 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
+  const isAdmin = currentAccount?.accessLevel === 'ADMINISTRATOR';
+
   // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('cred_accounts', JSON.stringify(accounts));
+  }, [accounts]);
+
+  useEffect(() => {
+    if (currentAccount) {
+      localStorage.setItem('cred_current_account', JSON.stringify(currentAccount));
+    } else {
+      localStorage.removeItem('cred_current_account');
+    }
+  }, [currentAccount]);
+
   useEffect(() => {
     localStorage.setItem('cred_providers', JSON.stringify(providers));
   }, [providers]);
@@ -209,9 +281,26 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem('cred_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
+  // Sync currentUser with currentAccount changes
+  useEffect(() => {
+    if (currentAccount) {
+      const match = users.find((u) => u.email.toLowerCase() === currentAccount.email.toLowerCase());
+      if (match) {
+        setCurrentUser({ ...match, accessLevel: currentAccount.accessLevel });
+      } else {
+        setCurrentUser({
+          id: currentAccount.id,
+          name: currentAccount.name,
+          email: currentAccount.email,
+          role: currentAccount.accessLevel === 'ADMINISTRATOR' ? 'Admin' : 'Specialist',
+          accessLevel: currentAccount.accessLevel,
+        });
+      }
+    }
+  }, [currentAccount, users]);
+
   // Automated overdue & SLA checker run on mount and records update
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
     let recordsUpdated = false;
 
     const checkedRecords = records.map((rec) => {
@@ -234,12 +323,97 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [records]);
 
+  // Auth Operations
+  const login = (email: string, password?: string): { success: boolean; error?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    const found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+
+    if (!found) {
+      return { success: false, error: 'No account found with this email address.' };
+    }
+
+    // If password provided, verify it (demo account password is "proficio")
+    if (password && found.password && found.password !== password) {
+      return { success: false, error: 'Incorrect password. For demo admin, enter "proficio".' };
+    }
+
+    const updated = {
+      ...found,
+      lastLogin: new Date().toISOString().split('T')[0],
+    };
+    setCurrentAccount(updated);
+    setAccounts((prev) => prev.map((a) => (a.id === found.id ? updated : a)));
+
+    return { success: true };
+  };
+
+  const logout = () => {
+    setCurrentAccount(null);
+  };
+
+  const createAccount = (accData: Omit<AppAccount, 'id' | 'createdAt'>): { success: boolean; account?: AppAccount; error?: string } => {
+    const cleanEmail = accData.email.trim().toLowerCase();
+    if (accounts.some((a) => a.email.toLowerCase() === cleanEmail)) {
+      return { success: false, error: 'An account with this email already exists.' };
+    }
+
+    const newAcc: AppAccount = {
+      id: `acc-${Date.now()}`,
+      name: accData.name.trim(),
+      email: cleanEmail,
+      password: accData.password || 'proficio',
+      accessLevel: accData.accessLevel || 'USER',
+      roleTitle: accData.roleTitle || (accData.accessLevel === 'ADMINISTRATOR' ? 'Credentialing Administrator' : 'Credentialing Specialist'),
+      department: accData.department || 'Proficio Therapy Credentialing Hub',
+      createdAt: new Date().toISOString().split('T')[0],
+      lastLogin: new Date().toISOString().split('T')[0],
+    };
+
+    setAccounts((prev) => [...prev, newAcc]);
+    return { success: true, account: newAcc };
+  };
+
+  const updateAccount = (id: string, updates: Partial<AppAccount>) => {
+    setAccounts((prev) =>
+      prev.map((a) => {
+        if (a.id === id) {
+          const updated = { ...a, ...updates };
+          if (currentAccount && currentAccount.id === id) {
+            setCurrentAccount(updated);
+          }
+          return updated;
+        }
+        return a;
+      })
+    );
+  };
+
+  const deleteAccount = (id: string): { success: boolean; error?: string } => {
+    const accToDelete = accounts.find((a) => a.id === id);
+    if (accToDelete?.email.toLowerCase() === 'demo@proficiotherapy.com') {
+      return { success: false, error: 'The primary demo administrator account cannot be deleted.' };
+    }
+    if (currentAccount?.id === id) {
+      return { success: false, error: 'Cannot delete the account currently logged in.' };
+    }
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+    return { success: true };
+  };
+
+  const switchAccount = (accountId: string) => {
+    const acc = accounts.find((a) => a.id === accountId);
+    if (acc) {
+      setCurrentAccount(acc);
+    }
+  };
+
   const switchRole = (role: UserRole) => {
     const matched = users.find((u) => u.role === role) || {
       id: `usr-custom-${role.toLowerCase()}`,
       name: `${role} User`,
       email: `${role.toLowerCase()}@organization.com`,
       role,
+      accessLevel: role === 'Admin' || role === 'Leadership' ? 'ADMINISTRATOR' : 'USER',
     };
     setCurrentUser(matched);
   };
@@ -392,7 +566,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
-  // Stage Progression with Pre-Submission Validation Gating (FR-008, FR-009, FR-016)
+  // Stage Progression with Pre-Submission Validation Gating
   const advanceRecordStage = (
     recordId: string,
     newStage: CredentialingStage,
@@ -431,10 +605,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     let nextFollowUpDate = record.nextFollowUpDate;
-    // When submitted, automatically schedule follow-up according to payer cadence (FR-017)
     if (newStage === 'Application Submitted') {
       const cadenceDays = payer?.followUpCadenceDays || 7;
-      nextFollowUpDate = addBusinessDays(dates?.submissionDate || todayStr, cadenceCadenceDays(cadenceDays));
+      nextFollowUpDate = addBusinessDays(dates?.submissionDate || todayStr, cadenceDays > 0 ? cadenceDays : 7);
     }
 
     let linkingStatus = record.linkingStatus;
@@ -462,11 +635,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     return { success: true };
   };
 
-  function cadenceCadenceDays(cadence: number): number {
-    return cadence > 0 ? cadence : 7;
-  }
-
-  // Log Follow-up & Automated Escalation (FR-017, FR-018, FR-019)
+  // Log Follow-up & Automated Escalation
   const logFollowUp = (
     recordId: string,
     followUp: Omit<FollowUpEntry, 'id' | 'specialistId' | 'specialistName'>
@@ -591,7 +760,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
-  // Provider Linking Update (FR-014)
+  // Provider Linking Update
   const updateProviderLinking = (recordId: string, status: LinkingStatus, linkEffectiveDate?: string, notes?: string) => {
     const record = records.find((r) => r.id === recordId);
     if (!record) return;
@@ -626,6 +795,20 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       updatedAt: new Date().toISOString().split('T')[0],
     };
     setProviders((prev) => [newProvider, ...prev]);
+
+    // Send notification
+    const newNotif: SystemNotification = {
+      id: `notif-${Date.now()}`,
+      type: 'MISSING_DOCS',
+      title: `Provider Added: ${newProvider.firstName} ${newProvider.lastName}`,
+      message: `${newProvider.providerType} (${newProvider.disciplines.join(', ')}) registered in Master Directory.`,
+      timestamp: new Date().toLocaleString(),
+      providerId: newProvider.id,
+      severity: 'info',
+      isRead: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+
     return newProvider;
   };
 
@@ -731,7 +914,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       // Needs Action
       if (filters.needsActionOnly && !['Additional Documents Requested', 'Correction Required', 'Recredentialing Due', 'Overdue', 'Intake', 'Documents Pending'].includes(rec.stage)) return false;
 
-      // Linking Pending Only (FR-014)
+      // Linking Pending Only
       if (filters.linkingPendingOnly && rec.stage !== 'Linking Pending' && rec.linkingStatus !== 'Pending Approval') return false;
 
       return true;
@@ -750,11 +933,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     const linked = records.filter((r) => r.linkingStatus === 'Linked').length;
     const linkingPending = records.filter((r) => r.linkingStatus === 'Pending Approval' || r.stage === 'Linking Pending').length;
 
-    // SLA-001: 95% submitted within 5 business days of complete docs
     let submittedWithin5Days = 0;
     let totalEligibleSubmissions = 0;
-
-    // SLA-003: Credentialing cycle times
     let totalCycleTimeSum = 0;
     let cycleTimeCount = 0;
 
@@ -791,7 +971,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     const submissionEfficiencyRate = totalEligibleSubmissions > 0 ? Math.round((submittedWithin5Days / totalEligibleSubmissions) * 100) : 96;
     const avgCycleDays = cycleTimeCount > 0 ? Math.round(totalCycleTimeSum / cycleTimeCount) : 66;
 
-    // Follow-up compliance: Percentage of records not overdue
     const activeFollowUpEligible = records.filter((r) => ['Application Submitted', 'Payer Review', 'Linking Pending'].includes(r.stage));
     const compliantCount = activeFollowUpEligible.filter((r) => !r.isOverdue).length;
     const followUpComplianceRate = activeFollowUpEligible.length > 0 ? Math.round((compliantCount / activeFollowUpEligible.length) * 100) : 92;
@@ -810,7 +989,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       averageCredentialingCycleDays: avgCycleDays,
       submissionEfficiencyRate,
       followUpComplianceRate,
-      zeroExpiredSubmissionRate: 100, // strictly enforced by validation engine
+      zeroExpiredSubmissionRate: 100,
       agingBuckets,
     };
   };
@@ -824,26 +1003,84 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem('cred_locations');
     localStorage.removeItem('cred_records');
     localStorage.removeItem('cred_notifications');
+    localStorage.removeItem('cred_accounts');
     setProviders(INITIAL_PROVIDERS);
     setPayers(INITIAL_PAYERS);
     setEntities(INITIAL_LEGAL_ENTITIES);
     setLocations(INITIAL_LOCATIONS);
     setRecords(INITIAL_CREDENTIALING_RECORDS);
     setNotifications(INITIAL_NOTIFICATIONS);
+    setAccounts(INITIAL_ACCOUNTS);
+    setCurrentAccount(INITIAL_ACCOUNTS[0]);
   };
 
-  const importBulkData = (importedRecords: CredentialingRecord[], importedProviders?: Provider[]) => {
+  const importBulkData = (
+    importedRecords: CredentialingRecord[], 
+    importedProviders?: Provider[],
+    importedPayers?: Payer[],
+    importedLocations?: Location[]
+  ) => {
     if (importedProviders && importedProviders.length > 0) {
-      setProviders((prev) => [...importedProviders, ...prev]);
+      setProviders((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newOnes = importedProviders.filter((p) => !existingIds.has(p.id));
+        const updated = prev.map((p) => {
+          const match = importedProviders.find((ip) => ip.id === p.id || ip.npi === p.npi);
+          return match ? { ...p, ...match } : p;
+        });
+        return [...newOnes, ...updated];
+      });
     }
+
+    if (importedPayers && importedPayers.length > 0) {
+      setPayers((prev) => {
+        const existingNames = new Set(prev.map((p) => p.name.toLowerCase()));
+        const newOnes = importedPayers.filter((p) => !existingNames.has(p.name.toLowerCase()));
+        return [...prev, ...newOnes];
+      });
+    }
+
+    if (importedLocations && importedLocations.length > 0) {
+      setLocations((prev) => [...prev, ...importedLocations]);
+    }
+
     if (importedRecords && importedRecords.length > 0) {
-      setRecords((prev) => [...importedRecords, ...prev]);
+      setRecords((prev) => {
+        const existingIds = new Set(prev.map((r) => r.id));
+        const newOnes = importedRecords.filter((r) => !existingIds.has(r.id));
+        const updated = prev.map((r) => {
+          const match = importedRecords.find((ir) => ir.id === r.id);
+          return match ? { ...r, ...match } : r;
+        });
+        return [...newOnes, ...updated];
+      });
     }
+
+    // Add notification about successful bulk import
+    const notif: SystemNotification = {
+      id: `notif-imp-${Date.now()}`,
+      type: 'APPROVAL_RECEIVED',
+      title: 'Spreadsheet Ingestion Complete',
+      message: `Successfully imported ${importedRecords.length} records and ${importedProviders?.length || 0} providers from Excel.`,
+      timestamp: new Date().toLocaleString(),
+      severity: 'success',
+      isRead: false,
+    };
+    setNotifications((prev) => [notif, ...prev]);
   };
 
   return (
     <CredentialingContext.Provider
       value={{
+        accounts,
+        currentAccount,
+        isAdmin,
+        login,
+        logout,
+        createAccount,
+        updateAccount,
+        deleteAccount,
+        switchAccount,
         providers,
         payers,
         entities,
@@ -901,3 +1138,4 @@ export const useCredentialing = () => {
   }
   return context;
 };
+

@@ -13,10 +13,12 @@ import { NotificationDrawer } from './components/notifications/NotificationDrawe
 import { NewApplicationModal } from './components/modals/NewApplicationModal';
 import { DataImportModal } from './components/admin/DataImportModal';
 import { SystemConfigModal } from './components/admin/SystemConfigModal';
+import { AuthModal } from './components/auth/AuthModal';
+import { UserManagementModal } from './components/admin/UserManagementModal';
 import { Discipline } from './types';
 
 const MainApp: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tracker' | 'linking' | 'providers' | 'payers' | 'entities' | 'reports'>('dashboard');
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
@@ -25,8 +27,10 @@ const MainApp: React.FC = () => {
   const [isNewAppModalOpen, setIsNewAppModalOpen] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState<boolean>(false);
 
-  const { setFilters } = useCredentialing();
+  const { setFilters, currentAccount } = useCredentialing();
 
   const handleSelectRecord = (recordId: string) => {
     setSelectedRecordId(recordId);
@@ -48,16 +52,24 @@ const MainApp: React.FC = () => {
     setActiveTab('linking');
   };
 
+  const handleOpenAddProvider = () => {
+    setSelectedProviderId(null);
+    setActiveTab('providers');
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans antialiased text-slate-800 selection:bg-sky-500 selection:text-white">
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans antialiased text-slate-800 selection:bg-[#2B4C9D] selection:text-white">
       {/* Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenNotifications={() => setIsNotificationOpen(true)}
         onOpenNewApplication={() => setIsNewAppModalOpen(true)}
-        onOpenImport={() => setIsImportModalOpen(true)}
-        onOpenConfig={() => setIsConfigModalOpen(true)}
+        onOpenAddProvider={handleOpenAddProvider}
+        onOpenNotificationDrawer={() => setIsNotificationOpen(true)}
+        onOpenImportModal={() => setIsImportModalOpen(true)}
+        onOpenConfigModal={() => setIsConfigModalOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenUserManagementModal={() => setIsUserManagementOpen(true)}
       />
 
       {/* Main Container */}
@@ -68,6 +80,9 @@ const MainApp: React.FC = () => {
             onSelectProvider={handleSelectProvider}
             onNavigateToTracker={handleNavigateToTracker}
             onNavigateToLinking={handleNavigateToLinking}
+            onOpenImportModal={() => setIsImportModalOpen(true)}
+            onOpenUserManagementModal={() => setIsUserManagementOpen(true)}
+            onOpenAddProvider={handleOpenAddProvider}
           />
         )}
 
@@ -131,16 +146,28 @@ const MainApp: React.FC = () => {
         onSelectRecord={handleSelectRecord}
       />
 
-      {/* Data Import Modal (FR-028) */}
+      {/* Data Import Modal (Excel .xlsx / CSV parser) */}
       <DataImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
       />
 
-      {/* System Configuration Modal (FR-027, FR-031) */}
+      {/* System Configuration Modal */}
       <SystemConfigModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
+      />
+
+      {/* Auth / Account Switch Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+
+      {/* User & Provider Access Management Modal (Admin) */}
+      <UserManagementModal
+        isOpen={isUserManagementOpen}
+        onClose={() => setIsUserManagementOpen(false)}
       />
     </div>
   );

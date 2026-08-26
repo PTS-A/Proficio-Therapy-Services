@@ -1,11 +1,83 @@
-import { CredentialingRecord, LegalEntity, Location, Payer, Provider, SystemNotification, User } from '../types';
+import { AppAccount, CredentialingRecord, LegalEntity, Location, Payer, Provider, SystemNotification, User } from '../types';
+
+export const INITIAL_ACCOUNTS: AppAccount[] = [
+  {
+    id: 'acc-admin-demo',
+    name: 'Proficio Administrator',
+    email: 'demo@proficiotherapy.com',
+    password: 'proficio',
+    accessLevel: 'ADMINISTRATOR',
+    roleTitle: 'Director of Credentialing & Operations',
+    department: 'Proficio Therapy & EdTheory Healthcare Hub',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-01-01',
+    lastLogin: '2026-08-26',
+  },
+  {
+    id: 'acc-user-sanjay',
+    name: 'Sanjay Tom',
+    email: 'sanjay.tom@ageslearningsolutions.com',
+    password: 'user123',
+    accessLevel: 'USER',
+    roleTitle: 'Credentialing Specialist (ABA & Speech)',
+    department: 'Ages Learning Solutions LLC',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-01-15',
+    lastLogin: '2026-08-25',
+  },
+  {
+    id: 'acc-admin-namitha',
+    name: 'Namitha Narayanan',
+    email: 'namitha.narayanan@ageslearningsolutions.com',
+    password: 'proficioadmin',
+    accessLevel: 'ADMINISTRATOR',
+    roleTitle: 'Credentialing Operations Manager',
+    department: 'Centralized Credentialing Hub',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-01-10',
+    lastLogin: '2026-08-26',
+  },
+  {
+    id: 'acc-user-elena',
+    name: 'Elena Rostova',
+    email: 'elena.rostova@proficiotherapy.com',
+    password: 'user123',
+    accessLevel: 'USER',
+    roleTitle: 'Enrollment Coordinator (Speech & OT)',
+    department: 'Proficio Speech Therapy Services',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-02-01',
+    lastLogin: '2026-08-24',
+  },
+  {
+    id: 'acc-user-sarah',
+    name: 'Sarah Jenkins',
+    email: 'sarah.jenkins@childsplaytherapy.com',
+    password: 'user123',
+    accessLevel: 'USER',
+    roleTitle: 'Clinical Credentialing Associate',
+    department: "Child's Play Therapy Services",
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-02-10',
+    lastLogin: '2026-08-22',
+  },
+];
 
 export const INITIAL_USERS: User[] = [
+  {
+    id: 'acc-admin-demo',
+    name: 'Proficio Administrator',
+    email: 'demo@proficiotherapy.com',
+    role: 'Admin',
+    accessLevel: 'ADMINISTRATOR',
+    assignedDisciplines: ['ABA', 'Speech', 'OT'],
+  },
   {
     id: 'usr-1',
     name: 'Sanjay Tom',
     email: 'sanjay.tom@ageslearningsolutions.com',
     role: 'Specialist',
+    accessLevel: 'USER',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
   {
@@ -13,6 +85,7 @@ export const INITIAL_USERS: User[] = [
     name: 'Namitha Narayanan',
     email: 'namitha.narayanan@ageslearningsolutions.com',
     role: 'Manager',
+    accessLevel: 'ADMINISTRATOR',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
   {
@@ -20,6 +93,7 @@ export const INITIAL_USERS: User[] = [
     name: 'Marcus Vance',
     email: 'marcus.vance@leadership.org',
     role: 'Leadership',
+    accessLevel: 'ADMINISTRATOR',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
   {
@@ -27,6 +101,7 @@ export const INITIAL_USERS: User[] = [
     name: 'Elena Rostova',
     email: 'elena.rostova@proficiotherapy.com',
     role: 'Specialist',
+    accessLevel: 'USER',
     assignedDisciplines: ['Speech', 'OT'],
   },
   {
@@ -34,6 +109,7 @@ export const INITIAL_USERS: User[] = [
     name: 'Sarah Jenkins',
     email: 'sarah.jenkins@childsplaytherapy.com',
     role: 'Admin',
+    accessLevel: 'USER',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
   {
@@ -41,6 +117,7 @@ export const INITIAL_USERS: User[] = [
     name: 'David Chen',
     email: 'david.chen@ageslearningsolutions.com',
     role: 'Operations',
+    accessLevel: 'USER',
   },
 ];
 

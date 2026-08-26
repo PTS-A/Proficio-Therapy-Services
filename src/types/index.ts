@@ -1,3 +1,5 @@
+export type AccessLevel = 'ADMINISTRATOR' | 'USER';
+
 export type UserRole = 
   | 'Specialist' 
   | 'Manager' 
@@ -8,11 +10,25 @@ export type UserRole =
   | 'Billing' 
   | 'Clinical';
 
+export interface AppAccount {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  accessLevel: AccessLevel;
+  roleTitle?: string;
+  department?: string;
+  avatar?: string;
+  createdAt: string;
+  lastLogin?: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  accessLevel?: AccessLevel;
   avatar?: string;
   assignedDisciplines?: Discipline[];
   assignedEntities?: string[];

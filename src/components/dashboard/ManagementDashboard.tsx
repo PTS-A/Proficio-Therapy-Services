@@ -31,7 +31,15 @@ import {
   UserCheck, 
   Users,
   Activity,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Database,
+  UserCog,
+  ShieldCheck,
+  FileSpreadsheet,
+  Plus,
+  HelpCircle,
+  X
 } from 'lucide-react';
 import { Discipline } from '../../types';
 
@@ -40,6 +48,9 @@ interface ManagementDashboardProps {
   onSelectProvider: (providerId: string) => void;
   onNavigateToTracker: (discipline?: Discipline) => void;
   onNavigateToLinking: () => void;
+  onOpenImportModal?: () => void;
+  onOpenUserManagementModal?: () => void;
+  onOpenAddProvider?: () => void;
 }
 
 export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
@@ -47,9 +58,25 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   onSelectProvider,
   onNavigateToTracker,
   onNavigateToLinking,
+  onOpenImportModal,
+  onOpenUserManagementModal,
+  onOpenAddProvider,
 }) => {
-  const { kpis, records, providers, payers, entities, locations, currentUser, filters, setFilters } = useCredentialing();
+  const { 
+    kpis, 
+    records, 
+    providers, 
+    payers, 
+    entities, 
+    locations, 
+    currentUser, 
+    currentAccount, 
+    isAdmin, 
+    filters, 
+    setFilters 
+  } = useCredentialing();
   const [selectedDisciplineTab, setSelectedDisciplineTab] = useState<'All' | 'ABA' | 'Speech' | 'OT'>('All');
+  const [showDemoGuide, setShowDemoGuide] = useState(true);
 
   // Filter records based on selected discipline tab for dashboard breakdown
   const activeRecords = selectedDisciplineTab === 'All' 
@@ -228,6 +255,106 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Demo Account & System Showcase Banner (Interactive Guide) */}
+      {showDemoGuide && (
+        <div className="bg-white border-2 border-[#2B4C9D]/30 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-[#EEF2FF] text-[#2B4C9D] rounded-xl border border-[#2B4C9D]/20">
+                <Sparkles className="w-5 h-5 text-[#E86424]" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-sm font-black text-slate-900">
+                    Administrator Demo Showcase — How This System Works
+                  </h3>
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    Active Demo Account: {currentAccount?.email || 'demo@proficiotherapy.com'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  This system replaces fragmented Excel tracking sheets with an enterprise multi-entity credentialing hub.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowDemoGuide(false)}
+              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              title="Dismiss Guide"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+            {/* Feature 1: Two Access Levels */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center space-x-2 font-bold text-slate-900">
+                <ShieldCheck className="w-4 h-4 text-[#2B4C9D]" />
+                <span>1. Role-Based Access Control</span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                • <strong>ADMINISTRATOR:</strong> Full privileges to ADD, DELETE, MODIFY providers, import spreadsheets, and manage user accounts.<br />
+                • <strong>USER:</strong> Operational staff access to process applications and track follow-ups.
+              </p>
+              {onOpenUserManagementModal && isAdmin && (
+                <button
+                  type="button"
+                  onClick={onOpenUserManagementModal}
+                  className="mt-1 text-[11px] text-[#2B4C9D] font-bold hover:underline flex items-center space-x-1 cursor-pointer"
+                >
+                  <UserCog className="w-3.5 h-3.5" />
+                  <span>Open User Management</span>
+                </button>
+              )}
+            </div>
+
+            {/* Feature 2: Excel Bulk Ingestion */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center space-x-2 font-bold text-slate-900">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>2. Excel Spreadsheet Bulk Import</span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Upload legacy `.xlsx` or `.csv` files for <strong>Provider Rosters</strong>, <strong>Applications Trackers</strong>, and <strong>Payers</strong>. Automatic field mapping and validation gating.
+              </p>
+              {onOpenImportModal && (
+                <button
+                  type="button"
+                  onClick={onOpenImportModal}
+                  className="mt-1 text-[11px] text-emerald-700 font-bold hover:underline flex items-center space-x-1 cursor-pointer"
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>Launch Excel Ingestion Tool</span>
+                </button>
+              )}
+            </div>
+
+            {/* Feature 3: Provider Master & Gated Controls */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center space-x-2 font-bold text-slate-900">
+                <Users className="w-4 h-4 text-[#E86424]" />
+                <span>3. Provider Master & 360° Management</span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Add, modify, and delete clinical providers across <strong>ABA</strong>, <strong>Speech</strong>, and <strong>OT</strong>. Real-time NPPES NPI checks, CAQH attestation, and PAVE tracking.
+              </p>
+              {onOpenAddProvider && isAdmin && (
+                <button
+                  type="button"
+                  onClick={onOpenAddProvider}
+                  className="mt-1 text-[11px] text-[#E86424] font-bold hover:underline flex items-center space-x-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add New Provider Record</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Primary KPI Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">

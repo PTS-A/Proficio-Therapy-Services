@@ -217,7 +217,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-              <Layers className="w-5 h-5 text-sky-600" />
+              <Layers className="w-5 h-5 text-[#2B4C9D]" />
               <span>Provider × Payer Credentialing Pipeline</span>
             </h2>
             <p className="text-xs text-slate-500">
@@ -230,8 +230,8 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
             <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-md flex items-center space-x-1 transition-all ${
-                  viewMode === 'table' ? 'bg-white text-sky-700 shadow-xs font-bold' : 'text-slate-600'
+                className={`p-1.5 rounded-md flex items-center space-x-1 transition-all cursor-pointer ${
+                  viewMode === 'table' ? 'bg-white text-[#2B4C9D] shadow-xs font-bold' : 'text-slate-600'
                 }`}
                 title="Table View"
               >
@@ -240,8 +240,8 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`p-1.5 rounded-md flex items-center space-x-1 transition-all ${
-                  viewMode === 'kanban' ? 'bg-white text-sky-700 shadow-xs font-bold' : 'text-slate-600'
+                className={`p-1.5 rounded-md flex items-center space-x-1 transition-all cursor-pointer ${
+                  viewMode === 'kanban' ? 'bg-white text-[#2B4C9D] shadow-xs font-bold' : 'text-slate-600'
                 }`}
                 title="Kanban Board View"
               >
@@ -262,7 +262,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
             {/* New Application */}
             <button
               onClick={onOpenNewApplication}
-              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
+              className="bg-[#2B4C9D] hover:bg-[#223E80] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Application</span>

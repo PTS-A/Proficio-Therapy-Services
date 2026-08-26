@@ -56,16 +56,16 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     ? records 
     : records.filter((r) => r.discipline === selectedDisciplineTab);
 
-  // Aging Data for Recharts
+  // Aging Data for Recharts with Proficio Palette
   const agingChartData = [
-    { name: '0-30 Days', count: kpis.agingBuckets.under30, fill: '#0ea5e9' },
-    { name: '31-60 Days', count: kpis.agingBuckets.days31to60, fill: '#38bdf8' },
-    { name: '61-90 Days', count: kpis.agingBuckets.days61to90, fill: '#f59e0b' },
-    { name: '91-120 Days', count: kpis.agingBuckets.days91to120, fill: '#f97316' },
-    { name: '120+ Days', count: kpis.agingBuckets.over120, fill: '#ef4444' },
+    { name: '0-30 Days', count: kpis.agingBuckets.under30, fill: '#2B4C9D' },
+    { name: '31-60 Days', count: kpis.agingBuckets.days31to60, fill: '#00A651' },
+    { name: '61-90 Days', count: kpis.agingBuckets.days61to90, fill: '#F5A623' },
+    { name: '91-120 Days', count: kpis.agingBuckets.days91to120, fill: '#E86424' },
+    { name: '120+ Days', count: kpis.agingBuckets.over120, fill: '#DC2626' },
   ];
 
-  // Discipline Breakdown
+  // Discipline Breakdown with Proficio Color Accents
   const disciplineStats = [
     {
       discipline: 'ABA',
@@ -74,8 +74,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       approved: records.filter((r) => r.discipline === 'ABA' && ['Approved', 'Linked', 'Effective'].includes(r.stage)).length,
       inReview: records.filter((r) => r.discipline === 'ABA' && ['Application Submitted', 'Payer Review'].includes(r.stage)).length,
       overdue: records.filter((r) => r.discipline === 'ABA' && r.isOverdue).length,
-      color: 'from-sky-500 to-indigo-600',
-      badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
+      color: 'from-[#2B4C9D] to-[#1B3169]',
+      badgeColor: 'bg-[#EEF2FF] text-[#2B4C9D] border-[#2B4C9D]/20',
     },
     {
       discipline: 'Speech',
@@ -84,8 +84,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       approved: records.filter((r) => r.discipline === 'Speech' && ['Approved', 'Linked', 'Effective'].includes(r.stage)).length,
       inReview: records.filter((r) => r.discipline === 'Speech' && ['Application Submitted', 'Payer Review'].includes(r.stage)).length,
       overdue: records.filter((r) => r.discipline === 'Speech' && r.isOverdue).length,
-      color: 'from-teal-500 to-emerald-600',
-      badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
+      color: 'from-[#00A651] to-[#047857]',
+      badgeColor: 'bg-[#ECFDF5] text-[#00A651] border-[#00A651]/20',
     },
     {
       discipline: 'OT',
@@ -94,8 +94,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       approved: records.filter((r) => r.discipline === 'OT' && ['Approved', 'Linked', 'Effective'].includes(r.stage)).length,
       inReview: records.filter((r) => r.discipline === 'OT' && ['Application Submitted', 'Payer Review'].includes(r.stage)).length,
       overdue: records.filter((r) => r.discipline === 'OT' && r.isOverdue).length,
-      color: 'from-purple-500 to-indigo-600',
-      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+      color: 'from-[#E86424] to-[#C2410C]',
+      badgeColor: 'bg-[#FFF7ED] text-[#E86424] border-[#E86424]/20',
     },
   ];
 
@@ -111,19 +111,19 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   }));
 
   const STAGE_COLORS: Record<string, string> = {
-    'Intake': '#94a3b8',
-    'Documents Pending': '#cbd5e1',
-    'Documents Complete': '#60a5fa',
-    'Application Preparation': '#38bdf8',
-    'Application Submitted': '#0284c7',
-    'Payer Review': '#6366f1',
-    'Additional Documents Requested': '#f59e0b',
-    'Approved': '#10b981',
-    'Linking Pending': '#8b5cf6',
+    'Intake': '#94A3B8',
+    'Documents Pending': '#CBD5E1',
+    'Documents Complete': '#93C5FD',
+    'Application Preparation': '#60A5FA',
+    'Application Submitted': '#2B4C9D',
+    'Payer Review': '#1D4ED8',
+    'Additional Documents Requested': '#F5A623',
+    'Approved': '#00A651',
+    'Linking Pending': '#E86424',
     'Linked': '#059669',
     'Effective': '#047857',
-    'Recredentialing Due': '#ec4899',
-    'Overdue': '#ef4444',
+    'Recredentialing Due': '#D946EF',
+    'Overdue': '#DC2626',
   };
 
   // Top urgent action items
@@ -152,28 +152,28 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Welcome Banner & Scope Context */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-xl">
+      {/* Welcome Banner & Scope Context with Proficio Navy & Brand Accents */}
+      <div className="bg-gradient-to-r from-[#111E42] via-[#1B3169] to-[#2B4C9D] rounded-2xl p-6 text-white shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-500/20 text-sky-300 border border-sky-400/30">
-                FY2026 Executive Performance Dashboard
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-[#00A651]/20 text-[#00A651] border border-[#00A651]/40">
+                Proficio Therapy Executive Overview
               </span>
-              <span className="text-slate-400 text-xs">• Active Role: {currentUser.role}</span>
+              <span className="text-slate-300 text-xs">• Active Role: {currentUser.role}</span>
             </div>
-            <h2 className="text-2xl font-black mt-2 tracking-tight">
+            <h2 className="text-2xl font-black mt-2 tracking-tight text-white">
               Provider Credentialing & Payer Enrollment Oversight
             </h2>
-            <p className="text-sm text-slate-300 max-w-3xl mt-1 leading-relaxed">
-              Standardized lifecycle tracker across <strong>Ages Learning Solutions LLC</strong>, <strong>Proficio Speech Therapy</strong>, and <strong>Child's Play Therapy Services</strong> across 20+ payers.
+            <p className="text-sm text-slate-200 max-w-3xl mt-1 leading-relaxed">
+              Standardized lifecycle management across <strong>Proficio Therapy (EdTheory)</strong>, <strong>Ages Learning Solutions</strong>, and <strong>Child's Play Therapy Services</strong> for 20+ commercial & Medicaid health plans.
             </p>
           </div>
 
           <div className="flex items-center space-x-2 shrink-0">
             <button
               onClick={() => onNavigateToTracker()}
-              className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-sky-500/20 transition-all cursor-pointer"
+              className="bg-[#00A651] hover:bg-[#059669] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-[#00A651]/30 transition-all cursor-pointer"
             >
               <span>View Active Pipeline</span>
               <ArrowUpRight className="w-4 h-4" />

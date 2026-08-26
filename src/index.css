@@ -1,1 +1,59 @@
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    --proficio-blue: #2B4C9D;
+    --proficio-blue-hover: #223e80;
+    --proficio-blue-light: #EEF2FF;
+    --proficio-green: #00A651;
+    --proficio-green-light: #ECFDF5;
+    --proficio-orange: #E86424;
+    --proficio-orange-light: #FFF7ED;
+    --proficio-gold: #F5A623;
+    --proficio-gold-light: #FEFCE8;
+  }
+}
+
+/* Custom Proficio Brand Color Utilities */
+.bg-proficio-blue {
+  background-color: #2B4C9D;
+}
+.bg-proficio-blue-hover:hover {
+  background-color: #223E80;
+}
+.bg-proficio-blue-subtle {
+  background-color: #EEF2FF;
+}
+.text-proficio-blue {
+  color: #2B4C9D;
+}
+.border-proficio-blue {
+  border-color: #2B4C9D;
+}
+
+.bg-proficio-green {
+  background-color: #00A651;
+}
+.text-proficio-green {
+  color: #00A651;
+}
+.border-proficio-green {
+  border-color: #00A651;
+}
+
+.bg-proficio-orange {
+  background-color: #E86424;
+}
+.text-proficio-orange {
+  color: #E86424;
+}
+.border-proficio-orange {
+  border-color: #E86424;
+}
+
+.bg-proficio-gold {
+  background-color: #F5A623;
+}
+.text-proficio-gold {
+  color: #F5A623;
+}

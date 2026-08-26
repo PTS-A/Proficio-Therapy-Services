@@ -185,7 +185,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
 
         <button
           onClick={handleOpenAdd}
-          className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 shadow-xs cursor-pointer"
+          className="bg-[#2B4C9D] hover:bg-[#223E80] text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 shadow-xs cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Add New Provider</span>

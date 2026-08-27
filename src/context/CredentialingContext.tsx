@@ -332,9 +332,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       return { success: false, error: 'No account found with this email address.' };
     }
 
-    // If password provided, verify it (demo account password is "proficio")
+    // If password provided, verify it
     if (password && found.password && found.password !== password) {
-      return { success: false, error: 'Incorrect password. For demo admin, enter "proficio".' };
+      return { success: false, error: 'Incorrect password. Please check your password and try again.' };
     }
 
     const updated = {

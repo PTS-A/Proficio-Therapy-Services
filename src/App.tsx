@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CredentialingProvider, useCredentialing } from './context/CredentialingContext';
-import { Header } from './components/layout/Header';
+import { Header, ActiveTabType } from './components/layout/Header';
 import { ManagementDashboard } from './components/dashboard/ManagementDashboard';
 import { CredentialingTracker } from './components/tracker/CredentialingTracker';
 import { RecordDetailModal } from './components/tracker/RecordDetailModal';
@@ -11,26 +11,27 @@ import { LinkingContractingTracker } from './components/linking/LinkingContracti
 import { ReportsView } from './components/reports/ReportsView';
 import { NotificationDrawer } from './components/notifications/NotificationDrawer';
 import { NewApplicationModal } from './components/modals/NewApplicationModal';
-import { DataImportModal } from './components/admin/DataImportModal';
-import { SystemConfigModal } from './components/admin/SystemConfigModal';
-import { AuthModal } from './components/auth/AuthModal';
-import { UserManagementModal } from './components/admin/UserManagementModal';
+import { UserManagementView } from './components/admin/UserManagementView';
+import { DataImportView } from './components/admin/DataImportView';
+import { SystemConfigView } from './components/admin/SystemConfigView';
+import { LoginPage } from './components/auth/LoginPage';
 import { Discipline } from './types';
 
-const MainApp: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tracker' | 'linking' | 'providers' | 'payers' | 'entities' | 'reports'>('dashboard');
+const MainContent: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<ActiveTabType>('dashboard');
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
   // Modals & Drawers
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [isNewAppModalOpen, setIsNewAppModalOpen] = useState<boolean>(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [isUserManagementOpen, setIsUserManagementOpen] = useState<boolean>(false);
 
   const { setFilters, currentAccount } = useCredentialing();
+
+  // If user is not logged in, display the clean dedicated Login Page
+  if (!currentAccount) {
+    return <LoginPage />;
+  }
 
   const handleSelectRecord = (recordId: string) => {
     setSelectedRecordId(recordId);
@@ -58,65 +59,100 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans antialiased text-slate-800 selection:bg-[#2B4C9D] selection:text-white">
-      {/* Header */}
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased text-slate-800 selection:bg-[#2B4C9D] selection:text-white">
+      {/* Sleek Minimalist Header with Dropdown navigating directly to Subpages */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenNewApplication={() => setIsNewAppModalOpen(true)}
         onOpenAddProvider={handleOpenAddProvider}
         onOpenNotificationDrawer={() => setIsNotificationOpen(true)}
-        onOpenImportModal={() => setIsImportModalOpen(true)}
-        onOpenConfigModal={() => setIsConfigModalOpen(true)}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onOpenUserManagementModal={() => setIsUserManagementOpen(true)}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      {/* Main Subpage Container */}
+      <main className="flex-1 w-full pb-12">
         {activeTab === 'dashboard' && (
           <ManagementDashboard
             onSelectRecord={handleSelectRecord}
             onSelectProvider={handleSelectProvider}
             onNavigateToTracker={handleNavigateToTracker}
             onNavigateToLinking={handleNavigateToLinking}
-            onOpenImportModal={() => setIsImportModalOpen(true)}
-            onOpenUserManagementModal={() => setIsUserManagementOpen(true)}
+            onOpenImportModal={() => setActiveTab('import')}
+            onOpenUserManagementModal={() => setActiveTab('users')}
             onOpenAddProvider={handleOpenAddProvider}
           />
         )}
 
         {activeTab === 'tracker' && (
-          <CredentialingTracker
-            onSelectRecord={handleSelectRecord}
-            onOpenNewApplication={() => setIsNewAppModalOpen(true)}
-          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <CredentialingTracker
+              onSelectRecord={handleSelectRecord}
+              onOpenNewApplication={() => setIsNewAppModalOpen(true)}
+            />
+          </div>
         )}
 
         {activeTab === 'providers' && (
-          <ProviderMaster
-            onSelectRecord={handleSelectRecord}
-            selectedProviderId={selectedProviderId}
-            onClearSelectedProvider={() => setSelectedProviderId(null)}
-          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <ProviderMaster
+              onSelectRecord={handleSelectRecord}
+              selectedProviderId={selectedProviderId}
+              onClearSelectedProvider={() => setSelectedProviderId(null)}
+            />
+          </div>
         )}
 
         {activeTab === 'payers' && (
-          <PayerMaster
-            onSelectPayerApplications={(payerId) => {
-              setFilters((prev) => ({ ...prev, payerId }));
-              setActiveTab('tracker');
-            }}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <PayerMaster
+              onSelectPayerApplications={(payerId) => {
+                setFilters((prev) => ({ ...prev, payerId }));
+                setActiveTab('tracker');
+              }}
+            />
+          </div>
+        )}
+
+        {activeTab === 'entities' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <EntityLocationMaster />
+          </div>
+        )}
+
+        {activeTab === 'linking' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <LinkingContractingTracker onSelectRecord={handleSelectRecord} />
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <ReportsView />
+          </div>
+        )}
+
+        {/* Dedicated Subpage: User & Access Management */}
+        {activeTab === 'users' && (
+          <UserManagementView
+            onBackToDashboard={() => setActiveTab('dashboard')}
           />
         )}
 
-        {activeTab === 'entities' && <EntityLocationMaster />}
-
-        {activeTab === 'linking' && (
-          <LinkingContractingTracker onSelectRecord={handleSelectRecord} />
+        {/* Dedicated Subpage: Spreadsheet Bulk Ingestion */}
+        {activeTab === 'import' && (
+          <DataImportView
+            onBackToDashboard={() => setActiveTab('dashboard')}
+            onNavigateToTracker={() => setActiveTab('tracker')}
+            onNavigateToProviders={() => setActiveTab('providers')}
+          />
         )}
 
-        {activeTab === 'reports' && <ReportsView />}
+        {/* Dedicated Subpage: System Settings & SLA */}
+        {activeTab === 'settings' && (
+          <SystemConfigView
+            onBackToDashboard={() => setActiveTab('dashboard')}
+          />
+        )}
       </main>
 
       {/* Record Detail Workspace Modal */}
@@ -145,38 +181,16 @@ const MainApp: React.FC = () => {
         onClose={() => setIsNewAppModalOpen(false)}
         onSelectRecord={handleSelectRecord}
       />
-
-      {/* Data Import Modal (Excel .xlsx / CSV parser) */}
-      <DataImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-      />
-
-      {/* System Configuration Modal */}
-      <SystemConfigModal
-        isOpen={isConfigModalOpen}
-        onClose={() => setIsConfigModalOpen(false)}
-      />
-
-      {/* Auth / Account Switch Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-      />
-
-      {/* User & Provider Access Management Modal (Admin) */}
-      <UserManagementModal
-        isOpen={isUserManagementOpen}
-        onClose={() => setIsUserManagementOpen(false)}
-      />
     </div>
   );
 };
 
-export default function App() {
+export const App: React.FC = () => {
   return (
     <CredentialingProvider>
-      <MainApp />
+      <MainContent />
     </CredentialingProvider>
   );
-}
+};
+
+export default App;

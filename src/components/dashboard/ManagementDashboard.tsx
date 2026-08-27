@@ -42,7 +42,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     payers, 
     entities, 
     filters, 
-    setFilters 
+    setFilters,
+    currentAccount
   } = useCredentialing();
 
   const [selectedDisciplineTab, setSelectedDisciplineTab] = useState<'All' | 'ABA' | 'Speech' | 'OT'>('All');
@@ -120,16 +121,23 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     }
   };
 
+  const displayName = currentAccount?.name || 'User';
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Top Header & Discipline Filter */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Credentialing Overview
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Welcome, {displayName}
+            </h1>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-[#2B4C9D] border border-indigo-100">
+              {currentAccount?.accessLevel === 'ADMINISTRATOR' ? 'Administrator' : 'Specialist'}
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Monitor provider enrollment, payer turnaround times, and linking status.
+            Credentialing Overview &bull; Monitor provider enrollment, payer turnaround times, and linking status.
           </p>
         </div>
 

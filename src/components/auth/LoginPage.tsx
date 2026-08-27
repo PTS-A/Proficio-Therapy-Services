@@ -5,13 +5,16 @@ import {
   ArrowRight, 
   Eye, 
   EyeOff, 
-  AlertCircle
+  AlertCircle,
+  Clock,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import fullLogoImg from '../../assets/images/proficio_brand_logo_1787774889684.jpg';
 
 export const LoginPage: React.FC = () => {
-  const { login } = useCredentialing();
+  const { login, sessionTimeoutMessage } = useCredentialing();
   
   // Login Form State
   const [email, setEmail] = useState('');
@@ -30,6 +33,24 @@ export const LoginPage: React.FC = () => {
       const res = login(email, password);
       setIsLoading(false);
       if (!res.success) {
+        setError(res.error || 'Invalid email or password.');
+      }
+    }, 200);
+  };
+
+  const handleQuickFill = (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setError(null);
+  };
+
+  const handleDirectDemoLogin = (demoEmail: string, demoPass: string) => {
+    setError(null);
+    setIsLoading(true);
+    setTimeout(() => {
+      const res = login(demoEmail, demoPass);
+      setIsLoading(false);
+      if (!res.success) {
         setError(res.error || 'Invalid credentials');
       }
     }, 200);
@@ -37,9 +58,9 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md space-y-5">
         {/* Prominent Large Brand Image Header */}
-        <div className="text-center mb-8 flex flex-col items-center">
+        <div className="text-center flex flex-col items-center">
           <div className="p-4 sm:p-5 bg-white rounded-2xl shadow-xs border border-slate-200/90 w-full flex justify-center items-center">
             <img
               src={fullLogoImg}
@@ -50,14 +71,25 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
+        {/* 20-Minute Session Timeout Alert */}
+        {sessionTimeoutMessage && (
+          <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-2xl flex items-start space-x-2.5 text-xs text-amber-900 shadow-xs">
+            <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="font-bold">Session Timed Out</p>
+              <p className="text-amber-800 mt-0.5">{sessionTimeoutMessage}</p>
+            </div>
+          </div>
+        )}
+
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 sm:p-8 space-y-5">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Sign In
+              Sign In to Credentialing Hub
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Enter your credentials to access the credentialing management portal.
+              Enter your credentials to access the provider & payer tracking portal.
             </p>
           </div>
 
@@ -129,6 +161,57 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* Quick Demo Credentials Assistant */}
+          <div className="pt-4 border-t border-slate-100">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center space-x-1">
+              <UserCheck className="w-3.5 h-3.5 text-[#2B4C9D]" />
+              <span>Quick Login Accounts</span>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => handleDirectDemoLogin('admin@example.com', 'admin')}
+                className="p-2.5 bg-indigo-50/70 hover:bg-indigo-100/80 border border-indigo-200 hover:border-[#2B4C9D] rounded-xl text-left transition-colors cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-[#2B4C9D]">Clean Admin</p>
+                  <span className="text-[9px] bg-[#2B4C9D] text-white px-1 py-0.2 rounded font-bold">Skeleton</span>
+                </div>
+                <p className="text-[10px] text-slate-600 font-mono mt-0.5">admin@example.com</p>
+                <p className="text-[10px] text-slate-400">Pass: admin (No mock data)</p>
+                <p className="text-[10px] text-[#2B4C9D] font-semibold mt-1">1-Click Sign In &rarr;</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectDemoLogin('demo@proficiotherapy.com', 'proficio')}
+                className="p-2.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-[#2B4C9D] rounded-xl text-left transition-colors cursor-pointer"
+              >
+                <p className="text-xs font-bold text-slate-800">Sample Demo Admin</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">demo@proficiotherapy...</p>
+                <p className="text-[10px] text-slate-400">Pass: proficio (With mock data)</p>
+                <p className="text-[10px] text-[#2B4C9D] font-semibold mt-1">1-Click Sign In &rarr;</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectDemoLogin('sanjay.tom@ageslearningsolutions.com', 'user123')}
+                className="p-2.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-[#2B4C9D] rounded-xl text-left transition-colors cursor-pointer"
+              >
+                <p className="text-xs font-bold text-slate-800">Specialist User</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">sanjay.tom@ages...</p>
+                <p className="text-[10px] text-slate-400">Pass: user123</p>
+                <p className="text-[10px] text-[#2B4C9D] font-semibold mt-1">1-Click Sign In &rarr;</p>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Security & Inactivity Policy Note */}
+        <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-400">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>HIPAA compliant: 20-minute automatic inactivity logout</span>
         </div>
       </div>
     </div>

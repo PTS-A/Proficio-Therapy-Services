@@ -163,16 +163,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     const saved = localStorage.getItem('cred_accounts');
     if (saved) {
       try {
-        const parsed: AppAccount[] = JSON.parse(saved);
-        let list = [...parsed];
-        // Ensure both clean admin and demo admin accounts are always present
-        if (!list.some((a) => a.email.toLowerCase() === 'admin@example.com')) {
-          list = [INITIAL_ACCOUNTS[0], ...list];
+        const parsed = JSON.parse(saved);
+        // Ensure the demo admin account is always present
+        const hasDemo = parsed.some((a: AppAccount) => a.email.toLowerCase() === 'demo@proficiotherapy.com');
+        if (!hasDemo) {
+          return [INITIAL_ACCOUNTS[0], ...parsed];
         }
-        if (!list.some((a) => a.email.toLowerCase() === 'demo@proficiotherapy.com')) {
-          list = [...list, INITIAL_ACCOUNTS[1]];
-        }
-        return list;
+        return parsed;
       } catch (e) {
         return INITIAL_ACCOUNTS;
       }
@@ -189,11 +186,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number>(20 * 60);
   const lastActivityRef = React.useRef<number>(Date.now());
-
-  // Helper to determine if account uses clean skeleton data
-  const isSkeletonEmail = (email?: string | null) => {
-    return email?.toLowerCase() === 'admin@example.com';
-  };
 
   // Default page is the login page (currentAccount is null by default on fresh visit/timeout)
   const [currentAccount, setCurrentAccount] = useState<AppAccount | null>(() => {
@@ -215,17 +207,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [providers, setProviders] = useState<Provider[]>(() => {
-    const savedCurrent = localStorage.getItem('cred_current_account');
-    let email: string | null = null;
-    if (savedCurrent) {
-      try {
-        email = JSON.parse(savedCurrent)?.email;
-      } catch (e) {}
-    }
-    if (isSkeletonEmail(email)) {
-      const saved = localStorage.getItem('cred_providers_skeleton');
-      return saved ? JSON.parse(saved) : [];
-    }
     const saved = localStorage.getItem('cred_providers');
     return saved ? JSON.parse(saved) : INITIAL_PROVIDERS;
   });
@@ -246,17 +227,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [records, setRecords] = useState<CredentialingRecord[]>(() => {
-    const savedCurrent = localStorage.getItem('cred_current_account');
-    let email: string | null = null;
-    if (savedCurrent) {
-      try {
-        email = JSON.parse(savedCurrent)?.email;
-      } catch (e) {}
-    }
-    if (isSkeletonEmail(email)) {
-      const saved = localStorage.getItem('cred_records_skeleton');
-      return saved ? JSON.parse(saved) : [];
-    }
     const saved = localStorage.getItem('cred_records');
     return saved ? JSON.parse(saved) : INITIAL_CREDENTIALING_RECORDS;
   });
@@ -278,17 +248,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
-    const savedCurrent = localStorage.getItem('cred_current_account');
-    let email: string | null = null;
-    if (savedCurrent) {
-      try {
-        email = JSON.parse(savedCurrent)?.email;
-      } catch (e) {}
-    }
-    if (isSkeletonEmail(email)) {
-      const saved = localStorage.getItem('cred_notifications_skeleton');
-      return saved ? JSON.parse(saved) : [];
-    }
     const saved = localStorage.getItem('cred_notifications');
     return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
   });
@@ -305,7 +264,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const isAdmin = currentAccount?.accessLevel === 'ADMINISTRATOR';
 
-  // Sync to localStorage with workspace isolation for skeleton vs demo accounts
+  // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('cred_accounts', JSON.stringify(accounts));
   }, [accounts]);
@@ -319,12 +278,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentAccount]);
 
   useEffect(() => {
-    if (isSkeletonEmail(currentAccount?.email)) {
-      localStorage.setItem('cred_providers_skeleton', JSON.stringify(providers));
-    } else {
-      localStorage.setItem('cred_providers', JSON.stringify(providers));
-    }
-  }, [providers, currentAccount]);
+    localStorage.setItem('cred_providers', JSON.stringify(providers));
+  }, [providers]);
 
   useEffect(() => {
     localStorage.setItem('cred_payers', JSON.stringify(payers));
@@ -339,20 +294,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [locations]);
 
   useEffect(() => {
-    if (isSkeletonEmail(currentAccount?.email)) {
-      localStorage.setItem('cred_records_skeleton', JSON.stringify(records));
-    } else {
-      localStorage.setItem('cred_records', JSON.stringify(records));
-    }
-  }, [records, currentAccount]);
+    localStorage.setItem('cred_records', JSON.stringify(records));
+  }, [records]);
 
   useEffect(() => {
-    if (isSkeletonEmail(currentAccount?.email)) {
-      localStorage.setItem('cred_notifications_skeleton', JSON.stringify(notifications));
-    } else {
-      localStorage.setItem('cred_notifications', JSON.stringify(notifications));
-    }
-  }, [notifications, currentAccount]);
+    localStorage.setItem('cred_notifications', JSON.stringify(notifications));
+  }, [notifications]);
 
   // Sync currentUser with currentAccount changes
   useEffect(() => {
@@ -455,28 +402,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [currentAccount, SESSION_TIMEOUT_MS]);
 
-  const switchDataForAccount = (targetAccount: AppAccount) => {
-    if (isSkeletonEmail(targetAccount.email)) {
-      const savedProviders = localStorage.getItem('cred_providers_skeleton');
-      setProviders(savedProviders ? JSON.parse(savedProviders) : []);
-
-      const savedRecords = localStorage.getItem('cred_records_skeleton');
-      setRecords(savedRecords ? JSON.parse(savedRecords) : []);
-
-      const savedNotifications = localStorage.getItem('cred_notifications_skeleton');
-      setNotifications(savedNotifications ? JSON.parse(savedNotifications) : []);
-    } else {
-      const savedProviders = localStorage.getItem('cred_providers');
-      setProviders(savedProviders ? JSON.parse(savedProviders) : INITIAL_PROVIDERS);
-
-      const savedRecords = localStorage.getItem('cred_records');
-      setRecords(savedRecords ? JSON.parse(savedRecords) : INITIAL_CREDENTIALING_RECORDS);
-
-      const savedNotifications = localStorage.getItem('cred_notifications');
-      setNotifications(savedNotifications ? JSON.parse(savedNotifications) : INITIAL_NOTIFICATIONS);
-    }
-  };
-
   // Auth Operations
   const login = (email: string, password?: string): { success: boolean; error?: string } => {
     const cleanEmail = email.trim().toLowerCase();
@@ -496,7 +421,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       lastLogin: new Date().toISOString().split('T')[0],
     };
     setCurrentAccount(updated);
-    switchDataForAccount(updated);
     setAccounts((prev) => prev.map((a) => (a.id === found.id ? updated : a)));
 
     // Clear timeout reason & start new session activity timer
@@ -561,9 +485,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const deleteAccount = (id: string): { success: boolean; error?: string } => {
     const accToDelete = accounts.find((a) => a.id === id);
-    const cleanDelEmail = accToDelete?.email.toLowerCase();
-    if (cleanDelEmail === 'demo@proficiotherapy.com' || cleanDelEmail === 'admin@example.com') {
-      return { success: false, error: 'Primary system administrator accounts cannot be deleted.' };
+    if (accToDelete?.email.toLowerCase() === 'demo@proficiotherapy.com') {
+      return { success: false, error: 'The primary demo administrator account cannot be deleted.' };
     }
     if (currentAccount?.id === id) {
       return { success: false, error: 'Cannot delete the account currently logged in.' };
@@ -576,7 +499,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     const acc = accounts.find((a) => a.id === accountId);
     if (acc) {
       setCurrentAccount(acc);
-      switchDataForAccount(acc);
     }
   };
 

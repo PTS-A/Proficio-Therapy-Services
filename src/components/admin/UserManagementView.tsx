@@ -391,7 +391,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
             ) : (
               filteredAccounts.map((acc) => {
                 const isCurrent = currentAccount?.id === acc.id;
-                const isSystemAccount = acc.email.toLowerCase() === 'demo@proficiotherapy.com' || acc.email.toLowerCase() === 'admin@example.com';
+                const isDemoAccount = acc.email.toLowerCase() === 'demo@proficiotherapy.com';
 
                 return (
                   <div key={acc.id} className="p-4 sm:p-5 hover:bg-slate-50/60 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -444,7 +444,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
                         <span>Edit</span>
                       </button>
 
-                      {!isSystemAccount && !isCurrent && (
+                      {!isDemoAccount && !isCurrent && (
                         <>
                           {deleteConfirmId === acc.id ? (
                             <div className="flex items-center space-x-1 bg-rose-50 p-1 rounded-lg border border-rose-200">

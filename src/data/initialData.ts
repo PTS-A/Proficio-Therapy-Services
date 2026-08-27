@@ -2,18 +2,6 @@ import { AppAccount, CredentialingRecord, LegalEntity, Location, Payer, Provider
 
 export const INITIAL_ACCOUNTS: AppAccount[] = [
   {
-    id: 'acc-admin-clean',
-    name: 'Administrator',
-    email: 'admin@example.com',
-    password: 'admin',
-    accessLevel: 'ADMINISTRATOR',
-    roleTitle: 'System Administrator (Skeleton Workspace)',
-    department: 'Healthcare Operations & Credentialing',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-    createdAt: '2026-01-01',
-    lastLogin: '2026-08-26',
-  },
-  {
     id: 'acc-admin-demo',
     name: 'Proficio Administrator',
     email: 'demo@proficiotherapy.com',
@@ -76,14 +64,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
 ];
 
 export const INITIAL_USERS: User[] = [
-  {
-    id: 'acc-admin-clean',
-    name: 'Administrator',
-    email: 'admin@example.com',
-    role: 'Admin',
-    accessLevel: 'ADMINISTRATOR',
-    assignedDisciplines: ['ABA', 'Speech', 'OT'],
-  },
   {
     id: 'acc-admin-demo',
     name: 'Proficio Administrator',

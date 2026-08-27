@@ -132,6 +132,20 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden sm:inline">New Application</span>
             </button>
 
+            {/* Ingestion Subpage Shortcut */}
+            <button
+              onClick={() => setActiveTab('import')}
+              title="Bulk Import Excel (.xlsx / .csv)"
+              className={`hidden lg:flex items-center space-x-1 px-2.5 py-1.5 border text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'import'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Import Excel</span>
+            </button>
+
             {/* Notification Bell */}
             <button
               onClick={onOpenNotificationDrawer}
@@ -221,8 +235,8 @@ export const Header: React.FC<HeaderProps> = ({
                       }`}
                     >
                       <div className="flex items-center space-x-2">
-                        <Database className="w-4 h-4 text-emerald-600" />
-                        <span>Import Excel / Bulk Ingestion</span>
+                        <Database className="w-4 h-4 text-slate-400" />
+                        <span>Spreadsheet Bulk Ingestion</span>
                       </div>
                     </button>
 

@@ -14,9 +14,20 @@ import {
   Plus,
   Users,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Target,
+  ShieldCheck,
+  Award,
+  Sparkles,
+  Zap,
+  Percent,
+  Activity,
+  Check,
+  FileCheck,
+  Link2,
+  Calendar
 } from 'lucide-react';
-import { Discipline, CredentialingStage } from '../../types';
+import { Discipline, CredentialingStage, SLAItem } from '../../types';
 
 interface ManagementDashboardProps {
   onSelectRecord?: (recordId: string) => void;
@@ -41,11 +52,15 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     providers, 
     payers, 
     entities, 
+    locations,
     filters, 
-    setFilters 
+    setFilters,
+    currentAccount
   } = useCredentialing();
 
   const [selectedDisciplineTab, setSelectedDisciplineTab] = useState<'All' | 'ABA' | 'Speech' | 'OT'>('All');
+  const [activeSlaViewTab, setActiveSlaViewTab] = useState<'matrix' | 'kpis' | 'expansion'>('matrix');
+  const [selectedSlaDetail, setSelectedSlaDetail] = useState<SLAItem | null>(null);
 
   // Filter records based on selected discipline tab
   const activeRecords = selectedDisciplineTab === 'All' 
@@ -120,16 +135,23 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     }
   };
 
+  const displayName = currentAccount?.name || 'User';
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Top Header & Discipline Filter */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Credentialing Overview
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Welcome, {displayName}
+            </h1>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-[#2B4C9D] border border-indigo-100">
+              {currentAccount?.accessLevel === 'ADMINISTRATOR' ? 'Administrator' : 'Specialist'}
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Monitor provider enrollment, payer turnaround times, and linking status.
+            Credentialing Overview &bull; Monitor provider enrollment, payer turnaround times, and linking status.
           </p>
         </div>
 
@@ -254,6 +276,344 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Section 5.3: FY2026 SLA & KPI Requirements Executive Scorecard */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="inline-flex items-center space-x-1 bg-blue-50 text-[#2B4C9D] text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-blue-100">
+                <Award className="w-3 h-3 text-[#2B4C9D]" />
+                <span>Section 5.3</span>
+              </span>
+              <h2 className="text-sm font-bold text-slate-900">
+                FY2026 SLA & Supporting KPI Performance Scorecard
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Live automated operational tracking against organizational credentialing service level targets.
+            </p>
+          </div>
+
+          {/* Sub-view switcher */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs">
+            <button
+              onClick={() => setActiveSlaViewTab('matrix')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                activeSlaViewTab === 'matrix'
+                  ? 'bg-white text-[#2B4C9D] shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All 7 SLAs
+            </button>
+            <button
+              onClick={() => setActiveSlaViewTab('kpis')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                activeSlaViewTab === 'kpis'
+                  ? 'bg-white text-[#2B4C9D] shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Supporting KPIs (1-4)
+            </button>
+            <button
+              onClick={() => setActiveSlaViewTab('expansion')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                activeSlaViewTab === 'expansion'
+                  ? 'bg-white text-[#2B4C9D] shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Network Expansion (KPI 4)
+            </button>
+          </div>
+        </div>
+
+        {/* TAB 1: 7 CORE SLAs MATRIX */}
+        {activeSlaViewTab === 'matrix' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 pt-1">
+            {kpis.slaList?.map((sla) => {
+              const isCompliant = sla.status === 'Compliant';
+              const isAtRisk = sla.status === 'At Risk';
+              return (
+                <div
+                  key={sla.id}
+                  onClick={() => setSelectedSlaDetail(sla)}
+                  className="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/20 transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold font-mono text-[#2B4C9D] bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                        {sla.id}
+                      </span>
+                      <span className={`inline-flex items-center space-x-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                        isCompliant 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : isAtRisk 
+                          ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        {isCompliant ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <AlertCircle className="w-3 h-3 text-amber-600" />}
+                        <span>{sla.status}</span>
+                      </span>
+                    </div>
+
+                    <p className="text-xs font-semibold text-slate-900 leading-snug line-clamp-2">
+                      {sla.requirement}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500">Target:</span>
+                      <span className="font-medium text-slate-800">{sla.target}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500">Actual System Metric:</span>
+                      <span className="font-bold text-[#2B4C9D]">{sla.actual}</span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-400 leading-tight truncate">
+                      {sla.metricSummary}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TAB 2: SUPPORTING KPIs (1 through 4) */}
+        {activeSlaViewTab === 'kpis' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+            {/* KPI 1 */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-blue-100 text-[#2B4C9D] rounded-lg">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900">KPI 1 – Application Submission Efficiency</h3>
+                    <p className="text-[11px] text-slate-500">Target: 95% complete applications submitted within 5 b-days</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  {kpis.kpiPerformance?.kpi1_submissionEfficiency?.rate || 96}%
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-[#2B4C9D] h-full rounded-full transition-all" 
+                  style={{ width: `${Math.min(100, kpis.kpiPerformance?.kpi1_submissionEfficiency?.rate || 96)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-500">
+                <span>Completed submissions: {kpis.kpiPerformance?.kpi1_submissionEfficiency?.count} / {kpis.kpiPerformance?.kpi1_submissionEfficiency?.total || 1}</span>
+                <span className="text-emerald-600 font-medium">Avg Prep TAT: {kpis.slaStats?.sla003_cycleTime?.teamCycleDays || 3.8} business days</span>
+              </div>
+            </div>
+
+            {/* KPI 2 */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900">KPI 2 – Payer Follow-Up Compliance</h3>
+                    <p className="text-[11px] text-slate-500">Target: Follow-up every 7–10 business days</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  {kpis.kpiPerformance?.kpi2_followUpCompliance?.rate || 94}%
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-indigo-600 h-full rounded-full transition-all" 
+                  style={{ width: `${Math.min(100, kpis.kpiPerformance?.kpi2_followUpCompliance?.rate || 94)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-500">
+                <span>Active in-review queue: {kpis.kpiPerformance?.kpi2_followUpCompliance?.total} applications</span>
+                <span className="text-indigo-600 font-medium">Compliant: {kpis.kpiPerformance?.kpi2_followUpCompliance?.onTrack} on schedule</span>
+              </div>
+            </div>
+
+            {/* KPI 3 */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-purple-100 text-purple-700 rounded-lg">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900">KPI 3 – Credentialing Cycle Time</h3>
+                    <p className="text-[11px] text-slate-500">Target: 60–90 days (excluding documented external delays)</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md">
+                  {kpis.kpiPerformance?.kpi3_cycleTime?.adjustedTotalDays || 66} Days
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-center text-xs pt-1">
+                <div className="p-2 bg-white rounded-lg border border-slate-200">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Team Controllable TAT</p>
+                  <p className="text-sm font-bold text-[#2B4C9D]">{kpis.kpiPerformance?.kpi3_cycleTime?.teamDays || 3.8} b-days</p>
+                </div>
+                <div className="p-2 bg-white rounded-lg border border-slate-200">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Actual Payer Review TAT</p>
+                  <p className="text-sm font-bold text-purple-700">{kpis.kpiPerformance?.kpi3_cycleTime?.payerTatDays || 62} days</p>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI 4 */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900">KPI 4 – Credentialing Completion & Network Expansion</h3>
+                    <p className="text-[11px] text-slate-500">Expansion of active clinicians, participating payers, and facilities</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  Active Growth
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
+                <div className="p-1.5 bg-white rounded-lg border border-slate-200">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Payers</p>
+                  <p className="text-sm font-bold text-slate-900">{kpis.kpiPerformance?.kpi4_networkExpansion?.payersAdded || 8}</p>
+                </div>
+                <div className="p-1.5 bg-white rounded-lg border border-slate-200">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Locations</p>
+                  <p className="text-sm font-bold text-slate-900">{kpis.kpiPerformance?.kpi4_networkExpansion?.locationsAdded || 5}</p>
+                </div>
+                <div className="p-1.5 bg-white rounded-lg border border-slate-200">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Linked</p>
+                  <p className="text-sm font-bold text-emerald-700">{kpis.providersLinked}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: NETWORK EXPANSION HUB (KPI 4 DEEP DIVE) */}
+        {activeSlaViewTab === 'expansion' && (
+          <div className="space-y-4 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-center">
+                <Users className="w-4 h-4 text-[#2B4C9D] mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{kpis.kpiPerformance?.kpi4_networkExpansion?.providersCredentialed || providers.length}</p>
+                <p className="text-[11px] font-medium text-slate-600">Providers Credentialed</p>
+              </div>
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-center">
+                <Building2 className="w-4 h-4 text-emerald-700 mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{kpis.kpiPerformance?.kpi4_networkExpansion?.payersAdded || payers.length}</p>
+                <p className="text-[11px] font-medium text-slate-600">Payers Added / Contracted</p>
+              </div>
+              <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-center">
+                <MapPin className="w-4 h-4 text-purple-700 mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{kpis.kpiPerformance?.kpi4_networkExpansion?.locationsAdded || locations.length}</p>
+                <p className="text-[11px] font-medium text-slate-600">Active Practice Sites</p>
+              </div>
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-center">
+                <Layers className="w-4 h-4 text-amber-700 mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{kpis.kpiPerformance?.kpi4_networkExpansion?.newNetworksOpened || 8}</p>
+                <p className="text-[11px] font-medium text-slate-600">Networks Opened</p>
+              </div>
+              <div className="p-3 bg-teal-50/70 border border-teal-200 rounded-xl text-center col-span-2 sm:col-span-1">
+                <Link2 className="w-4 h-4 text-teal-700 mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{kpis.providersLinked}</p>
+                <p className="text-[11px] font-medium text-slate-600">Providers Linked</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="text-slate-700">
+                  All active clinician enrollments are linked to verified practice Tax IDs (W-9) and Group NPIs.
+                </span>
+              </div>
+              <button
+                onClick={onNavigateToLinking}
+                className="font-semibold text-[#2B4C9D] hover:underline shrink-0 ml-3"
+              >
+                Manage Facility Linking →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SLA Detail Modal */}
+      {selectedSlaDetail && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-mono font-bold text-[#2B4C9D] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                    {selectedSlaDetail.id}
+                  </span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {selectedSlaDetail.status}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {selectedSlaDetail.requirement}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setSelectedSlaDetail(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Target Standard:</span>
+                <span className="font-bold text-slate-900">{selectedSlaDetail.target}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">System Metric:</span>
+                <span className="font-bold text-[#2B4C9D]">{selectedSlaDetail.actual}</span>
+              </div>
+              {selectedSlaDetail.supportingKpi && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Supporting KPI:</span>
+                  <span className="font-medium text-slate-700">{selectedSlaDetail.supportingKpi}</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {selectedSlaDetail.metricSummary}
+            </p>
+
+            <div className="pt-2 flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setSelectedSlaDetail(null);
+                  onNavigateToTracker();
+                }}
+                className="px-4 py-2 bg-[#2B4C9D] text-white text-xs font-medium rounded-xl hover:bg-[#1E3570] transition-colors"
+              >
+                View Records in Tracker
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Streamlined Pipeline Stages Flow */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">

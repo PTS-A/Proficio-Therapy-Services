@@ -1,5 +1,15 @@
 export type AccessLevel = 'ADMINISTRATOR' | 'USER';
 
+export type SystemRole = 
+  | 'Credentialing Specialist'
+  | 'Credentialing Lead / Manager'
+  | 'Provider'
+  | 'HR/Operations'
+  | 'Clinical Team'
+  | 'Billing and Claims'
+  | 'Leadership / Management'
+  | 'System Administrator';
+
 export type UserRole = 
   | 'Specialist' 
   | 'Manager' 
@@ -16,11 +26,16 @@ export interface AppAccount {
   email: string;
   password?: string;
   accessLevel: AccessLevel;
+  systemRole?: SystemRole;
   roleTitle?: string;
   department?: string;
   avatar?: string;
   createdAt: string;
   lastLogin?: string;
+  assignedDisciplines?: Discipline[];
+  assignedEntities?: string[];
+  permissions?: string[];
+  status?: 'Active' | 'Inactive' | 'Pending Activation';
 }
 
 export interface User {
@@ -38,11 +53,13 @@ export type Discipline = 'ABA' | 'Speech' | 'OT';
 
 export type ProviderType = 
   | 'BCBA' 
-  | 'SLP' 
-  | 'OTR/L' 
-  | 'SLPA' 
-  | 'COTA' 
+  | 'BCaBA'
   | 'RBT' 
+  | 'ABA Therapist'
+  | 'SLP' 
+  | 'SLPA' 
+  | 'OTR/L' 
+  | 'COTA' 
   | 'Clinical Director';
 
 export type EmploymentStatus = 'Full-Time' | 'Part-Time' | 'Contractor' | 'Inactive';
@@ -56,13 +73,16 @@ export interface DocumentItem {
   name: string;
   type: 
     | 'State License'
+    | 'Board Certification'
+    | 'Degree / Diploma'
     | 'DEA Registration'
     | 'Malpractice Insurance / COI'
     | 'General Liability (GL)'
     | 'Workers Comp (WC)'
     | 'W-9 Form'
     | 'Curriculum Vitae (CV)'
-    | 'Board Certification'
+    | 'Government ID'
+    | 'Background Check / Fingerprinting'
     | 'Lease / Sublease Agreement'
     | 'Ownership / Control Disclosure'
     | 'Provider Agreement'
@@ -70,6 +90,7 @@ export interface DocumentItem {
     | 'Approval Letter'
     | 'Contract Document'
     | 'PAVE Proof'
+    | 'Medicaid Enrollment Proof'
     | 'Other';
   fileName: string;
   fileSize: string;
@@ -127,14 +148,18 @@ export interface Provider {
 
 export type PayerType = 
   | 'Commercial' 
+  | 'Commercial insurance'
+  | 'Medicaid'
+  | 'Medicaid / Medi-Cal'
   | 'Medicaid Managed Care'
+  | 'Regional'
+  | 'Regional / local health plans'
   | 'Regional Center / State'
+  | 'Network'
+  | 'Other behavioral health and therapy networks'
   | 'Tricare / Military'
   | 'Medicare Advantage'
-  | 'Medicaid' 
-  | 'Regional' 
   | 'Government' 
-  | 'Network' 
   | 'State program';
 
 export interface PayerContact {
@@ -229,17 +254,23 @@ export interface Location {
 export type PracticeLocation = Location;
 
 export type ApplicationType = 
+  | 'New provider credentialing'
   | 'Initial credentialing'
   | 'Recredentialing'
+  | 'Provider enrollment and participation'
   | 'Enrollment'
   | 'Re-enrollment'
   | 'Group addition'
   | 'Provider addition'
+  | 'Provider address / location additions'
   | 'Location addition'
   | 'Provider linking'
   | 'Contracting'
+  | 'Provider demographic updates'
   | 'Demographic update'
+  | 'Taxonomy updates'
   | 'Taxonomy update'
+  | 'Group affiliation and rendering provider enrollment'
   | 'Entity update';
 
 export type CredentialingStage = 
@@ -261,6 +292,27 @@ export type CredentialingStage =
   | 'Closed / Not Contracted'
   | 'Recredentialing Due'
   | 'Overdue';
+
+export type StageCategory = 
+  | 'Pre-Submission' 
+  | 'In-Review' 
+  | 'Approval & Linking' 
+  | 'Completed / Closed' 
+  | 'Maintenance / Alert';
+
+export interface StageConfig {
+  id: string;
+  name: CredentialingStage;
+  category: StageCategory;
+  description: string;
+  slaTurnaroundTargetDays?: number;
+  isSystemAssigned?: boolean;
+  isMandatory?: boolean;
+  order: number;
+  badgeColor: string;
+  isActive: boolean;
+  allowedNextStages?: CredentialingStage[];
+}
 
 export interface FollowUpEntry {
   id: string;
@@ -331,6 +383,7 @@ export interface CredentialingRecord {
   intakeDate: string;
   documentsRequestedDate?: string;
   documentsReceivedDate?: string;
+  documentsCompleteDate?: string;
   submissionDate?: string;
   targetTurnaroundDate?: string;
   approvalDate?: string;
@@ -339,19 +392,23 @@ export interface CredentialingRecord {
   revalidationDate?: string;
   expirationDate?: string;
   
-  // Follow-up Tracking
+  // Follow-up & Cycle Time Tracking (SLA-002, SLA-003)
   followUps: FollowUpEntry[];
   nextFollowUpDate?: string;
   lastFollowUpDate?: string;
   isOverdue: boolean;
   daysInCurrentStage: number;
   totalCycleDays: number;
+  teamCycleDays?: number; // Days from intake to submission (team controllable)
+  actualPayerTatDays?: number; // Days from submission to approval (payer controllable)
+  externalDelayDays?: number; // Delays outside team control (payer freeze, backlog)
+  externalDelayReason?: string;
   
-  // Checklist & Requirements
+  // Checklist & Requirements (SLA-005)
   checklist: ChecklistItem[];
   documents: DocumentItem[];
   
-  // Entity & DBA Validation Engine
+  // Entity & DBA Validation Engine (SLA-007)
   validationIssues: ValidationIssue[];
   validationOverridden?: {
     overriddenBy: string;
@@ -387,6 +444,105 @@ export interface CredentialingRecord {
   updatedAt: string;
 }
 
+export interface SLAItem {
+  id: 'SLA-001' | 'SLA-002' | 'SLA-003' | 'SLA-004' | 'SLA-005' | 'SLA-006' | 'SLA-007';
+  requirement: string;
+  target: string;
+  actual: string;
+  status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  metricSummary: string;
+  supportingKpi?: string;
+}
+
+export interface FY2026SLAStats {
+  sla001_submissionEfficiency: {
+    target: string;
+    actualRate: number;
+    eligibleSubmissions: number;
+    submittedWithin5Days: number;
+    status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  };
+  sla002_followUpCadence: {
+    target: string;
+    actualRate: number;
+    activeInReview: number;
+    compliantCount: number;
+    status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  };
+  sla003_cycleTime: {
+    target: string;
+    teamCycleDays: number;
+    actualPayerTatDays: number;
+    totalCycleDays: number;
+    excludedDelaysCount: number;
+    status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  };
+  sla004_trackingCoverage: {
+    target: string;
+    actualRate: number;
+    totalTracked: number;
+    totalRoster: number;
+    status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  };
+  sla005_preSubmissionDocCheck: {
+    target: string;
+    actualRate: number;
+    zeroMissingSubmitted: boolean;
+    blockedSubmissionsPrevented: number;
+    status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  };
+  sla006_approvalEffectiveDates: {
+    target: string;
+    actualRate: number;
+    totalApproved: number;
+    bothDatesRecorded: number;
+    status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  };
+  sla007_zeroExpiredSubmissions: {
+    target: string;
+    expiredSubmissionsCount: number;
+    actualRate: number;
+    status: 'Compliant' | 'At Risk' | 'Non-Compliant';
+  };
+}
+
+export interface KPIPerformanceStats {
+  kpi1_submissionEfficiency: {
+    title: string;
+    target: string;
+    rate: number;
+    count: number;
+    total: number;
+    status: 'Exceeding' | 'On Track' | 'Action Needed';
+  };
+  kpi2_followUpCompliance: {
+    title: string;
+    target: string;
+    rate: number;
+    onTrack: number;
+    total: number;
+    status: 'Exceeding' | 'On Track' | 'Action Needed';
+  };
+  kpi3_cycleTime: {
+    title: string;
+    target: string;
+    teamDays: number;
+    payerTatDays: number;
+    adjustedTotalDays: number;
+    status: 'Exceeding' | 'On Track' | 'Action Needed';
+  };
+  kpi4_networkExpansion: {
+    title: string;
+    target: string;
+    providersCredentialed: number;
+    payersAdded: number;
+    locationsAdded: number;
+    newNetworksOpened: number;
+    providersLinked: number;
+    status: 'Exceeding' | 'On Track' | 'Action Needed';
+  };
+}
+
 export interface KPIStats {
   totalProviders: number;
   totalApplications: number;
@@ -402,6 +558,9 @@ export interface KPIStats {
   submissionEfficiencyRate: number; // target 95%
   followUpComplianceRate: number; // target 95%
   zeroExpiredSubmissionRate: number; // target 100%
+  slaStats: FY2026SLAStats;
+  kpiPerformance: KPIPerformanceStats;
+  slaList: SLAItem[];
   agingBuckets: {
     under30: number;
     days31to60: number;

@@ -54,6 +54,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
     saveCurrentFilter,
     applySavedFilter,
     getFilteredRecords,
+    stageConfigs,
   } = useCredentialing();
 
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
@@ -62,10 +63,12 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
 
   const filteredRecords = getFilteredRecords();
 
-  const STAGES: CredentialingStage[] = [
+  const STAGES: CredentialingStage[] = stageConfigs?.map((s) => s.name) || [
     'Intake',
     'Documents Pending',
     'Documents Complete',
+    'CAQH Pending',
+    'PAVE Pending',
     'Application Preparation',
     'Application Submitted',
     'Payer Review',
@@ -76,6 +79,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
     'Linking Pending',
     'Linked',
     'Effective',
+    'Closed / Not Contracted',
     'Recredentialing Due',
     'Overdue',
   ];
@@ -96,11 +100,11 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
   ];
 
   const getStageBadge = (stage: CredentialingStage, isOverdue: boolean) => {
-    if (isOverdue) {
+    if (isOverdue || stage === 'Overdue') {
       return (
         <span className="inline-flex items-center space-x-1 bg-rose-100 text-rose-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-rose-200">
-          <ShieldAlert className="w-3 h-3" />
-          <span>Overdue Follow-up</span>
+          <ShieldAlert className="w-3 h-3 text-rose-700" />
+          <span>{stage === 'Overdue' ? 'Overdue' : 'Overdue Follow-up'}</span>
         </span>
       );
     }
@@ -111,22 +115,43 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
       case 'Effective':
         return (
           <span className="inline-flex items-center space-x-1 bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3" />
+            <CheckCircle2 className="w-3 h-3 text-emerald-700" />
             <span>{stage}</span>
           </span>
         );
       case 'Linking Pending':
         return (
           <span className="inline-flex items-center space-x-1 bg-purple-100 text-purple-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-purple-200">
-            <Link2 className="w-3 h-3" />
+            <Link2 className="w-3 h-3 text-purple-700" />
             <span>Linking Pending</span>
+          </span>
+        );
+      case 'CAQH Pending':
+        return (
+          <span className="inline-flex items-center space-x-1 bg-indigo-100 text-indigo-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+            <Layers className="w-3 h-3 text-indigo-700" />
+            <span>CAQH Pending</span>
+          </span>
+        );
+      case 'PAVE Pending':
+        return (
+          <span className="inline-flex items-center space-x-1 bg-violet-100 text-violet-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-violet-200">
+            <Layers className="w-3 h-3 text-violet-700" />
+            <span>PAVE Pending</span>
+          </span>
+        );
+      case 'Resubmitted':
+        return (
+          <span className="inline-flex items-center space-x-1 bg-indigo-100 text-indigo-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+            <Clock className="w-3 h-3 text-indigo-700" />
+            <span>Resubmitted</span>
           </span>
         );
       case 'Additional Documents Requested':
       case 'Correction Required':
         return (
           <span className="inline-flex items-center space-x-1 bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
-            <AlertTriangle className="w-3 h-3" />
+            <AlertTriangle className="w-3 h-3 text-amber-700" />
             <span>{stage}</span>
           </span>
         );
@@ -134,15 +159,21 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
       case 'Payer Review':
         return (
           <span className="inline-flex items-center space-x-1 bg-sky-100 text-sky-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-sky-200">
-            <Clock className="w-3 h-3" />
+            <Clock className="w-3 h-3 text-sky-700" />
             <span>{stage}</span>
           </span>
         );
       case 'Recredentialing Due':
         return (
           <span className="inline-flex items-center space-x-1 bg-pink-100 text-pink-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-pink-200">
-            <Calendar className="w-3 h-3" />
+            <Calendar className="w-3 h-3 text-pink-700" />
             <span>Recredentialing Due</span>
+          </span>
+        );
+      case 'Closed / Not Contracted':
+        return (
+          <span className="inline-flex items-center space-x-1 bg-slate-200 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-slate-300">
+            <span>Closed / Not Contracted</span>
           </span>
         );
       default:

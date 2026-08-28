@@ -13,13 +13,15 @@ import {
   Bell,
   Database,
   UserCog,
+  UserPlus,
   LogOut,
   ShieldCheck,
   User,
   BarChart3,
   Sliders,
   Settings,
-  Clock
+  Clock,
+  ListOrdered
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -31,6 +33,7 @@ export type ActiveTabType =
   | 'entities' 
   | 'reports'
   | 'users'
+  | 'new-user'
   | 'import'
   | 'settings';
 
@@ -83,6 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'providers' as const, label: 'Providers', icon: Users },
     { id: 'payers' as const, label: 'Payers', icon: MapPin },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
+    ...(isAdmin ? [{ id: 'new-user' as const, label: 'New User', icon: UserPlus }] : []),
   ];
 
   return (
@@ -130,20 +134,6 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Plus className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">New Application</span>
-            </button>
-
-            {/* Ingestion Subpage Shortcut */}
-            <button
-              onClick={() => setActiveTab('import')}
-              title="Bulk Import Excel (.xlsx / .csv)"
-              className={`hidden lg:flex items-center space-x-1 px-2.5 py-1.5 border text-xs font-medium rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'import'
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Import Excel</span>
             </button>
 
             {/* Notification Bell */}
@@ -212,15 +202,15 @@ export const Header: React.FC<HeaderProps> = ({
                       <button
                         onClick={() => {
                           setUserMenuOpen(false);
-                          setActiveTab('users');
+                          setActiveTab('new-user');
                         }}
                         className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
-                          activeTab === 'users' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                          activeTab === 'new-user' || activeTab === 'users' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
                         <div className="flex items-center space-x-2">
-                          <UserCog className="w-4 h-4 text-slate-400" />
-                          <span>User & Access Management</span>
+                          <UserPlus className="w-4 h-4 text-[#2B4C9D]" />
+                          <span>User Management & Permissions</span>
                         </div>
                       </button>
                     )}
@@ -235,8 +225,8 @@ export const Header: React.FC<HeaderProps> = ({
                       }`}
                     >
                       <div className="flex items-center space-x-2">
-                        <Database className="w-4 h-4 text-slate-400" />
-                        <span>Spreadsheet Bulk Ingestion</span>
+                        <Database className="w-4 h-4 text-emerald-600" />
+                        <span>Import Excel / Bulk Ingestion</span>
                       </div>
                     </button>
 
@@ -251,7 +241,7 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <div className="flex items-center space-x-2">
                         <Settings className="w-4 h-4 text-slate-400" />
-                        <span>System Settings & SLA</span>
+                        <span>System Settings & SLA Policies</span>
                       </div>
                     </button>
                   </div>

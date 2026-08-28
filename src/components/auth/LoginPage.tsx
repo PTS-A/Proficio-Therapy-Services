@@ -6,9 +6,7 @@ import {
   Eye, 
   EyeOff, 
   AlertCircle,
-  Clock,
-  ShieldCheck,
-  UserCheck
+  Clock
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import fullLogoImg from '../../assets/images/proficio_brand_logo_1787774889684.jpg';
@@ -34,24 +32,6 @@ export const LoginPage: React.FC = () => {
       setIsLoading(false);
       if (!res.success) {
         setError(res.error || 'Invalid email or password.');
-      }
-    }, 200);
-  };
-
-  const handleQuickFill = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError(null);
-  };
-
-  const handleDirectDemoLogin = (demoEmail: string, demoPass: string) => {
-    setError(null);
-    setIsLoading(true);
-    setTimeout(() => {
-      const res = login(demoEmail, demoPass);
-      setIsLoading(false);
-      if (!res.success) {
-        setError(res.error || 'Invalid credentials');
       }
     }, 200);
   };
@@ -161,41 +141,6 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials Assistant */}
-          <div className="pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center space-x-1">
-              <UserCheck className="w-3.5 h-3.5 text-[#2B4C9D]" />
-              <span>Quick Demo Accounts</span>
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDirectDemoLogin('demo@proficiotherapy.com', 'proficio')}
-                className="p-2.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-[#2B4C9D] rounded-xl text-left transition-colors cursor-pointer"
-              >
-                <p className="text-xs font-bold text-slate-800">Admin Account</p>
-                <p className="text-[10px] text-slate-500 font-mono">demo@proficiotherapy.com</p>
-                <p className="text-[10px] text-[#2B4C9D] font-semibold mt-1">1-Click Sign In &rarr;</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDirectDemoLogin('sanjay.tom@ageslearningsolutions.com', 'user123')}
-                className="p-2.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-[#2B4C9D] rounded-xl text-left transition-colors cursor-pointer"
-              >
-                <p className="text-xs font-bold text-slate-800">Specialist Account</p>
-                <p className="text-[10px] text-slate-500 font-mono">sanjay.tom@ages...</p>
-                <p className="text-[10px] text-[#2B4C9D] font-semibold mt-1">1-Click Sign In &rarr;</p>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Security & Inactivity Policy Note */}
-        <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-400">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>HIPAA compliant: 20-minute automatic inactivity logout</span>
         </div>
       </div>
     </div>

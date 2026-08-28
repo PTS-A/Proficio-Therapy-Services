@@ -12,6 +12,7 @@ import { ReportsView } from './components/reports/ReportsView';
 import { NotificationDrawer } from './components/notifications/NotificationDrawer';
 import { NewApplicationModal } from './components/modals/NewApplicationModal';
 import { UserManagementView } from './components/admin/UserManagementView';
+import { NewUserView } from './components/admin/NewUserView';
 import { DataImportView } from './components/admin/DataImportView';
 import { SystemConfigView } from './components/admin/SystemConfigView';
 import { LoginPage } from './components/auth/LoginPage';
@@ -131,9 +132,9 @@ const MainContent: React.FC = () => {
           </div>
         )}
 
-        {/* Dedicated Subpage: User & Access Management */}
-        {activeTab === 'users' && (
-          <UserManagementView
+        {/* Dedicated Subpage: User & Access Management / New User */}
+        {(activeTab === 'new-user' || activeTab === 'users') && (
+          <NewUserView
             onBackToDashboard={() => setActiveTab('dashboard')}
           />
         )}

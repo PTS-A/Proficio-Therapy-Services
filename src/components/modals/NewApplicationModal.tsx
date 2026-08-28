@@ -137,22 +137,25 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
 
           {/* Application Type */}
           <div>
-            <label className="font-bold text-slate-800">3. Application Type</label>
+            <label className="font-bold text-slate-800">3. Credentialing Activity / Application Type</label>
             <select
               value={applicationType}
               onChange={(e) => setApplicationType(e.target.value as ApplicationType)}
-              className="w-full mt-1.5 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              className="w-full mt-1.5 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
               required
             >
-              <option value="Initial credentialing">Initial credentialing</option>
-              <option value="Recredentialing">Recredentialing (Cycle)</option>
-              <option value="Enrollment">Enrollment / Contracting</option>
-              <option value="Group addition">Group addition</option>
-              <option value="Provider addition">Provider addition</option>
-              <option value="Location addition">Location addition</option>
-              <option value="Provider linking">Provider linking (FR-014)</option>
-              <option value="Demographic update">Demographic update</option>
-              <option value="Taxonomy update">Taxonomy update</option>
+              <optgroup label="Core Credentialing & Enrollment">
+                <option value="New provider credentialing">New provider credentialing</option>
+                <option value="Recredentialing">Recredentialing (24/36 mo cycle)</option>
+                <option value="Provider enrollment and participation">Provider enrollment and participation</option>
+                <option value="Provider linking">Provider linking (Rendering to Group NPI / Billing)</option>
+              </optgroup>
+              <optgroup label="Maintenance & Affiliations">
+                <option value="Provider demographic updates">Provider demographic updates</option>
+                <option value="Provider address / location additions">Provider address / location additions</option>
+                <option value="Taxonomy updates">Taxonomy updates</option>
+                <option value="Group affiliation and rendering provider enrollment">Group affiliation and rendering provider enrollment</option>
+              </optgroup>
             </select>
           </div>
 

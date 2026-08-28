@@ -336,10 +336,21 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                   <div className="text-slate-500 flex items-center justify-between">
                     <span>NPI (10-Digit)</span>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <a
+                      href={`https://npiregistry.cms.hhs.gov/search?number=${activeProvider.npi}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-sky-600 hover:text-sky-800 font-semibold underline flex items-center space-x-0.5"
+                      title="Verify NPI on official CMS NPPES Registry"
+                    >
+                      <span>Verify NPPES</span>
+                    </a>
                   </div>
                   <div className="font-mono font-bold text-slate-900 mt-1">{activeProvider.npi}</div>
-                  <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">NPPES Registry Verified</div>
+                  <div className="text-[10px] text-emerald-600 font-semibold mt-0.5 flex items-center space-x-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                    <span>NPPES Registry Verified</span>
+                  </div>
                 </div>
 
                 {/* CAQH ProView Status */}
@@ -520,13 +531,21 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                     onChange={(e) => setFormData({ ...formData, providerType: e.target.value as ProviderType })}
                     className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                   >
-                    <option value="BCBA">BCBA</option>
-                    <option value="SLP">SLP</option>
-                    <option value="OTR/L">OTR/L</option>
-                    <option value="SLPA">SLPA</option>
-                    <option value="COTA">COTA</option>
-                    <option value="RBT">RBT</option>
-                    <option value="Clinical Director">Clinical Director</option>
+                    <optgroup label="Applied Behavior Analysis (ABA)">
+                      <option value="BCBA">BCBA (Board Certified Behavior Analyst)</option>
+                      <option value="BCaBA">BCaBA (Board Certified Assistant Behavior Analyst)</option>
+                      <option value="RBT">RBT (Registered Behavior Technician)</option>
+                      <option value="ABA Therapist">ABA Therapist</option>
+                      <option value="Clinical Director">Clinical Director</option>
+                    </optgroup>
+                    <optgroup label="Speech-Language Pathology (Speech)">
+                      <option value="SLP">SLP (Speech-Language Pathologist)</option>
+                      <option value="SLPA">SLPA (Speech-Language Pathology Assistant)</option>
+                    </optgroup>
+                    <optgroup label="Occupational Therapy (OT)">
+                      <option value="OTR/L">OTR/L (Occupational Therapist, Registered/Licensed)</option>
+                      <option value="COTA">COTA (Certified Occupational Therapy Assistant)</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -565,6 +584,16 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
+                  <label className="font-semibold text-slate-700">Taxonomy Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 103K00000X"
+                    value={formData.taxonomy}
+                    onChange={(e) => setFormData({ ...formData, taxonomy: e.target.value })}
+                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                  />
+                </div>
+                <div>
                   <label className="font-semibold text-slate-700">CAQH ID</label>
                   <input
                     type="text"
@@ -586,6 +615,9 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                     <option value="Initial">Initial Draft</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700">PAVE / Medi-Cal Status</label>
                   <select
@@ -596,8 +628,20 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                     <option value="Approved">Approved</option>
                     <option value="Submitted">Submitted</option>
                     <option value="In Progress">In Progress</option>
+                    <option value="Additional Docs Requested">Additional Docs Requested</option>
+                    <option value="Returned">Returned for Corrections</option>
                     <option value="Not Required">Not Required</option>
                   </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700">Medicaid / Medi-Cal Provider ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 00A1234567"
+                    value={formData.medicaidId}
+                    onChange={(e) => setFormData({ ...formData, medicaidId: e.target.value })}
+                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                  />
                 </div>
               </div>
 

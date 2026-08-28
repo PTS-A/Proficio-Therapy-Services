@@ -406,7 +406,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                           <UserCog className="w-4 h-4" />
                         </button>
 
-                        {acc.email.toLowerCase() !== 'demo@proficiotherapy.com' && acc.id !== currentAccount?.id && (
+                        {acc.email.toLowerCase() !== 'demo@proficiotherapy.com' && acc.email.toLowerCase() !== 'admin@example.com' && acc.id !== currentAccount?.id && (
                           <button
                             onClick={() => setDeleteConfirmId(acc.id)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"

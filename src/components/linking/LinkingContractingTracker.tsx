@@ -53,10 +53,10 @@ export const LinkingContractingTracker: React.FC<LinkingContractingTrackerProps>
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
             <Link2 className="w-5 h-5 text-purple-600" />
-            <span>FR-014: Provider-to-Group Linking & FR-030: Contracting Oversight</span>
+            <span>Provider-to-Group Linking & Contracting Coordination</span>
           </h2>
           <p className="text-xs text-slate-500">
-            Ensure approved providers are formally linked to group NPIs and locations before releasing claims for billing.
+            Track rendering provider enrollment, group NPI affiliations, and master payer agreement readiness.
           </p>
         </div>
 
@@ -79,7 +79,7 @@ export const LinkingContractingTracker: React.FC<LinkingContractingTrackerProps>
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            Payer Master Contracts (FR-030)
+            Contracting Coordination ({payers.length})
           </button>
         </div>
       </div>
@@ -213,9 +213,19 @@ export const LinkingContractingTracker: React.FC<LinkingContractingTrackerProps>
         </div>
       )}
 
-      {/* TAB 2: PAYER MASTER CONTRACTING (FR-030) */}
+      {/* TAB 2: PAYER MASTER CONTRACTING & COORDINATION */}
       {activeTab === 'contracting' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-4">
+          <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-900 flex items-center justify-between">
+            <div>
+              <span className="font-bold">Contracting Coordination (Tracking Only):</span> Master agreements and fee schedules are monitored here for provider enrollment readiness. Contract negotiation and execution remain leadership responsibilities.
+            </div>
+            <span className="px-2 py-0.5 rounded bg-purple-200 text-purple-800 text-[10px] font-bold shrink-0 ml-3">
+              Section 3.2.4
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {payers.map((payer) => {
             const payerRecords = records.filter((r) => r.payerId === payer.id);
             return (
@@ -252,6 +262,7 @@ export const LinkingContractingTracker: React.FC<LinkingContractingTrackerProps>
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>

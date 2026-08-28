@@ -43,7 +43,7 @@ export const SystemConfigModal: React.FC<SystemConfigModalProps> = ({ isOpen, on
         <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Settings className="w-5 h-5 text-sky-400" />
-            <h3 className="text-sm font-bold">FR-027 & FR-031: System Configuration & SLA Policies</h3>
+            <h3 className="text-sm font-bold">System Configuration & SLA Policies</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
             <X className="w-5 h-5" />

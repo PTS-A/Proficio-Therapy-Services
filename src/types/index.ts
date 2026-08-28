@@ -106,8 +106,28 @@ export interface DocumentItem {
   notes?: string;
 }
 
+export interface ProviderContractInfo {
+  contractNumber?: string;
+  contractType?: 'Group Agreement' | 'Individual Agreement' | 'Amendment' | 'Fee-for-Service' | string;
+  feeScheduleTier?: string;
+  contractEffectiveDate?: string;
+  recredentialingCycleYears?: number;
+  notes?: string;
+}
+
+export interface ProviderPayerEnrollment {
+  payerId: string;
+  payerName: string;
+  status: 'In-Network' | 'Application In Progress' | 'Linked' | 'Pending Payer Review' | 'Re-credentialing' | 'Not Enrolled' | string;
+  effectiveDate?: string;
+  recredentialingDate?: string;
+  providerIdNumber?: string;
+  networkType?: string;
+}
+
 export interface Provider {
   id: string;
+  // 1. Basic Information
   npi: string;
   firstName: string;
   lastName: string;
@@ -116,19 +136,32 @@ export interface Provider {
   providerType: ProviderType;
   email: string;
   phone: string;
+  altPhone?: string;
+  contactAddress?: string;
   licenseNumber: string;
   licenseState: string;
   licenseExpiration: string;
   taxonomy: string;
   specialty: string;
-  employmentStatus: EmploymentStatus;
-  startDate: string;
+
+  // 2. Employment / Group Information
   entityIds: string[]; // Legal entities provider works under
-  locationIds: string[]; // Locations provider renders services at
-  renderingProviderInfo?: string;
+  primaryEntityId?: string;
+  dba?: string;
+  employmentStatus: EmploymentStatus;
+  contractStatus?: 'W-2 Full-Time' | 'W-2 Part-Time' | '1099 Contractor' | 'Independent Consultant' | string;
+  startDate: string;
   groupAffiliation?: string;
+  renderingProviderInfo?: string;
+
+  // 3. Location Information
+  primaryLocationId?: string;
+  locationIds: string[]; // Locations provider renders services at
+  additionalLocationIds?: string[];
+  serviceTypes?: ServiceType[];
+  locationEffectiveDate?: string;
   
-  // Credentialing Master fields
+  // 4. Credentialing Information
   caqhId: string;
   caqhStatus: CAQHStatus;
   lastAttestationDate?: string;
@@ -138,6 +171,10 @@ export interface Provider {
   npiVerified: boolean;
   npiVerificationDate?: string;
   nppesRecordMatch: boolean;
+  effectiveDate?: string;
+  recredentialingDate?: string;
+  contractInfo?: ProviderContractInfo;
+  payerEnrollments?: ProviderPayerEnrollment[];
   
   documents: DocumentItem[];
   notes?: string;
@@ -152,7 +189,9 @@ export type PayerType =
   | 'Medicaid'
   | 'Medicaid / Medi-Cal'
   | 'Medicaid Managed Care'
+  | 'Medicaid / Commercial'
   | 'Regional'
+  | 'Regional / Medicaid'
   | 'Regional / local health plans'
   | 'Regional Center / State'
   | 'Network'

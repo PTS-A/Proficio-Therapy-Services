@@ -90,7 +90,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold">Initiate Credentialing Application</h2>
-              <p className="text-xs text-slate-400">Section 5.4 Application Workflow Intake</p>
+              <p className="text-xs text-slate-400">Application Workflow Intake & Submission</p>
             </div>
           </div>
 

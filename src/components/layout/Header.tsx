@@ -241,7 +241,7 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <div className="flex items-center space-x-2">
                         <Settings className="w-4 h-4 text-slate-400" />
-                        <span>System Settings & SLA Policies</span>
+                        <span>System Settings & Configuration</span>
                       </div>
                     </button>
                   </div>

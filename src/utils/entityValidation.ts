@@ -30,7 +30,7 @@ export function validateCredentialingRecord(
         field: 'W-9 Form',
         severity: 'Error',
         description: `W-9 form is not on file for legal entity '${entity.legalName}'. Payer requires valid W-9 prior to submission.`,
-        ruleReference: 'Section 5.10: Entity/DBA Validation - Missing W-9',
+        ruleReference: 'Entity/DBA Validation - Missing W-9',
       });
     }
 
@@ -44,7 +44,7 @@ export function validateCredentialingRecord(
         field: 'General Liability Insurance',
         severity: 'Error',
         description: `General Liability insurance expired on ${glExpiry} for entity '${entity.legalName}'.`,
-        ruleReference: 'Section 5.10: Entity/DBA Validation - Expired GL Insurance',
+        ruleReference: 'Entity/DBA Validation - Expired GL Insurance',
       });
     }
 
@@ -58,7 +58,7 @@ export function validateCredentialingRecord(
         field: 'Workers Compensation Insurance',
         severity: 'Error',
         description: `Workers' Comp policy expired on ${wcExpiry} for entity '${entity.legalName}'.`,
-        ruleReference: 'Section 5.10: Entity/DBA Validation - Expired WC Insurance',
+        ruleReference: 'Entity/DBA Validation - Expired WC Insurance',
       });
     }
   }
@@ -71,7 +71,7 @@ export function validateCredentialingRecord(
         field: 'Location Legal Entity',
         severity: 'Error',
         description: `Location '${location.name}' is assigned to entity '${location.entityId}' but application is filed under '${entity.legalName}'.`,
-        ruleReference: 'Section 5.10: Entity/DBA Validation - Location Entity Mismatch',
+        ruleReference: 'Entity/DBA Validation - Location Entity Mismatch',
       });
     }
 
@@ -81,7 +81,7 @@ export function validateCredentialingRecord(
         field: 'Lease / Sublease Documentation',
         severity: 'Warning',
         description: `Missing active lease/sublease documentation for location '${location.name}'. Payers may issue RFI.`,
-        ruleReference: 'Section 5.10: Location Documentation - Lease Required',
+        ruleReference: 'Location Documentation - Lease Required',
       });
     } else if (location.leaseAgreementStatus === 'Expired' || (location.leaseExpiryDate && location.leaseExpiryDate < today)) {
       issues.push({
@@ -89,7 +89,7 @@ export function validateCredentialingRecord(
         field: 'Lease Agreement',
         severity: 'Error',
         description: `Lease for location '${location.name}' has expired. Valid proof of address required.`,
-        ruleReference: 'Section 5.10: Location Documentation - Expired Lease',
+        ruleReference: 'Location Documentation - Expired Lease',
       });
     }
   }
@@ -102,7 +102,7 @@ export function validateCredentialingRecord(
         field: 'State Professional License',
         severity: 'Error',
         description: `Provider's license (${provider.licenseNumber}) expired on ${provider.licenseExpiration}. Strictly forbidden to submit expired credentials.`,
-        ruleReference: 'SLA-007 / Section 5.10: Zero Providers Submitted with Expired Credentials',
+        ruleReference: 'Credential Compliance - Active License Required',
       });
     } else if (provider.licenseExpiration) {
       const expDate = new Date(provider.licenseExpiration);
@@ -114,7 +114,7 @@ export function validateCredentialingRecord(
           field: 'State Professional License',
           severity: 'Warning',
           description: `License expires in ${diffDays} days (${provider.licenseExpiration}). Payer credentialing may be delayed if not renewed.`,
-          ruleReference: 'Section 5.10: Credentials Expiration Alert',
+          ruleReference: 'Credentials Expiration Alert',
         });
       }
     }
@@ -126,7 +126,7 @@ export function validateCredentialingRecord(
         field: 'National Provider Identifier (NPI)',
         severity: 'Error',
         description: `Provider NPI '${provider.npi}' is not a valid 10-digit format.`,
-        ruleReference: 'FR-011: NPI Format & Verification',
+        ruleReference: 'NPI Format & Verification',
       });
     }
 
@@ -136,7 +136,7 @@ export function validateCredentialingRecord(
         field: 'NPI Registry Verification',
         severity: 'Warning',
         description: 'NPI has not been verified against NPPES registry.',
-        ruleReference: 'FR-011: NPI NPPES Verification',
+        ruleReference: 'NPI NPPES Verification',
       });
     }
 

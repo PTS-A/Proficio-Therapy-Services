@@ -72,7 +72,7 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
     addAuditEntry 
   } = useCredentialing();
 
-  const [activeConfigTab, setActiveConfigTab] = useState<'sla' | 'stages' | 'holidays' | 'templates' | 'retention-dr'>('sla');
+  const [activeConfigTab, setActiveConfigTab] = useState<'stages' | 'holidays' | 'templates' | 'retention-dr'>('stages');
   const [stageCategoryFilter, setStageCategoryFilter] = useState<string>('All');
   const [editingStage, setEditingStage] = useState<StageConfig | null>(null);
   const [showAddStageModal, setShowAddStageModal] = useState(false);
@@ -229,24 +229,13 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
               <span className="text-xs font-semibold text-[#2B4C9D]">System Configuration & Policies</span>
             </div>
             <h1 className="text-lg font-bold text-slate-900 mt-0.5">
-              System Settings, SLA Policies & Holiday Calendar
+              System Settings, Workflow Stages & Holiday Calendar
             </h1>
           </div>
         </div>
 
         {/* Subtab Selector */}
         <div className="flex flex-wrap items-center bg-slate-100 p-1.5 rounded-xl text-xs gap-1">
-          <button
-            type="button"
-            onClick={() => setActiveConfigTab('sla')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-              activeConfigTab === 'sla' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5 text-[#2B4C9D]" />
-            <span>SLA & Alerts</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setActiveConfigTab('stages')}
@@ -303,191 +292,6 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* SUBTAB 1: SLA & AUTOMATION POLICIES */}
-      {/* ========================================================= */}
-      {activeConfigTab === 'sla' && (
-        <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* SLA Target Thresholds Card */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
-            <div className="flex items-center space-x-2 pb-3 border-b border-slate-100">
-              <Clock className="w-4 h-4 text-[#2B4C9D]" />
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Operational SLA Thresholds
-              </h2>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-slate-700">Initial Submission SLA Target</label>
-                  <span className="font-mono font-bold text-[#2B4C9D] bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
-                    {slaSubmissionDays} Business Days
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mb-2">
-                  Target turnaround from document completion to active payer portal filing.
-                </p>
-                <input
-                  type="range"
-                  min={1}
-                  max={15}
-                  value={slaSubmissionDays}
-                  onChange={(e) => setSlaSubmissionDays(Number(e.target.value))}
-                  className="w-full accent-[#2B4C9D] cursor-pointer"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-slate-700">Payer Follow-up Cycle Cadence</label>
-                  <span className="font-mono font-bold text-[#2B4C9D] bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
-                    Every {slaFollowUpMinDays} - {slaFollowUpMaxDays} Days
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mb-2">
-                  Recommended frequency for credentialing specialists to contact payer reps for status checks.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-medium">Minimum Days:</span>
-                    <input
-                      type="number"
-                      min={3}
-                      max={14}
-                      value={slaFollowUpMinDays}
-                      onChange={(e) => setSlaFollowUpMinDays(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs mt-1"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-medium">Maximum Days:</span>
-                    <input
-                      type="number"
-                      min={7}
-                      max={30}
-                      value={slaFollowUpMaxDays}
-                      onChange={(e) => setSlaFollowUpMaxDays(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs mt-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-slate-700">CAQH ProView Re-attestation Cadence</label>
-                  <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                    {caqhReattestationDays} Days
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Standard industry standard mandate for re-certifying provider profiles on CAQH ProView.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-slate-700">License Expiration Advance Warning</label>
-                  <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    {licenseExpAdvanceAlertDays} Days Before
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Days in advance to flag state license renewals on provider rosters and dashboards.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Automation & Escalation Policies Card */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
-            <div className="flex items-center space-x-2 pb-3 border-b border-slate-100">
-              <Bell className="w-4 h-4 text-[#E86424]" />
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Alerts & Automated Policy Rules
-              </h2>
-            </div>
-
-            <div className="space-y-3.5 text-xs">
-              <div className="flex items-start space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                <input
-                  type="checkbox"
-                  id="autoAging"
-                  checked={autoReminderPayerAging}
-                  onChange={(e) => setAutoReminderPayerAging(e.target.checked)}
-                  className="mt-0.5 rounded text-[#2B4C9D] focus:ring-[#2B4C9D]"
-                />
-                <label htmlFor="autoAging" className="cursor-pointer">
-                  <span className="font-bold text-slate-800 block">Automatic Aging Escalation Alerts</span>
-                  <span className="text-[11px] text-slate-500">
-                    Automatically generate high-priority dashboard alerts when a payer application crosses 60+ days without determination.
-                  </span>
-                </label>
-              </div>
-
-              <div className="flex items-start space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                <input
-                  type="checkbox"
-                  id="autoEscalate"
-                  checked={autoEscalateOverdueFollowup}
-                  onChange={(e) => setAutoEscalateOverdueFollowup(e.target.checked)}
-                  className="mt-0.5 rounded text-[#2B4C9D] focus:ring-[#2B4C9D]"
-                />
-                <label htmlFor="autoEscalate" className="cursor-pointer">
-                  <span className="font-bold text-slate-800 block">Flag Overdue Follow-up Actions</span>
-                  <span className="text-[11px] text-slate-500">
-                    Highlight application rows in red when the scheduled follow-up date has lapsed.
-                  </span>
-                </label>
-              </div>
-
-              <div className="flex items-start space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                <input
-                  type="checkbox"
-                  id="nppesSync"
-                  checked={nppesAutoValidation}
-                  onChange={(e) => setNppesAutoValidation(e.target.checked)}
-                  className="mt-0.5 rounded text-[#2B4C9D] focus:ring-[#2B4C9D]"
-                />
-                <label htmlFor="nppesSync" className="cursor-pointer">
-                  <span className="font-bold text-slate-800 block">NPPES NPI Registry Auto-Validation</span>
-                  <span className="text-[11px] text-slate-500">
-                    Validate 10-digit NPIs and taxonomy codes against CMS NPPES Registry during provider intake.
-                  </span>
-                </label>
-              </div>
-
-              <div className="flex items-start space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                <input
-                  type="checkbox"
-                  id="dailySummary"
-                  checked={enableDailySummaryEmail}
-                  onChange={(e) => setEnableDailySummaryEmail(e.target.checked)}
-                  className="mt-0.5 rounded text-[#2B4C9D] focus:ring-[#2B4C9D]"
-                />
-                <label htmlFor="dailySummary" className="cursor-pointer">
-                  <span className="font-bold text-slate-800 block">Daily Executive Digest Email</span>
-                  <span className="text-[11px] text-slate-500">
-                    Dispatch a 9:00 AM summary of approvals, pending linking, and expiring documents to team administrators.
-                  </span>
-                </label>
-              </div>
-
-              <div className="pt-3">
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[#2B4C9D] hover:bg-[#203a7a] text-white text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center space-x-1.5 cursor-pointer"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save SLA & Policy Configurations</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </form>
       )}
 
       {/* ========================================================= */}

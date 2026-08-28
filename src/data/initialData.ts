@@ -445,7 +445,7 @@ export const INITIAL_PAYERS: Payer[] = [
   {
     id: 'pyr-alameda',
     name: 'Alameda Alliance',
-    type: 'Regional',
+    type: 'Regional / Medicaid',
     portalUrl: 'https://www.alamedaalliance.org',
     statesServed: ['CA (Alameda County)'],
     contacts: [{ id: 'c-7', name: 'Tanya Gomez', role: 'Provider Enrollment Lead', email: 'tgomez@alamedaalliance.org', phone: '(510) 747-4500' }],
@@ -459,7 +459,7 @@ export const INITIAL_PAYERS: Payer[] = [
   {
     id: 'pyr-cchp',
     name: 'CCHP (Chinese Community Health Plan)',
-    type: 'Regional',
+    type: 'Regional / Medicaid',
     portalUrl: 'https://www.cchphealthplan.com',
     statesServed: ['CA (San Francisco / San Mateo)'],
     contacts: [{ id: 'c-8', name: 'Wai Ling', role: 'Contracting Manager', email: 'wling@cchphealthplan.com', phone: '(415) 834-2100' }],
@@ -473,7 +473,7 @@ export const INITIAL_PAYERS: Payer[] = [
   {
     id: 'pyr-scfhp',
     name: 'SCFHP (Santa Clara Family Health Plan)',
-    type: 'Regional',
+    type: 'Regional / Medicaid',
     portalUrl: 'https://www.scfhp.com',
     statesServed: ['CA (Santa Clara County)'],
     contacts: [{ id: 'c-9', name: 'Carlos Mendez', role: 'Credentialing Coordinator', email: 'cmendez@scfhp.com', phone: '(408) 874-1788' }],
@@ -487,7 +487,7 @@ export const INITIAL_PAYERS: Payer[] = [
   {
     id: 'pyr-hpsm',
     name: 'HPSM (Health Plan of San Mateo)',
-    type: 'Regional',
+    type: 'Regional / Medicaid',
     portalUrl: 'https://www.hpsm.org',
     statesServed: ['CA (San Mateo County)'],
     contacts: [{ id: 'c-10', name: 'Jennifer Wong', role: 'Provider Network Liaison', email: 'jennifer.wong@hpsm.org', phone: '(650) 616-2106' }],
@@ -515,7 +515,7 @@ export const INITIAL_PAYERS: Payer[] = [
   {
     id: 'pyr-molina',
     name: 'Molina',
-    type: 'Medicaid',
+    type: 'Medicaid / Commercial',
     portalUrl: 'https://provider.molinahealthcare.com',
     statesServed: ['CA', 'UT', 'Nationwide'],
     contacts: [{ id: 'c-12', name: 'Patricia Ramos', role: 'Medicaid Credentialing Rep', email: 'patricia.ramos@molinahealthcare.com', phone: '(888) 562-5442' }],
@@ -643,6 +643,7 @@ export const INITIAL_PAYERS: Payer[] = [
 export const INITIAL_PROVIDERS: Provider[] = [
   {
     id: 'prv-1',
+    // Basic Information
     npi: '1487920193',
     firstName: 'Ashley',
     lastName: 'Vanderbilt',
@@ -651,17 +652,32 @@ export const INITIAL_PROVIDERS: Provider[] = [
     providerType: 'BCBA',
     email: 'ashley.vanderbilt@ageslearningsolutions.com',
     phone: '(408) 555-0129',
+    altPhone: '(408) 555-0130',
+    contactAddress: '2105 S Bascom Ave, Suite 150, San Jose, CA 95124',
     licenseNumber: 'LBA-CA-9021',
     licenseState: 'CA',
     licenseExpiration: '2027-05-31',
     taxonomy: '103K00000X (Behavior Analyst)',
     specialty: 'Pediatric Autism Spectrum & Early Intervention',
-    employmentStatus: 'Full-Time',
-    startDate: '2023-02-15',
+
+    // Employment / Group Information
     entityIds: ['ent-1'],
-    locationIds: ['loc-3', 'loc-4'],
-    renderingProviderInfo: 'Renders ABA clinical supervisory services & direct assessments.',
+    primaryEntityId: 'ent-1',
+    dba: 'AGES Learning Solutions',
+    employmentStatus: 'Full-Time',
+    contractStatus: 'W-2 Full-Time',
+    startDate: '2023-02-15',
     groupAffiliation: 'AGES Learning Solutions Clinical Group',
+    renderingProviderInfo: 'Renders ABA clinical supervisory services & direct assessments. Type 1 Rendering NPI under Group Type 2 NPI 1982736450.',
+
+    // Location Information
+    primaryLocationId: 'loc-3',
+    locationIds: ['loc-3', 'loc-4'],
+    additionalLocationIds: ['loc-4'],
+    serviceTypes: ['In-Clinic', 'In-Home', 'In-School', 'Telehealth'],
+    locationEffectiveDate: '2023-02-15',
+
+    // Credentialing Information
     caqhId: '18492011',
     caqhStatus: 'Attested',
     lastAttestationDate: '2026-06-12',
@@ -671,6 +687,22 @@ export const INITIAL_PROVIDERS: Provider[] = [
     npiVerified: true,
     npiVerificationDate: '2026-01-10',
     nppesRecordMatch: true,
+    effectiveDate: '2023-03-01',
+    recredentialingDate: '2026-11-15',
+    contractInfo: {
+      contractNumber: 'CNT-AGES-AET-2024',
+      contractType: 'Group Agreement',
+      feeScheduleTier: 'Tier 1 Specialty ABA',
+      contractEffectiveDate: '2024-01-01',
+      recredentialingCycleYears: 3,
+      notes: 'Group participating agreement with commercial & Medicaid managed care riders.'
+    },
+    payerEnrollments: [
+      { payerId: 'pyr-aetna', payerName: 'Aetna', status: 'In-Network', effectiveDate: '2023-04-01', recredentialingDate: '2026-10-01', providerIdNumber: 'AET-PRV-9810' },
+      { payerId: 'pyr-cigna', payerName: 'Cigna', status: 'In-Network', effectiveDate: '2023-05-15', recredentialingDate: '2026-11-15', providerIdNumber: 'CG-882109' },
+      { payerId: 'pyr-uhc', payerName: 'UnitedHealthcare (UHC)', status: 'In-Network', effectiveDate: '2023-06-01', recredentialingDate: '2026-12-01', providerIdNumber: 'UHC-019283' },
+      { payerId: 'pyr-alameda', payerName: 'Alameda Alliance', status: 'In-Network', effectiveDate: '2023-07-01', recredentialingDate: '2026-10-15', providerIdNumber: 'AA-44019' }
+    ],
     documents: [
       {
         id: 'doc-101',
@@ -714,6 +746,7 @@ export const INITIAL_PROVIDERS: Provider[] = [
   },
   {
     id: 'prv-2',
+    // Basic Information
     npi: '1922847102',
     firstName: 'Maya',
     lastName: 'Patel',
@@ -722,17 +755,32 @@ export const INITIAL_PROVIDERS: Provider[] = [
     providerType: 'SLP',
     email: 'maya.patel@proficiotherapy.com',
     phone: '(925) 555-0163',
+    altPhone: '(925) 555-0164',
+    contactAddress: '1220 Airway Blvd, Suite 200, Livermore, CA 94551',
     licenseNumber: 'SLP-CA-4482',
     licenseState: 'CA',
     licenseExpiration: '2026-10-31', // Expiring in ~2 months!
     taxonomy: '235Z00000X (Speech-Language Pathologist)',
     specialty: 'Pediatric Articulation, AAC Devices & Language Disorders',
-    employmentStatus: 'Full-Time',
-    startDate: '2022-09-01',
+
+    // Employment / Group Information
     entityIds: ['ent-2', 'ent-1'],
-    locationIds: ['loc-1', 'loc-3'],
-    renderingProviderInfo: 'Provides Speech Therapy in clinic and schools.',
+    primaryEntityId: 'ent-2',
+    dba: 'Proficio Speech Therapy',
+    employmentStatus: 'Full-Time',
+    contractStatus: 'W-2 Full-Time',
+    startDate: '2022-09-01',
     groupAffiliation: 'Proficio Speech Therapy Group',
+    renderingProviderInfo: 'Provides Speech Therapy in clinic and schools. Supervised rendering billing under Proficio Group NPI 1849201948.',
+
+    // Location Information
+    primaryLocationId: 'loc-1',
+    locationIds: ['loc-1', 'loc-3'],
+    additionalLocationIds: ['loc-3'],
+    serviceTypes: ['In-Clinic', 'In-School', 'Telehealth'],
+    locationEffectiveDate: '2022-09-01',
+
+    // Credentialing Information
     caqhId: '19920144',
     caqhStatus: 'Re-attestation Due', // Needs attention
     lastAttestationDate: '2026-04-10',
@@ -742,6 +790,21 @@ export const INITIAL_PROVIDERS: Provider[] = [
     npiVerified: true,
     npiVerificationDate: '2026-02-01',
     nppesRecordMatch: true,
+    effectiveDate: '2022-10-15',
+    recredentialingDate: '2026-10-31',
+    contractInfo: {
+      contractNumber: 'CNT-PROF-SLP-2023',
+      contractType: 'Group Agreement',
+      feeScheduleTier: 'Tier 1 Speech Pathology',
+      contractEffectiveDate: '2022-10-01',
+      recredentialingCycleYears: 3,
+      notes: 'Participating provider under Proficio master payer agreements.'
+    },
+    payerEnrollments: [
+      { payerId: 'pyr-bsc', payerName: 'Blue Shield of California', status: 'In-Network', effectiveDate: '2022-11-01', recredentialingDate: '2026-10-31', providerIdNumber: 'BSC-SP-4482' },
+      { payerId: 'pyr-kaiser', payerName: 'Kaiser Permanente', status: 'In-Network', effectiveDate: '2023-01-01', recredentialingDate: '2026-11-30', providerIdNumber: 'KP-991204' },
+      { payerId: 'pyr-cigna', payerName: 'Cigna', status: 'Application In Progress', effectiveDate: '', recredentialingDate: '', providerIdNumber: 'PENDING' }
+    ],
     documents: [
       {
         id: 'doc-201',
@@ -771,6 +834,7 @@ export const INITIAL_PROVIDERS: Provider[] = [
   },
   {
     id: 'prv-3',
+    // Basic Information
     npi: '1639201948',
     firstName: 'Lucas',
     lastName: 'Moreno',
@@ -779,16 +843,32 @@ export const INITIAL_PROVIDERS: Provider[] = [
     providerType: 'OTR/L',
     email: 'lucas.moreno@childsplaytherapy.com',
     phone: '(925) 555-0199',
+    altPhone: '(925) 555-0200',
+    contactAddress: '8440 Brentwood Blvd, Suite F, Brentwood, CA 94513',
     licenseNumber: 'OTR-CA-8831',
     licenseState: 'CA',
     licenseExpiration: '2027-09-30',
     taxonomy: '225X00000X (Occupational Therapist)',
     specialty: 'Sensory Integration, Fine Motor Coordination & Feeding Therapy',
-    employmentStatus: 'Full-Time',
-    startDate: '2023-06-10',
+
+    // Employment / Group Information
     entityIds: ['ent-3', 'ent-1'],
-    locationIds: ['loc-2', 'loc-3'],
+    primaryEntityId: 'ent-3',
+    dba: "Child's Play Therapy",
+    employmentStatus: 'Full-Time',
+    contractStatus: 'W-2 Full-Time',
+    startDate: '2023-06-10',
     groupAffiliation: "Child's Play Therapy Services Group",
+    renderingProviderInfo: 'Direct OT Clinical Services & Feeding Assessments.',
+
+    // Location Information
+    primaryLocationId: 'loc-2',
+    locationIds: ['loc-2', 'loc-3'],
+    additionalLocationIds: ['loc-3'],
+    serviceTypes: ['In-Clinic', 'In-Home', 'Telehealth'],
+    locationEffectiveDate: '2023-06-10',
+
+    // Credentialing Information
     caqhId: '17839204',
     caqhStatus: 'Attested',
     lastAttestationDate: '2026-07-01',
@@ -798,6 +878,20 @@ export const INITIAL_PROVIDERS: Provider[] = [
     npiVerified: true,
     npiVerificationDate: '2026-01-15',
     nppesRecordMatch: true,
+    effectiveDate: '2023-07-15',
+    recredentialingDate: '2027-04-01',
+    contractInfo: {
+      contractNumber: 'CNT-CP-OT-2023',
+      contractType: 'Group Agreement',
+      feeScheduleTier: 'Tier 1 OT Standard',
+      contractEffectiveDate: '2023-07-01',
+      recredentialingCycleYears: 3,
+      notes: 'Child\'s Play participating provider agreement.'
+    },
+    payerEnrollments: [
+      { payerId: 'pyr-aetna', payerName: 'Aetna', status: 'In-Network', effectiveDate: '2023-08-01', recredentialingDate: '2026-12-01', providerIdNumber: 'AET-OT-8831' },
+      { payerId: 'pyr-ccah', payerName: 'Central California Alliance for Health', status: 'Pending Payer Review', effectiveDate: '', recredentialingDate: '', providerIdNumber: 'PENDING' }
+    ],
     documents: [
       {
         id: 'doc-301',
@@ -827,6 +921,7 @@ export const INITIAL_PROVIDERS: Provider[] = [
   },
   {
     id: 'prv-4',
+    // Basic Information
     npi: '1093847291',
     firstName: 'Kaitlyn',
     lastName: 'Zimmerman',
@@ -835,16 +930,31 @@ export const INITIAL_PROVIDERS: Provider[] = [
     providerType: 'BCBA',
     email: 'kaitlyn.zimmerman@ageslearningsolutions.com',
     phone: '(801) 555-0178',
+    contactAddress: '10984 S Jordan Gateway, Suite 400, South Jordan, UT 84095',
     licenseNumber: 'UT-BCBA-1029',
     licenseState: 'UT',
     licenseExpiration: '2027-11-30',
     taxonomy: '103K00000X (Behavior Analyst)',
     specialty: 'School-Based Behavior Interventions & Parent Coaching',
-    employmentStatus: 'Full-Time',
-    startDate: '2024-10-01',
+
+    // Employment / Group Information
     entityIds: ['ent-1'],
-    locationIds: ['loc-5'],
+    primaryEntityId: 'ent-1',
+    dba: 'AGES Learning Solutions Utah',
+    employmentStatus: 'Full-Time',
+    contractStatus: 'W-2 Full-Time',
+    startDate: '2024-10-01',
     groupAffiliation: 'AGES Learning Solutions Utah',
+    renderingProviderInfo: 'Utah Regional Clinical Director & Rendering BCBA Supervisor.',
+
+    // Location Information
+    primaryLocationId: 'loc-5',
+    locationIds: ['loc-5'],
+    additionalLocationIds: [],
+    serviceTypes: ['In-Clinic', 'In-Home', 'Telehealth'],
+    locationEffectiveDate: '2024-10-01',
+
+    // Credentialing Information
     caqhId: '20194827',
     caqhStatus: 'Attested',
     lastAttestationDate: '2026-05-18',
@@ -854,6 +964,20 @@ export const INITIAL_PROVIDERS: Provider[] = [
     npiVerified: true,
     npiVerificationDate: '2026-01-20',
     nppesRecordMatch: true,
+    effectiveDate: '2024-11-01',
+    recredentialingDate: '2027-10-01',
+    contractInfo: {
+      contractNumber: 'CNT-AGES-UT-2024',
+      contractType: 'Group Agreement',
+      feeScheduleTier: 'Tier 1 Utah Regional',
+      contractEffectiveDate: '2024-10-01',
+      recredentialingCycleYears: 3,
+      notes: 'Utah regional Medicaid and commercial expansion contract.'
+    },
+    payerEnrollments: [
+      { payerId: 'pyr-cigna', payerName: 'Cigna', status: 'In-Network', effectiveDate: '2024-11-15', recredentialingDate: '2027-10-15', providerIdNumber: 'CG-UT-1029' },
+      { payerId: 'pyr-uhc', payerName: 'UnitedHealthcare (UHC)', status: 'In-Network', effectiveDate: '2024-12-01', recredentialingDate: '2027-11-01', providerIdNumber: 'UHC-UT-882' }
+    ],
     documents: [],
     notes: 'Utah regional clinical director.',
     active: true,
@@ -862,6 +986,7 @@ export const INITIAL_PROVIDERS: Provider[] = [
   },
   {
     id: 'prv-5',
+    // Basic Information
     npi: '1582910482',
     firstName: 'Jordan',
     lastName: 'Taylor',
@@ -870,16 +995,31 @@ export const INITIAL_PROVIDERS: Provider[] = [
     providerType: 'SLP',
     email: 'jordan.taylor@proficiotherapy.com',
     phone: '(925) 555-0182',
+    contactAddress: '1220 Airway Blvd, Suite 200, Livermore, CA 94551',
     licenseNumber: 'SLP-CA-9931',
     licenseState: 'CA',
     licenseExpiration: '2027-08-31',
     taxonomy: '235Z00000X / 103K00000X',
     specialty: 'Dual Certified SLP & BCBA for Non-Verbal Autism',
-    employmentStatus: 'Full-Time',
-    startDate: '2024-01-15',
+
+    // Employment / Group Information
     entityIds: ['ent-1', 'ent-2'],
-    locationIds: ['loc-1', 'loc-3'],
+    primaryEntityId: 'ent-2',
+    dba: 'Proficio Speech & AGES Joint Clinic',
+    employmentStatus: 'Full-Time',
+    contractStatus: 'W-2 Full-Time',
+    startDate: '2024-01-15',
     groupAffiliation: 'Proficio Speech & AGES Joint Clinic',
+    renderingProviderInfo: 'Dual discipline provider for integrated AAC and behavioral communication therapy.',
+
+    // Location Information
+    primaryLocationId: 'loc-1',
+    locationIds: ['loc-1', 'loc-3'],
+    additionalLocationIds: ['loc-3'],
+    serviceTypes: ['In-Clinic', 'In-Home', 'In-School', 'Telehealth'],
+    locationEffectiveDate: '2024-01-15',
+
+    // Credentialing Information
     caqhId: '19482019',
     caqhStatus: 'Attested',
     lastAttestationDate: '2026-07-20',
@@ -889,6 +1029,20 @@ export const INITIAL_PROVIDERS: Provider[] = [
     npiVerified: true,
     npiVerificationDate: '2026-01-12',
     nppesRecordMatch: true,
+    effectiveDate: '2024-02-15',
+    recredentialingDate: '2027-01-15',
+    contractInfo: {
+      contractNumber: 'CNT-DUAL-2024-01',
+      contractType: 'Group Agreement',
+      feeScheduleTier: 'Tier 1 Dual Specialty',
+      contractEffectiveDate: '2024-01-15',
+      recredentialingCycleYears: 3,
+      notes: 'Dual discipline SLP & BCBA agreement.'
+    },
+    payerEnrollments: [
+      { payerId: 'pyr-aetna', payerName: 'Aetna', status: 'In-Network', effectiveDate: '2024-03-01', recredentialingDate: '2027-02-01', providerIdNumber: 'AET-DUAL-9931' },
+      { payerId: 'pyr-bsc', payerName: 'Blue Shield of California', status: 'In-Network', effectiveDate: '2024-03-15', recredentialingDate: '2027-02-15', providerIdNumber: 'BSC-9931' }
+    ],
     documents: [],
     active: true,
     createdAt: '2024-01-10',
@@ -896,6 +1050,7 @@ export const INITIAL_PROVIDERS: Provider[] = [
   },
   {
     id: 'prv-6',
+    // Basic Information
     npi: '1749201849',
     firstName: 'Derrick',
     lastName: 'Sterling',
@@ -904,21 +1059,53 @@ export const INITIAL_PROVIDERS: Provider[] = [
     providerType: 'OTR/L',
     email: 'derrick.sterling@childsplaytherapy.com',
     phone: '(925) 555-0133',
+    contactAddress: '8440 Brentwood Blvd, Suite F, Brentwood, CA 94513',
     licenseNumber: 'OTR-CA-7721',
     licenseState: 'CA',
     licenseExpiration: '2026-09-15', // Expiring VERY SOON
     taxonomy: '225X00000X (Occupational Therapist)',
     specialty: 'Neurodevelopmental Therapy & Bilateral Coordination',
-    employmentStatus: 'Part-Time',
-    startDate: '2023-11-01',
+
+    // Employment / Group Information
     entityIds: ['ent-3'],
+    primaryEntityId: 'ent-3',
+    dba: "Child's Play Therapy",
+    employmentStatus: 'Part-Time',
+    contractStatus: '1099 Contractor',
+    startDate: '2023-11-01',
+    groupAffiliation: "Child's Play Therapy Services PC",
+    renderingProviderInfo: 'Part-time contractor providing sensory OT and fine motor therapy.',
+
+    // Location Information
+    primaryLocationId: 'loc-2',
     locationIds: ['loc-2'],
+    additionalLocationIds: [],
+    serviceTypes: ['In-Clinic', 'In-Home'],
+    locationEffectiveDate: '2023-11-01',
+
+    // Credentialing Information
     caqhId: '18920194',
     caqhStatus: 'Complete',
+    lastAttestationDate: '2026-05-10',
+    nextAttestationDate: '2026-09-10',
     paveStatus: 'Approved',
+    medicaidId: 'MED-CA-7721',
     npiVerified: true,
     npiVerificationDate: '2026-01-05',
     nppesRecordMatch: true,
+    effectiveDate: '2023-12-01',
+    recredentialingDate: '2026-09-15',
+    contractInfo: {
+      contractNumber: 'CNT-CP-1099-7721',
+      contractType: '1099 Contractor Agreement',
+      feeScheduleTier: 'Tier 2 Hourly Rate',
+      contractEffectiveDate: '2023-11-01',
+      recredentialingCycleYears: 2,
+      notes: 'Contractor agreement requiring annual COI and biannual recredentialing.'
+    },
+    payerEnrollments: [
+      { payerId: 'pyr-aetna', payerName: 'Aetna', status: 'In-Network', effectiveDate: '2023-12-15', recredentialingDate: '2026-09-15', providerIdNumber: 'AET-OT-7721' }
+    ],
     documents: [],
     notes: 'Urgent: License expiration coming in September 2026.',
     active: true,

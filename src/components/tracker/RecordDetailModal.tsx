@@ -31,9 +31,11 @@ import {
   Upload, 
   UserCheck, 
   Users, 
-  X 
+  X,
+  CheckSquare
 } from 'lucide-react';
 import { addBusinessDays } from '../../utils/slaCalculator';
+import { AdminApproveModal } from '../modals/AdminApproveModal';
 
 interface RecordDetailModalProps {
   recordId: string;
@@ -53,6 +55,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     entities,
     locations,
     currentUser,
+    isAdmin,
+    stageConfigs,
     advanceRecordStage,
     logFollowUp,
     addDocumentToRecord,
@@ -60,10 +64,14 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     overrideValidation,
     updateProviderLinking,
     updateRecord,
+    adminVerifyDocument,
+    adminVerifyAllDocuments,
+    adminCompleteAllChecklist,
   } = useCredentialing();
 
   const record = records.find((r) => r.id === recordId);
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'followups' | 'documents' | 'linking' | 'audit'>('overview');
+  const [isAdminApproveModalOpen, setIsAdminApproveModalOpen] = useState(false);
 
   // Stage advance state
   const [targetStage, setTargetStage] = useState<CredentialingStage | ''>('');
@@ -224,34 +232,60 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Stage Timeline Stepper Strip (FR-008) */}
-        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 overflow-x-auto">
-          <div className="flex items-center space-x-2 min-w-max">
-            {STAGES_SEQUENCE.map((st, idx) => {
-              const isCurrent = record.stage === st;
-              const isPassed = STAGES_SEQUENCE.indexOf(record.stage as any) > idx;
+        {/* Stage Timeline Stepper Strip */}
+        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center space-x-2 overflow-x-auto pb-1 lg:pb-0 min-w-max">
+              {STAGES_SEQUENCE.map((st, idx) => {
+                const isCurrent = record.stage === st;
+                const isPassed = STAGES_SEQUENCE.indexOf(record.stage as any) > idx;
 
-              return (
-                <div key={st} className="flex items-center space-x-1.5">
-                  <button
-                    onClick={() => handleStageTransition(st)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      isCurrent
-                        ? 'bg-sky-600 text-white shadow-xs'
-                        : isPassed
-                        ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {isPassed ? <Check className="w-3 h-3 text-emerald-700" /> : <span className="text-[10px]">{idx + 1}</span>}
-                    <span>{st}</span>
-                  </button>
-                  {idx < STAGES_SEQUENCE.length - 1 && (
-                    <ArrowRight className="w-3 h-3 text-slate-300 shrink-0" />
-                  )}
-                </div>
-              );
-            })}
+                return (
+                  <div key={st} className="flex items-center space-x-1.5">
+                    <button
+                      onClick={() => handleStageTransition(st)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                        isCurrent
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : isPassed
+                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {isPassed ? <Check className="w-3 h-3 text-emerald-700" /> : <span className="text-[10px]">{idx + 1}</span>}
+                      <span>{st}</span>
+                    </button>
+                    {idx < STAGES_SEQUENCE.length - 1 && (
+                      <ArrowRight className="w-3 h-3 text-slate-300 shrink-0" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Direct Stage Transition Dropdown for all 18 Standardized Stages */}
+            <div className="flex items-center space-x-2 shrink-0">
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Stage:</span>
+              <select
+                value={record.stage}
+                onChange={(e) => handleStageTransition(e.target.value as CredentialingStage)}
+                className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1 font-semibold text-slate-800 focus:ring-1 focus:ring-sky-500 cursor-pointer shadow-2xs"
+              >
+                {['Pre-Submission', 'In-Review', 'Approval & Linking', 'Completed / Closed', 'Maintenance / Alert'].map((category) => {
+                  const categoryStages = (stageConfigs || []).filter((s) => s.category === category && s.isActive);
+                  if (categoryStages.length === 0) return null;
+                  return (
+                    <optgroup key={category} label={category}>
+                      {categoryStages.map((s) => (
+                        <option key={s.id} value={s.name}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+            </div>
           </div>
 
           {transitionError && (
@@ -268,11 +302,11 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         <div className="flex border-b border-slate-200 bg-white px-5 overflow-x-auto text-xs font-semibold">
           {[
             { id: 'overview', label: 'Overview & Validation', icon: ShieldCheck },
-            { id: 'checklist', label: 'Payer Checklist', icon: CheckCircle2, count: record.checklist.length },
-            { id: 'followups', label: 'Follow-ups & SLA', icon: Clock, count: record.followUps.length },
-            { id: 'linking', label: 'Provider Linking (FR-014)', icon: Link2 },
-            { id: 'documents', label: 'Document Vault', icon: FileText, count: record.documents.length },
-            { id: 'audit', label: 'Audit Trail', icon: History, count: record.auditTrail.length },
+            { id: 'checklist', label: 'Payer Checklist', icon: CheckCircle2, count: (record.checklist || []).length },
+            { id: 'followups', label: 'Follow-ups & SLA', icon: Clock, count: (record.followUps || []).length },
+            { id: 'linking', label: 'Provider Linking', icon: Link2 },
+            { id: 'documents', label: 'Document Vault', icon: FileText, count: (record.documents || []).length },
+            { id: 'audit', label: 'Audit Trail', icon: History, count: (record.auditTrail || []).length },
           ].map((tab) => {
             const Icon = tab.icon;
             return (
@@ -302,6 +336,67 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
           {/* TAB 1: OVERVIEW & ENTITY/DBA VALIDATION */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              {/* ADMIN VERIFICATION & APPROVAL FAST-TRACK STATION */}
+              {isAdmin && (
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  ['Approved', 'Linked', 'Effective'].includes(record.stage)
+                    ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 shadow-xs'
+                    : 'bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 border-indigo-200 shadow-xs'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start space-x-3">
+                      <div className={`p-2 rounded-xl shadow-xs ${
+                        ['Approved', 'Linked', 'Effective'].includes(record.stage)
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-[#2B4C9D] text-white'
+                      }`}>
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] font-extrabold uppercase tracking-widest bg-white text-indigo-900 px-2 py-0.5 rounded-full border border-indigo-200">
+                            Administrator Authority
+                          </span>
+                          <span className="text-xs text-slate-600">
+                            Reviewing as <strong>{currentUser.name}</strong>
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900 mt-1">
+                          {['Approved', 'Linked', 'Effective'].includes(record.stage)
+                            ? `Application Officially Verified & Approved`
+                            : `Admin Fast-Track: Verify & Approve Application`}
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {['Approved', 'Linked', 'Effective'].includes(record.stage)
+                            ? `Payer approval recorded on ${record.approvalDate || 'N/A'}. Billing effective date: ${record.effectiveDate || 'Active'}. Linking status: ${record.linkingStatus}.`
+                            : `One-click administrative verification: sign off on attached credentials, satisfy checklist gates, and grant formal payer approval.`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                      {!['Approved', 'Linked', 'Effective'].includes(record.stage) ? (
+                        <button
+                          onClick={() => setIsAdminApproveModalOpen(true)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer transform hover:-translate-y-0.5"
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Verify & Approve Application</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setIsAdminApproveModalOpen(true)}
+                          className="bg-white hover:bg-slate-50 text-slate-700 font-semibold px-3 py-1.5 rounded-xl text-xs flex items-center space-x-1 border border-slate-200 transition-colors cursor-pointer"
+                        >
+                          <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Re-verify / Update Sign-Off</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* SECTION 5.10 ENTITY / DBA VALIDATION WIDGET */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -309,7 +404,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     <ShieldCheck className="w-5 h-5 text-sky-600" />
                     <div>
                       <h3 className="text-sm font-bold text-slate-900">
-                        Section 5.10 Entity / DBA Pre-Submission Validation Check
+                        Entity & DBA Pre-Submission Validation Check
                       </h3>
                       <p className="text-xs text-slate-500">
                         Automated verification of Legal Entity, DBA, W-9, Insurance, Lease, and NPI
@@ -336,9 +431,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 </div>
 
                 {/* Validation Issues Listing */}
-                {record.validationIssues.length > 0 ? (
+                {(record.validationIssues || []).length > 0 ? (
                   <div className="mt-4 space-y-2.5">
-                    {record.validationIssues.map((issue) => (
+                    {(record.validationIssues || []).map((issue) => (
                       <div
                         key={issue.id}
                         className={`p-3 rounded-xl border flex items-start space-x-3 ${
@@ -511,7 +606,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
           {activeTab === 'checklist' && (
             <div className="space-y-4">
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">
                       Payer-Specific Requirements Checklist ({payer?.name})
@@ -520,13 +615,25 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                       All required items must be completed before submission to prevent rejections.
                     </p>
                   </div>
-                  <span className="text-xs font-semibold bg-sky-50 text-sky-700 px-2.5 py-1 rounded-lg">
-                    {record.checklist.filter((c) => c.isCompleted).length} / {record.checklist.length} Completed
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-semibold bg-sky-50 text-sky-700 px-2.5 py-1 rounded-lg">
+                      {(record.checklist || []).filter((c) => c.isCompleted).length} / {(record.checklist || []).length} Completed
+                    </span>
+                    {isAdmin && (record.checklist || []).some(c => !c.isCompleted) && (
+                      <button
+                        onClick={() => adminCompleteAllChecklist(record.id)}
+                        className="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 cursor-pointer transition-colors"
+                        title="Mark all items as verified and completed"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Complete All (Admin)</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="divide-y divide-slate-100 mt-3">
-                  {record.checklist.map((item) => (
+                  {(record.checklist || []).map((item) => (
                     <div
                       key={item.id}
                       onClick={() => toggleChecklistItem(record.id, item.id)}
@@ -700,16 +807,16 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
               {/* Follow-up History Timeline */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                 <h3 className="text-sm font-bold text-slate-900 mb-3">
-                  Follow-up History & Activity Log ({record.followUps.length})
+                  Follow-up History & Activity Log ({(record.followUps || []).length})
                 </h3>
 
                 <div className="space-y-3">
-                  {record.followUps.length === 0 ? (
+                  {(record.followUps || []).length === 0 ? (
                     <div className="text-center py-6 text-slate-400 text-xs">
                       No follow-ups logged yet. Record first interaction above.
                     </div>
                   ) : (
-                    record.followUps.map((fu) => (
+                    (record.followUps || []).map((fu) => (
                       <div
                         key={fu.id}
                         className={`p-3.5 rounded-xl border text-xs ${
@@ -762,7 +869,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                   <Link2 className="w-5 h-5 text-purple-600" />
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">
-                      FR-014: Provider-to-Group Linking Management
+                      Provider-to-Group Linking Management
                     </h3>
                     <p className="text-xs text-slate-500">
                       Linking connects credentialed providers to billing group NPIs and locations inside payer systems.
@@ -810,13 +917,13 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Contracting Tracker (FR-030) */}
+              {/* Contracting Tracker */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                 <div className="flex items-center space-x-2 pb-3 border-b border-slate-100">
                   <DollarSign className="w-5 h-5 text-emerald-600" />
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">
-                      FR-030: Payer Contracting Tracking (Distinct from Credentialing)
+                      Payer Contracting Tracking (Distinct from Credentialing)
                     </h3>
                     <p className="text-xs text-slate-500">
                       Tracks overarching payer agreement status and contract execution terms.
@@ -905,34 +1012,78 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 
               {/* Document List */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-                <h3 className="text-sm font-bold text-slate-900 mb-3">
-                  Attached Documents ({record.documents.length + (provider?.documents.length || 0)})
-                </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Attached Documents ({(record.documents || []).length + (provider?.documents?.length || 0)})
+                  </h3>
+                  {isAdmin && (record.documents || []).some(d => d.verificationStatus !== 'Verified') && (
+                    <button
+                      onClick={() => adminVerifyAllDocuments(record.id)}
+                      className="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 cursor-pointer transition-colors"
+                      title="Verify all pending documents"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Verify All Documents (Admin)</span>
+                    </button>
+                  )}
+                </div>
 
                 <div className="divide-y divide-slate-100">
-                  {[...record.documents, ...(provider?.documents || [])].map((doc) => (
-                    <div key={doc.id} className="py-3 flex items-center justify-between text-xs">
+                  {[...(record.documents || []), ...(provider?.documents || [])].map((doc) => (
+                    <div key={doc.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                       <div className="flex items-center space-x-3">
-                        <div className="p-2 rounded-lg bg-sky-50 text-sky-600">
+                        <div className="p-2 rounded-lg bg-sky-50 text-sky-600 shrink-0">
                           <FileText className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="font-bold text-slate-900">{doc.name}</div>
                           <div className="text-[11px] text-slate-400">
                             {doc.type} • {doc.fileSize} • Uploaded {doc.uploadDate}
+                            {doc.verifiedBy && ` • Verified by ${doc.verifiedBy}`}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2 shrink-0">
                         {doc.expirationDate && (
-                          <span className="text-[11px] font-semibold text-slate-600">
+                          <span className="text-[11px] font-semibold text-slate-600 mr-1">
                             Exp: {doc.expirationDate}
                           </span>
                         )}
-                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            doc.verificationStatus === 'Verified'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                              : doc.verificationStatus === 'Rejected'
+                              ? 'bg-rose-100 text-rose-800 border-rose-200'
+                              : 'bg-amber-100 text-amber-800 border-amber-200'
+                          }`}
+                        >
                           {doc.verificationStatus}
                         </span>
+
+                        {isAdmin && (
+                          <div className="flex items-center space-x-1 ml-2">
+                            {doc.verificationStatus !== 'Verified' && (
+                              <button
+                                onClick={() => adminVerifyDocument(record.id, doc.id, 'Verified')}
+                                className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-bold rounded cursor-pointer transition-colors"
+                                title="Mark Verified"
+                              >
+                                Verify
+                              </button>
+                            )}
+                            {doc.verificationStatus !== 'Rejected' && (
+                              <button
+                                onClick={() => adminVerifyDocument(record.id, doc.id, 'Rejected')}
+                                className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10.5px] font-medium rounded border border-rose-200 cursor-pointer transition-colors"
+                                title="Reject Document"
+                              >
+                                Reject
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -947,19 +1098,19 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    FR-025: Immutable Credentialing Audit Trail
+                    Immutable Credentialing Audit Trail
                   </h3>
                   <p className="text-xs text-slate-500">
                     Retained for ≥ 7 years per regulatory and HIPAA compliance requirements.
                   </p>
                 </div>
                 <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                  {record.auditTrail.length} Entries
+                  {(record.auditTrail || []).length} Entries
                 </span>
               </div>
 
               <div className="space-y-3">
-                {record.auditTrail.map((entry) => (
+                {(record.auditTrail || []).map((entry) => (
                   <div key={entry.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
                       <span className="font-mono">{entry.timestamp}</span>
@@ -991,14 +1142,35 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
             <span>Open Provider 360 Profile ({provider?.firstName} {provider?.lastName})</span>
           </button>
 
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg"
-          >
-            Close Workspace
-          </button>
+          <div className="flex items-center space-x-2">
+            {isAdmin && !['Approved', 'Linked', 'Effective'].includes(record.stage) && (
+              <button
+                onClick={() => setIsAdminApproveModalOpen(true)}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center space-x-1 transition-colors cursor-pointer shadow-xs"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Verify & Approve</span>
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg cursor-pointer"
+            >
+              Close Workspace
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Admin Approval Modal */}
+      {isAdminApproveModalOpen && (
+        <AdminApproveModal
+          isOpen={isAdminApproveModalOpen}
+          onClose={() => setIsAdminApproveModalOpen(false)}
+          record={record}
+        />
+      )}
     </div>
   );
 };

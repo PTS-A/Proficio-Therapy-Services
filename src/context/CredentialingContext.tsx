@@ -106,6 +106,36 @@ interface CredentialingContextType {
   selectedProviderId: string | null;
   setSelectedProviderId: (id: string | null) => void;
 
+  // Admin Verification & Approval Actions
+  adminVerifyAndApproveApplication: (
+    recordId: string,
+    options?: {
+      approvalDate?: string;
+      effectiveDate?: string;
+      referenceNumber?: string;
+      notes?: string;
+      autoLink?: boolean;
+      linkEffectiveDate?: string;
+    }
+  ) => { success: boolean; error?: string };
+  adminBatchApproveApplications: (
+    recordIds: string[],
+    options?: {
+      approvalDate?: string;
+      effectiveDate?: string;
+      notes?: string;
+      autoLink?: boolean;
+    }
+  ) => { successCount: number; errors: string[] };
+  adminVerifyDocument: (
+    recordId: string,
+    docId: string,
+    status: 'Verified' | 'Pending Verification' | 'Rejected',
+    notes?: string
+  ) => void;
+  adminVerifyAllDocuments: (recordId: string) => void;
+  adminCompleteAllChecklist: (recordId: string) => void;
+
   // Record CRUD & Actions
   createRecord: (data: {
     providerId: string;
@@ -328,7 +358,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
-  const isAdmin = currentAccount?.accessLevel === 'ADMINISTRATOR';
+  const isAdmin = 
+    currentAccount?.accessLevel === 'ADMINISTRATOR' || 
+    currentUser.role === 'Admin' || 
+    currentUser.role === 'Manager' || 
+    currentUser.accessLevel === 'ADMINISTRATOR' ||
+    currentAccount?.systemRole === 'System Administrator' ||
+    currentAccount?.systemRole === 'Credentialing Lead / Manager';
 
   useEffect(() => {
     localStorage.setItem('cred_stage_configs', JSON.stringify(stageConfigs));
@@ -987,6 +1023,246 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  // =========================================================================
+  // ADMIN VERIFICATION & APPROVAL ENGINE
+  // =========================================================================
+  const adminVerifyAndApproveApplication = (
+    recordId: string,
+    options?: {
+      approvalDate?: string;
+      effectiveDate?: string;
+      referenceNumber?: string;
+      notes?: string;
+      autoLink?: boolean;
+      linkEffectiveDate?: string;
+    }
+  ): { success: boolean; error?: string } => {
+    const record = records.find((r) => r.id === recordId);
+    if (!record) return { success: false, error: 'Record not found.' };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const appDate = options?.approvalDate || todayStr;
+    const effDate = options?.effectiveDate || appDate;
+    const isAutoLink = options?.autoLink ?? true;
+
+    const provider = providers.find((p) => p.id === record.providerId);
+    const payer = payers.find((p) => p.id === record.payerId);
+
+    // 1. Auto verify all attached documents
+    const verifiedDocs: DocumentItem[] = (record.documents || []).map((doc) => ({
+      ...doc,
+      verificationStatus: 'Verified' as const,
+      verifiedBy: currentUser.name,
+      verifiedDate: todayStr,
+    }));
+
+    // 2. Auto complete all checklist items
+    const completedChecklist: ChecklistItem[] = (record.checklist || []).map((item) => ({
+      ...item,
+      isCompleted: true,
+      completedDate: todayStr,
+      completedBy: currentUser.name,
+    }));
+
+    const finalStage: CredentialingStage = isAutoLink ? 'Linked' : 'Approved';
+
+    const auditEntry: AuditEntry = {
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toLocaleString(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: 'Admin Verified & Approved Application',
+      previousValue: record.stage,
+      newValue: finalStage,
+      notes: options?.notes
+        ? `Direct Admin Approval. Ref: ${options.referenceNumber || 'N/A'}. ${options.notes}`
+        : `Directly verified and approved by Administrator ${currentUser.name}. Reference: ${options?.referenceNumber || 'ADMIN-APPR-' + Date.now().toString().slice(-4)}`,
+    };
+
+    updateRecord(recordId, {
+      stage: finalStage,
+      approvalDate: appDate,
+      effectiveDate: effDate,
+      linkEffectiveDate: isAutoLink ? (options?.linkEffectiveDate || effDate) : record.linkEffectiveDate,
+      linkingStatus: isAutoLink ? 'Linked' : 'Pending Approval',
+      isOverdue: false,
+      documents: verifiedDocs,
+      checklist: completedChecklist,
+      validationOverridden: {
+        overriddenBy: currentUser.name,
+        date: todayStr,
+        reason: options?.notes ? `Admin Approval Sign-off: ${options.notes}` : 'Admin Direct Verification & Approval Sign-off',
+      },
+      notes: options?.notes
+        ? `${record.notes ? record.notes + ' | ' : ''}Approved by Admin: ${options.notes}`
+        : record.notes,
+      auditTrail: [auditEntry, ...record.auditTrail],
+    });
+
+    // 3. Update provider's payer enrollment record
+    if (provider && payer) {
+      const existingEnrollments = provider.payerEnrollments || [];
+      const updatedEnrollments = existingEnrollments.map((enr) => {
+        if (enr.payerId === payer.id) {
+          return {
+            ...enr,
+            status: isAutoLink ? 'In-Network' : 'Linked',
+            effectiveDate: effDate,
+            recredentialingDate: addBusinessDays(effDate, 365 * 3),
+          };
+        }
+        return enr;
+      });
+
+      if (!existingEnrollments.some((e) => e.payerId === payer.id)) {
+        updatedEnrollments.push({
+          payerId: payer.id,
+          payerName: payer.name,
+          status: isAutoLink ? 'In-Network' : 'Linked',
+          effectiveDate: effDate,
+          recredentialingDate: addBusinessDays(effDate, 365 * 3),
+        });
+      }
+
+      updateProvider(provider.id, {
+        payerEnrollments: updatedEnrollments,
+        active: true,
+      });
+    }
+
+    // 4. System notification
+    const approvalNotif: SystemNotification = {
+      id: `notif-appr-${Date.now()}`,
+      type: 'STAGE_CHANGE',
+      title: `Application Verified & Approved: ${record.id}`,
+      message: `Administrator ${currentUser.name} verified and approved application ${record.id} for ${provider ? provider.firstName + ' ' + provider.lastName : 'Provider'} (${record.discipline}) with ${payer?.name || 'Payer'}.`,
+      timestamp: new Date().toLocaleString(),
+      recordId: record.id,
+      providerId: record.providerId,
+      severity: 'info',
+      isRead: false,
+    };
+    setNotifications((prev) => [approvalNotif, ...prev]);
+
+    return { success: true };
+  };
+
+  const adminBatchApproveApplications = (
+    recordIds: string[],
+    options?: {
+      approvalDate?: string;
+      effectiveDate?: string;
+      notes?: string;
+      autoLink?: boolean;
+    }
+  ): { successCount: number; errors: string[] } => {
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const recId of recordIds) {
+      const res = adminVerifyAndApproveApplication(recId, options);
+      if (res.success) {
+        successCount++;
+      } else if (res.error) {
+        errors.push(`${recId}: ${res.error}`);
+      }
+    }
+
+    return { successCount, errors };
+  };
+
+  const adminVerifyDocument = (
+    recordId: string,
+    docId: string,
+    status: 'Verified' | 'Pending Verification' | 'Rejected',
+    notes?: string
+  ) => {
+    const record = records.find((r) => r.id === recordId);
+    if (!record) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const updatedDocs = (record.documents || []).map((doc) => {
+      if (doc.id === docId) {
+        return {
+          ...doc,
+          verificationStatus: status,
+          verifiedBy: status === 'Verified' ? currentUser.name : undefined,
+          verifiedDate: status === 'Verified' ? todayStr : undefined,
+          notes: notes || doc.notes,
+        };
+      }
+      return doc;
+    });
+
+    const auditEntry: AuditEntry = {
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toLocaleString(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: `Document ${status}`,
+      notes: `Document ID ${docId} marked as ${status} by ${currentUser.name}. ${notes || ''}`,
+    };
+
+    updateRecord(recordId, {
+      documents: updatedDocs,
+      auditTrail: [auditEntry, ...record.auditTrail],
+    });
+  };
+
+  const adminVerifyAllDocuments = (recordId: string) => {
+    const record = records.find((r) => r.id === recordId);
+    if (!record) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const updatedDocs = (record.documents || []).map((doc) => ({
+      ...doc,
+      verificationStatus: 'Verified' as const,
+      verifiedBy: currentUser.name,
+      verifiedDate: todayStr,
+    }));
+
+    const auditEntry: AuditEntry = {
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toLocaleString(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: 'All Documents Verified',
+      notes: `All ${updatedDocs.length} documents verified by Administrator ${currentUser.name}.`,
+    };
+
+    updateRecord(recordId, {
+      documents: updatedDocs,
+      auditTrail: [auditEntry, ...record.auditTrail],
+    });
+  };
+
+  const adminCompleteAllChecklist = (recordId: string) => {
+    const record = records.find((r) => r.id === recordId);
+    if (!record) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const updatedChecklist = (record.checklist || []).map((item) => ({
+      ...item,
+      isCompleted: true,
+      completedDate: todayStr,
+      completedBy: currentUser.name,
+    }));
+
+    const auditEntry: AuditEntry = {
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toLocaleString(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: 'All Checklist Items Completed',
+      notes: `All ${updatedChecklist.length} checklist items verified and completed by Administrator ${currentUser.name}.`,
+    };
+
+    updateRecord(recordId, {
+      checklist: updatedChecklist,
+      auditTrail: [auditEntry, ...record.auditTrail],
+    });
+  };
+
   // Provider CRUD
   const addProvider = (providerData: Omit<Provider, 'id' | 'createdAt' | 'updatedAt' | 'documents'>): Provider => {
     const newProvider: Provider = {
@@ -1583,6 +1859,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         setSelectedRecordId,
         selectedProviderId,
         setSelectedProviderId,
+        adminVerifyAndApproveApplication,
+        adminBatchApproveApplications,
+        adminVerifyDocument,
+        adminVerifyAllDocuments,
+        adminCompleteAllChecklist,
         createRecord,
         updateRecord,
         advanceRecordStage,

@@ -125,7 +125,7 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
             <Building className="w-5 h-5 text-sky-600" />
-            <span>FR-003: Payer Master Directory (20+ Configured Networks)</span>
+            <span>Payer Master Directory (20+ Configured Networks)</span>
           </h2>
           <p className="text-xs text-slate-500">
             Standardized TATs, portals, submission methods, and specific credentialing checklist requirements.
@@ -157,8 +157,8 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
               />
             </div>
 
-            <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold overflow-x-auto">
-              {(['All', 'Commercial', 'Medicaid Managed Care', 'Regional Center / State', 'Tricare / Military'] as (PayerType | 'All')[]).map((t) => (
+            <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold overflow-x-auto pb-1">
+              {(['All', 'Commercial', 'Regional', 'Regional / Medicaid', 'Medicaid', 'Medicaid / Commercial', 'Network', 'Government', 'State program'] as (PayerType | 'All')[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTypeFilter(t)}
@@ -204,7 +204,7 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
 
                   <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
                     <span>{payerApps.length} active applications</span>
-                    <span>States: {p.statesServed.join(', ')}</span>
+                    <span>States: {(p.statesServed || []).join(', ')}</span>
                   </div>
                 </div>
               );
@@ -227,7 +227,7 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
                     <div className="text-xs text-slate-500 flex items-center space-x-2 mt-0.5">
                       <span className="font-medium text-sky-700">{activePayer.type}</span>
                       <span>•</span>
-                      <span>Serving: {activePayer.statesServed.join(', ')}</span>
+                      <span>Serving: {(activePayer.statesServed || []).join(', ')}</span>
                     </div>
                   </div>
                 </div>
@@ -308,15 +308,15 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div>
                     <span className="text-slate-400">Contact / Dept</span>
-                    <div className="font-semibold text-slate-800">{activePayer.contactName || 'Provider Enrollment Team'}</div>
+                    <div className="font-semibold text-slate-800">{activePayer.contactName || activePayer.contacts?.[0]?.name || 'Provider Enrollment Team'}</div>
                   </div>
                   <div>
                     <span className="text-slate-400">Email</span>
-                    <div className="font-semibold text-slate-800">{activePayer.contactEmail || 'credentialing@payer.com'}</div>
+                    <div className="font-semibold text-slate-800">{activePayer.contactEmail || activePayer.contacts?.[0]?.email || 'credentialing@payer.com'}</div>
                   </div>
                   <div>
                     <span className="text-slate-400">Phone</span>
-                    <div className="font-semibold text-slate-800">{activePayer.contactPhone || '(800) 555-0199'}</div>
+                    <div className="font-semibold text-slate-800">{activePayer.contactPhone || activePayer.contacts?.[0]?.phone || '(800) 555-0199'}</div>
                   </div>
                   <div>
                     <span className="text-slate-400">Payer ID / Network Code</span>
@@ -332,7 +332,12 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
                   <span>Mandatory Document Types for Clean Submission</span>
                 </h4>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  {activePayer.requiredDocumentTypes.map((docType) => (
+                  {(activePayer.requiredDocuments || activePayer.requiredDocumentTypes || [
+                    'State Professional License',
+                    'W-9 Form (Entity matching)',
+                    'Certificate of Insurance (GL & WC)',
+                    'CAQH Attestation Release',
+                  ]).map((docType) => (
                     <div key={docType} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 flex items-center space-x-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-sky-500"></div>
                       <span className="text-slate-700 font-medium">{docType}</span>
@@ -355,7 +360,7 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
           <div className="bg-white p-6 rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900">
-                {editingPayer ? 'Edit Payer Configuration' : 'Add New Payer Network (Section 5.7)'}
+                {editingPayer ? 'Edit Payer Configuration' : 'Add New Payer Network'}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
@@ -384,8 +389,13 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
                     className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
                   >
                     <option value="Commercial">Commercial</option>
-                    <option value="Medicaid Managed Care">Medicaid Managed Care</option>
-                    <option value="Regional Center / State">Regional Center / State</option>
+                    <option value="Regional">Regional</option>
+                    <option value="Regional / Medicaid">Regional / Medicaid</option>
+                    <option value="Medicaid">Medicaid</option>
+                    <option value="Medicaid / Commercial">Medicaid / Commercial</option>
+                    <option value="Network">Network</option>
+                    <option value="Government">Government</option>
+                    <option value="State program">State program</option>
                     <option value="Tricare / Military">Tricare / Military</option>
                     <option value="Medicare Advantage">Medicare Advantage</option>
                   </select>

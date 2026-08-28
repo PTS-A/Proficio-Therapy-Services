@@ -25,11 +25,13 @@ import {
   RefreshCw, 
   Search, 
   ShieldAlert, 
+  ShieldCheck, 
   Sparkles, 
   Table, 
   UserCheck, 
   X 
 } from 'lucide-react';
+import { AdminApproveModal } from '../modals/AdminApproveModal';
 
 interface CredentialingTrackerProps {
   onSelectRecord: (recordId: string) => void;
@@ -47,6 +49,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
     entities,
     locations,
     users,
+    isAdmin,
     filters,
     setFilters,
     resetFilters,
@@ -60,6 +63,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [saveFilterModalOpen, setSaveFilterModalOpen] = useState(false);
   const [newFilterName, setNewFilterName] = useState('');
+  const [adminApproveRecord, setAdminApproveRecord] = useState<CredentialingRecord | null>(null);
 
   const filteredRecords = getFilteredRecords();
 
@@ -414,7 +418,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
               }`}
             >
               <Link2 className="w-3.5 h-3.5" />
-              <span>Linking Pending (FR-014)</span>
+              <span>Linking Pending</span>
             </button>
 
             {(filters.searchQuery ||
@@ -639,16 +643,32 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
 
                         {/* Action */}
                         <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectRecord(rec.id);
-                            }}
-                            className="text-sky-600 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 p-1.5 rounded-lg transition-colors cursor-pointer"
-                            title="Open Credentialing Workspace"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-end space-x-1.5">
+                            {isAdmin && !['Approved', 'Linked', 'Effective'].includes(rec.stage) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAdminApproveRecord(rec);
+                                }}
+                                className="text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded-lg transition-colors cursor-pointer flex items-center space-x-1 text-xs font-bold border border-emerald-200"
+                                title="Admin: Fast-Track Verify & Approve"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="hidden sm:inline">Approve</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectRecord(rec.id);
+                              }}
+                              className="text-sky-600 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 p-1.5 rounded-lg transition-colors cursor-pointer"
+                              title="Open Credentialing Workspace"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -667,7 +687,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
             { id: 'intake', title: '1. Intake & Prep', stages: ['Intake', 'Documents Pending', 'Documents Complete', 'Application Preparation'] },
             { id: 'submitted', title: '2. Submitted / Payer Review', stages: ['Application Submitted', 'Payer Review', 'Resubmitted'] },
             { id: 'action', title: '3. Action Required / RFI', stages: ['Additional Documents Requested', 'Correction Required'] },
-            { id: 'linking', title: '4. Linking Pending (FR-014)', stages: ['Approved', 'Linking Pending'] },
+            { id: 'linking', title: '4. Linking Pending', stages: ['Approved', 'Linking Pending'] },
             { id: 'effective', title: '5. Linked & Effective', stages: ['Linked', 'Effective'] },
           ].map((column) => {
             const colRecords = filteredRecords.filter((r) => column.stages.includes(r.stage));
@@ -724,7 +744,21 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
 
                         <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
                           {getStageBadge(rec.stage, rec.isOverdue)}
-                          <span className="text-slate-400 font-medium">{rec.assignedSpecialistName.split(' ')[0]}</span>
+                          <div className="flex items-center space-x-1">
+                            {isAdmin && !['Approved', 'Linked', 'Effective'].includes(rec.stage) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAdminApproveRecord(rec);
+                                }}
+                                className="text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded text-[9px] font-bold border border-emerald-200"
+                                title="Admin: Approve"
+                              >
+                                Approve
+                              </button>
+                            )}
+                            <span className="text-slate-400 font-medium">{rec.assignedSpecialistName.split(' ')[0]}</span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -734,6 +768,15 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
             );
           })}
         </div>
+      )}
+
+      {/* Admin Approve Modal */}
+      {adminApproveRecord && (
+        <AdminApproveModal
+          isOpen={!!adminApproveRecord}
+          onClose={() => setAdminApproveRecord(null)}
+          record={adminApproveRecord}
+        />
       )}
     </div>
   );

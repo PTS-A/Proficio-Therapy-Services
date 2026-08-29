@@ -8,7 +8,7 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     password: 'admin',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'System Administrator',
-    roleTitle: 'System Administrator (Skeleton Workspace)',
+    roleTitle: 'System Administrator (Executive Operations)',
     department: 'Healthcare Operations & Credentialing',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     createdAt: '2026-01-01',

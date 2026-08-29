@@ -141,6 +141,74 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* Quick Sign-In Selection (Preview & Production) */}
+          <div className="pt-4 border-t border-slate-100">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+              Quick One-Click Sign In
+            </p>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('demo@proficiotherapy.com');
+                  setPassword('proficio');
+                  login('demo@proficiotherapy.com', 'proficio');
+                }}
+                className="w-full p-2.5 bg-slate-50 hover:bg-sky-50/80 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition-all flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <div className="text-xs font-bold text-slate-800 group-hover:text-[#2B4C9D]">
+                    Proficio Administrator (Admin Authority)
+                  </div>
+                  <div className="text-[11px] text-slate-400">demo@proficiotherapy.com</div>
+                </div>
+                <span className="text-[10px] font-bold bg-[#2B4C9D]/10 text-[#2B4C9D] px-2 py-0.5 rounded-full">
+                  Admin
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('admin@example.com');
+                  setPassword('admin');
+                  login('admin@example.com', 'admin');
+                }}
+                className="w-full p-2.5 bg-slate-50 hover:bg-sky-50/80 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition-all flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <div className="text-xs font-bold text-slate-800 group-hover:text-[#2B4C9D]">
+                    Executive Administrator (Full Access)
+                  </div>
+                  <div className="text-[11px] text-slate-400">admin@example.com</div>
+                </div>
+                <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
+                  Admin
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('sanjay.tom@ageslearningsolutions.com');
+                  setPassword('user123');
+                  login('sanjay.tom@ageslearningsolutions.com', 'user123');
+                }}
+                className="w-full p-2.5 bg-slate-50 hover:bg-sky-50/80 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition-all flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <div className="text-xs font-bold text-slate-800 group-hover:text-[#2B4C9D]">
+                    Sanjay Tom (Specialist)
+                  </div>
+                  <div className="text-[11px] text-slate-400">sanjay.tom@ageslearningsolutions.com</div>
+                </div>
+                <span className="text-[10px] font-bold bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">
+                  Specialist
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

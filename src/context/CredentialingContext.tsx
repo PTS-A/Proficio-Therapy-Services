@@ -234,11 +234,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number>(20 * 60);
   const lastActivityRef = React.useRef<number>(Date.now());
 
-  // Helper to determine if account uses clean skeleton data
-  const isSkeletonEmail = (email?: string | null) => {
-    return email?.toLowerCase() === 'admin@example.com';
-  };
-
   // Default page is the login page (currentAccount is null by default on fresh visit/timeout)
   const [currentAccount, setCurrentAccount] = useState<AppAccount | null>(() => {
     const saved = localStorage.getItem('cred_current_account');
@@ -259,50 +254,58 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [providers, setProviders] = useState<Provider[]>(() => {
-    const savedCurrent = localStorage.getItem('cred_current_account');
-    let email: string | null = null;
-    if (savedCurrent) {
+    const saved = localStorage.getItem('cred_providers');
+    if (saved) {
       try {
-        email = JSON.parse(savedCurrent)?.email;
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    if (isSkeletonEmail(email)) {
-      const saved = localStorage.getItem('cred_providers_skeleton');
-      return saved ? JSON.parse(saved) : [];
-    }
-    const saved = localStorage.getItem('cred_providers');
-    return saved ? JSON.parse(saved) : INITIAL_PROVIDERS;
+    return INITIAL_PROVIDERS;
   });
 
   const [payers, setPayers] = useState<Payer[]>(() => {
     const saved = localStorage.getItem('cred_payers');
-    return saved ? JSON.parse(saved) : INITIAL_PAYERS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_PAYERS;
   });
 
   const [entities, setEntities] = useState<LegalEntity[]>(() => {
     const saved = localStorage.getItem('cred_entities');
-    return saved ? JSON.parse(saved) : INITIAL_LEGAL_ENTITIES;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_LEGAL_ENTITIES;
   });
 
   const [locations, setLocations] = useState<Location[]>(() => {
     const saved = localStorage.getItem('cred_locations');
-    return saved ? JSON.parse(saved) : INITIAL_LOCATIONS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_LOCATIONS;
   });
 
   const [records, setRecords] = useState<CredentialingRecord[]>(() => {
-    const savedCurrent = localStorage.getItem('cred_current_account');
-    let email: string | null = null;
-    if (savedCurrent) {
+    const saved = localStorage.getItem('cred_records');
+    if (saved) {
       try {
-        email = JSON.parse(savedCurrent)?.email;
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    if (isSkeletonEmail(email)) {
-      const saved = localStorage.getItem('cred_records_skeleton');
-      return saved ? JSON.parse(saved) : [];
-    }
-    const saved = localStorage.getItem('cred_records');
-    return saved ? JSON.parse(saved) : INITIAL_CREDENTIALING_RECORDS;
+    return INITIAL_CREDENTIALING_RECORDS;
   });
 
   const [users] = useState<User[]>(INITIAL_USERS);
@@ -322,19 +325,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
-    const savedCurrent = localStorage.getItem('cred_current_account');
-    let email: string | null = null;
-    if (savedCurrent) {
+    const saved = localStorage.getItem('cred_notifications');
+    if (saved) {
       try {
-        email = JSON.parse(savedCurrent)?.email;
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    if (isSkeletonEmail(email)) {
-      const saved = localStorage.getItem('cred_notifications_skeleton');
-      return saved ? JSON.parse(saved) : [];
-    }
-    const saved = localStorage.getItem('cred_notifications');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+    return INITIAL_NOTIFICATIONS;
   });
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -370,7 +368,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem('cred_stage_configs', JSON.stringify(stageConfigs));
   }, [stageConfigs]);
 
-  // Sync to localStorage with workspace isolation for skeleton vs demo accounts
+  // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('cred_accounts', JSON.stringify(accounts));
   }, [accounts]);
@@ -384,12 +382,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentAccount]);
 
   useEffect(() => {
-    if (isSkeletonEmail(currentAccount?.email)) {
-      localStorage.setItem('cred_providers_skeleton', JSON.stringify(providers));
-    } else {
-      localStorage.setItem('cred_providers', JSON.stringify(providers));
-    }
-  }, [providers, currentAccount]);
+    localStorage.setItem('cred_providers', JSON.stringify(providers));
+  }, [providers]);
 
   useEffect(() => {
     localStorage.setItem('cred_payers', JSON.stringify(payers));
@@ -404,20 +398,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [locations]);
 
   useEffect(() => {
-    if (isSkeletonEmail(currentAccount?.email)) {
-      localStorage.setItem('cred_records_skeleton', JSON.stringify(records));
-    } else {
-      localStorage.setItem('cred_records', JSON.stringify(records));
-    }
-  }, [records, currentAccount]);
+    localStorage.setItem('cred_records', JSON.stringify(records));
+  }, [records]);
 
   useEffect(() => {
-    if (isSkeletonEmail(currentAccount?.email)) {
-      localStorage.setItem('cred_notifications_skeleton', JSON.stringify(notifications));
-    } else {
-      localStorage.setItem('cred_notifications', JSON.stringify(notifications));
-    }
-  }, [notifications, currentAccount]);
+    localStorage.setItem('cred_notifications', JSON.stringify(notifications));
+  }, [notifications]);
 
   // Sync currentUser with currentAccount changes
   useEffect(() => {
@@ -520,26 +506,15 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [currentAccount, SESSION_TIMEOUT_MS]);
 
-  const switchDataForAccount = (targetAccount: AppAccount) => {
-    if (isSkeletonEmail(targetAccount.email)) {
-      const savedProviders = localStorage.getItem('cred_providers_skeleton');
-      setProviders(savedProviders ? JSON.parse(savedProviders) : []);
+  const switchDataForAccount = (_targetAccount: AppAccount) => {
+    const savedProviders = localStorage.getItem('cred_providers');
+    setProviders(savedProviders ? JSON.parse(savedProviders) : INITIAL_PROVIDERS);
 
-      const savedRecords = localStorage.getItem('cred_records_skeleton');
-      setRecords(savedRecords ? JSON.parse(savedRecords) : []);
+    const savedRecords = localStorage.getItem('cred_records');
+    setRecords(savedRecords ? JSON.parse(savedRecords) : INITIAL_CREDENTIALING_RECORDS);
 
-      const savedNotifications = localStorage.getItem('cred_notifications_skeleton');
-      setNotifications(savedNotifications ? JSON.parse(savedNotifications) : []);
-    } else {
-      const savedProviders = localStorage.getItem('cred_providers');
-      setProviders(savedProviders ? JSON.parse(savedProviders) : INITIAL_PROVIDERS);
-
-      const savedRecords = localStorage.getItem('cred_records');
-      setRecords(savedRecords ? JSON.parse(savedRecords) : INITIAL_CREDENTIALING_RECORDS);
-
-      const savedNotifications = localStorage.getItem('cred_notifications');
-      setNotifications(savedNotifications ? JSON.parse(savedNotifications) : INITIAL_NOTIFICATIONS);
-    }
+    const savedNotifications = localStorage.getItem('cred_notifications');
+    setNotifications(savedNotifications ? JSON.parse(savedNotifications) : INITIAL_NOTIFICATIONS);
   };
 
   // Auth Operations
@@ -1133,7 +1108,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     // 4. System notification
     const approvalNotif: SystemNotification = {
       id: `notif-appr-${Date.now()}`,
-      type: 'STAGE_CHANGE',
+      type: 'APPROVAL_RECEIVED',
       title: `Application Verified & Approved: ${record.id}`,
       message: `Administrator ${currentUser.name} verified and approved application ${record.id} for ${provider ? provider.firstName + ' ' + provider.lastName : 'Provider'} (${record.discipline}) with ${payer?.name || 'Payer'}.`,
       timestamp: new Date().toLocaleString(),

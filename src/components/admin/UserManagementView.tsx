@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { AccessLevel, AppAccount } from '../../types';
+import { isSuperAdmin, canViewPasswords } from '../../utils/rbac';
 import { 
   AlertCircle, 
   ArrowLeft, 
+  Check,
   CheckCircle2, 
   Key, 
   Mail, 
@@ -21,7 +23,10 @@ import {
   X,
   Edit2,
   Building2,
-  Lock
+  Lock,
+  Eye,
+  EyeOff,
+  Crown
 } from 'lucide-react';
 
 interface UserManagementViewProps {
@@ -47,6 +52,15 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [mustChangePasswordOnFirstLogin, setMustChangePasswordOnFirstLogin] = useState(true);
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
+
+  const isCurrentSuperAdmin = isSuperAdmin(currentAccount);
+
+  const togglePasswordReveal = (accId: string) => {
+    if (!isCurrentSuperAdmin) return;
+    setRevealedPasswords(prev => ({ ...prev, [accId]: !prev[accId] }));
+  };
 
   // If not admin, show clear restricted access message
   if (!isAdmin) {
@@ -78,6 +92,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
     setName('');
     setEmail('');
     setPassword('');
+    setMustChangePasswordOnFirstLogin(true);
     setAccessLevel('USER');
     setRoleTitle('Credentialing Specialist');
     setDepartment('Proficio Therapy Credentialing Hub');
@@ -90,6 +105,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
     setName(acc.name);
     setEmail(acc.email);
     setPassword(acc.password || '');
+    setMustChangePasswordOnFirstLogin(acc.mustChangePasswordOnFirstLogin ?? true);
     setAccessLevel(acc.accessLevel);
     setRoleTitle(acc.roleTitle || '');
     setDepartment(acc.department || '');
@@ -114,6 +130,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
         accessLevel,
         roleTitle: roleTitle.trim(),
         department: department.trim(),
+        mustChangePasswordOnFirstLogin
       });
       setMsg({ type: 'success', text: `Account for ${name} updated successfully.` });
       setIsEditing(false);
@@ -126,6 +143,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
         accessLevel,
         roleTitle: roleTitle.trim(),
         department: department.trim(),
+        mustChangePasswordOnFirstLogin
       });
 
       if (res.success) {
@@ -252,16 +270,44 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  {editingAccountId ? 'Password (Leave blank to keep existing)' : 'Initial Password *'}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    {editingAccountId ? 'Password (Leave blank to keep existing)' : 'Initial Password *'}
+                  </label>
+                  {isCurrentSuperAdmin ? (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                      Super Admin Visible
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">
+                      Protected by Super Admin
+                    </span>
+                  )}
+                </div>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={editingAccountId ? '••••••••' : 'Enter login password'}
-                  className="w-full px-3 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D]"
+                  placeholder={editingAccountId ? (isCurrentSuperAdmin ? (password || '••••••••') : '•••••••• (Protected)') : 'Enter login password'}
+                  className="w-full px-3 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D]"
                 />
+              </div>
+
+              {/* Mandatory password change checkbox */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-start space-x-2.5">
+                <input
+                  type="checkbox"
+                  id="user-mgmt-must-change-password"
+                  checked={mustChangePasswordOnFirstLogin}
+                  onChange={(e) => setMustChangePasswordOnFirstLogin(e.target.checked)}
+                  className="mt-0.5 w-3.5 h-3.5 text-[#2B4C9D] border-slate-300 rounded focus:ring-[#2B4C9D] cursor-pointer"
+                />
+                <label htmlFor="user-mgmt-must-change-password" className="text-xs text-slate-700 cursor-pointer select-none">
+                  <span className="font-bold text-slate-900">Require password update on first sign-on</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    User will be forced to choose a new password upon first successful login. Stored passwords can only be audited by Super Administrator.
+                  </p>
+                </label>
               </div>
 
               <div>
@@ -419,7 +465,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
                           </span>
                         </div>
 
-                        <div className="flex items-center space-x-3 text-[11px] text-slate-500 mt-1">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 mt-1">
                           <span className="flex items-center space-x-1 font-mono">
                             <Mail className="w-3 h-3 text-slate-400" />
                             <span>{acc.email}</span>
@@ -429,6 +475,47 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onBackTo
                           )}
                           {acc.department && (
                             <span>• {acc.department}</span>
+                          )}
+                        </div>
+
+                        {/* First signon badge & password inspection */}
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {acc.mustChangePasswordOnFirstLogin ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center space-x-1">
+                              <Key className="w-2.5 h-2.5 text-amber-600" />
+                              <span>First Sign-on: Change Required</span>
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center space-x-1">
+                              <Check className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>First Sign-on: Completed</span>
+                            </span>
+                          )}
+
+                          {isCurrentSuperAdmin ? (
+                            <div className="inline-flex items-center space-x-1 bg-amber-50/60 border border-amber-200 px-2 py-0.5 rounded text-[10px]">
+                              <span className="text-amber-800 font-semibold">Password:</span>
+                              <span className="font-mono text-slate-800 font-bold">
+                                {revealedPasswords[acc.id] ? (acc.password || 'proficio') : '••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => togglePasswordReveal(acc.id)}
+                                className="ml-1 text-amber-700 hover:text-amber-900 cursor-pointer"
+                                title={revealedPasswords[acc.id] ? 'Hide Password' : 'Super Admin: Reveal Stored Password'}
+                              >
+                                {revealedPasswords[acc.id] ? (
+                                  <EyeOff className="w-3 h-3" />
+                                ) : (
+                                  <Eye className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center space-x-1 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-500">
+                              <Lock className="w-2.5 h-2.5 text-slate-400" />
+                              <span>Password: •••••••• (Super Admin Only)</span>
+                            </div>
                           )}
                         </div>
                       </div>

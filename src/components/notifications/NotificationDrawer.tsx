@@ -144,7 +144,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                               }}
                               className="text-xs font-semibold text-sky-700 hover:text-sky-900 flex items-center space-x-1"
                             >
-                              <span>View Provider Profile</span>
+                              <span>View Staff Profile</span>
                               <ExternalLink className="w-3 h-3" />
                             </button>
                           )}

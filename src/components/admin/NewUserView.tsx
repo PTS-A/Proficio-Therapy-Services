@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { AccessLevel, AppAccount, Discipline, SystemRole } from '../../types';
 import { SYSTEM_ROLES, SystemRoleDefinition } from '../../data/roleConfig';
+import { isSuperAdmin, canViewPasswords } from '../../utils/rbac';
 import { 
   AlertCircle, 
   ArrowLeft, 
   Check, 
   CheckCircle2, 
+  ChevronDown, 
   ChevronRight, 
   FileText, 
   Key, 
@@ -32,7 +34,8 @@ import {
   Briefcase,
   Sliders,
   Eye,
-  EyeOff
+  EyeOff,
+  Crown
 } from 'lucide-react';
 
 interface NewUserViewProps {
@@ -65,17 +68,25 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [mustChangePasswordOnFirstLogin, setMustChangePasswordOnFirstLogin] = useState(true);
   const [selectedRole, setSelectedRole] = useState<SystemRole>('Credentialing Specialist');
   const [accessLevel, setAccessLevel] = useState<AccessLevel>('USER');
   const [department, setDepartment] = useState('Proficio Therapy Credentialing Hub');
   const [assignedDisciplines, setAssignedDisciplines] = useState<Discipline[]>(['ABA', 'Speech', 'OT']);
   const [assignedEntities, setAssignedEntities] = useState<string[]>(entities.map(e => e.id));
-  const [customPermissions, setCustomPermissions] = useState<string[]>(
-    SYSTEM_ROLES.find(r => r.id === 'Credentialing Specialist')?.responsibilities || []
-  );
+
+  // Super Admin view password toggles in roster table
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const isCurrentSuperAdmin = isSuperAdmin(currentAccount);
+
+  const togglePasswordReveal = (accountId: string) => {
+    if (!isCurrentSuperAdmin) return;
+    setRevealedPasswords(prev => ({ ...prev, [accountId]: !prev[accountId] }));
+  };
 
   // Selected role configuration
   const currentRoleDef = SYSTEM_ROLES.find(r => r.id === selectedRole) || SYSTEM_ROLES[0];
@@ -86,7 +97,6 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     const def = SYSTEM_ROLES.find(r => r.id === roleId);
     if (def) {
       setAccessLevel(def.defaultAccessLevel);
-      setCustomPermissions([...def.responsibilities]);
       if (!department || department === 'Proficio Therapy Credentialing Hub') {
         if (roleId === 'Billing and Claims') setDepartment('Revenue Cycle & Billing Operations');
         else if (roleId === 'HR/Operations') setDepartment('Human Resources & Staffing');
@@ -99,15 +109,15 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     }
   };
 
-  const togglePermission = (perm: string) => {
-    setCustomPermissions(prev => 
-      prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
-    );
-  };
-
   const toggleDiscipline = (disc: Discipline) => {
     setAssignedDisciplines(prev => 
       prev.includes(disc) ? prev.filter(d => d !== disc) : [...prev, disc]
+    );
+  };
+
+  const toggleEntity = (entityId: string) => {
+    setAssignedEntities(prev =>
+      prev.includes(entityId) ? prev.filter(id => id !== entityId) : [...prev, entityId]
     );
   };
 
@@ -117,10 +127,10 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     setName('');
     setEmail('');
     setPassword('');
+    setMustChangePasswordOnFirstLogin(true);
     setSelectedRole('Credentialing Specialist');
     const defaultRole = SYSTEM_ROLES.find(r => r.id === 'Credentialing Specialist');
     setAccessLevel(defaultRole?.defaultAccessLevel || 'USER');
-    setCustomPermissions(defaultRole ? [...defaultRole.responsibilities] : []);
     setDepartment('Proficio Therapy Credentialing Hub');
     setAssignedDisciplines(['ABA', 'Speech', 'OT']);
     setAssignedEntities(entities.map(e => e.id));
@@ -134,13 +144,13 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     setName(acc.name);
     setEmail(acc.email);
     setPassword(acc.password || '');
+    setMustChangePasswordOnFirstLogin(acc.mustChangePasswordOnFirstLogin ?? true);
     const matchedRole = SYSTEM_ROLES.find(r => r.id === acc.systemRole || r.title === acc.roleTitle) || SYSTEM_ROLES[0];
     setSelectedRole((acc.systemRole as SystemRole) || matchedRole.id);
     setAccessLevel(acc.accessLevel);
     setDepartment(acc.department || 'Proficio Therapy Credentialing Hub');
     setAssignedDisciplines(acc.assignedDisciplines || ['ABA', 'Speech', 'OT']);
     setAssignedEntities(acc.assignedEntities || entities.map(e => e.id));
-    setCustomPermissions(acc.permissions && acc.permissions.length > 0 ? acc.permissions : [...matchedRole.responsibilities]);
     setActiveSubTab('create');
     setToastMsg(null);
   };
@@ -159,6 +169,9 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
       return;
     }
 
+    // Access capabilities are programmed directly within the role configuration in code
+    const programmedPermissions = [...currentRoleDef.responsibilities];
+
     if (editingAccountId) {
       updateAccount(editingAccountId, {
         name: name.trim(),
@@ -170,7 +183,8 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
         department: department.trim(),
         assignedDisciplines,
         assignedEntities,
-        permissions: customPermissions,
+        permissions: programmedPermissions,
+        mustChangePasswordOnFirstLogin,
         status: 'Active'
       });
       setToastMsg({ type: 'success', text: `User login for ${name} (${selectedRole}) updated successfully.` });
@@ -188,7 +202,8 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
         department: department.trim(),
         assignedDisciplines,
         assignedEntities,
-        permissions: customPermissions,
+        permissions: programmedPermissions,
+        mustChangePasswordOnFirstLogin,
         status: 'Active'
       });
 
@@ -341,32 +356,34 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
       {/* SUBTAB 1: CREATE / EDIT USER LOGIN PAGE */}
       {/* ========================================================= */}
       {activeSubTab === 'create' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left / Main Form Column */}
-          <div className="lg:col-span-7 space-y-6">
-            <form onSubmit={handleSaveUser} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-              <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-                    <UserCog className="w-4 h-4 text-[#2B4C9D]" />
-                    <span>{isEditing ? `Editing User: ${name || 'User'}` : 'User Account Credentials & Profile'}</span>
-                  </h2>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Enter authentication details and assign organizational role.
-                  </p>
-                </div>
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleOpenCreateNew}
-                    className="text-xs text-[#2B4C9D] hover:underline font-semibold"
-                  >
-                    + Switch to New User Form
-                  </button>
-                )}
+        <div className="max-w-4xl mx-auto space-y-6">
+          <form onSubmit={handleSaveUser} className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                  <UserCog className="w-5 h-5 text-[#2B4C9D]" />
+                  <span>{isEditing ? `Editing User: ${name || 'User'}` : 'User Account Credentials & Role Provisioning'}</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Specify user credentials and assign their organizational role. System access capabilities are programmed automatically based on the chosen role.
+                </p>
               </div>
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleOpenCreateNew}
+                  className="text-xs text-[#2B4C9D] hover:underline font-semibold"
+                >
+                  + Switch to New User Form
+                </button>
+              )}
+            </div>
 
-              {/* Basic Details */}
+            {/* Basic Account Credentials */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider text-slate-400">
+                1. Account Credentials & Contact Information
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -401,14 +418,22 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* Password & Department */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {isEditing ? 'Password (Leave blank to keep existing)' : 'Login Password *'}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      {isEditing ? 'Password (Leave blank to keep existing)' : 'Login Password *'}
+                    </label>
+                    {isCurrentSuperAdmin ? (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                        Super Admin Visible
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">
+                        Protected by Super Admin
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                     <input
@@ -416,7 +441,7 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                       required={!isEditing}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={isEditing ? '•••••••• (Unchanged)' : 'Enter initial secure password'}
+                      placeholder={isEditing ? (isCurrentSuperAdmin ? (password || '••••••••') : '•••••••• (Protected)') : 'Enter initial secure password'}
                       className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D]"
                     />
                     <button
@@ -446,221 +471,138 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                 </div>
               </div>
 
-              {/* System Role Selection Grid */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-2">
-                  Select User Role Profile <span className="text-rose-500">*</span>
+              {/* First-login password change policy checkbox */}
+              <div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200/80 flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="must-change-password-checkbox"
+                  checked={mustChangePasswordOnFirstLogin}
+                  onChange={(e) => setMustChangePasswordOnFirstLogin(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 text-[#2B4C9D] border-slate-300 rounded focus:ring-[#2B4C9D] cursor-pointer"
+                />
+                <label htmlFor="must-change-password-checkbox" className="text-xs text-slate-700 cursor-pointer select-none">
+                  <span className="font-bold text-slate-900">Require password change upon first sign-on</span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    When enabled, the user will be presented with a mandatory password update prompt upon logging in. Passwords remain viewable only by Super Administrator.
+                  </p>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {SYSTEM_ROLES.map((role) => {
-                    const isSelected = selectedRole === role.id;
-                    return (
-                      <button
-                        type="button"
-                        key={role.id}
-                        onClick={() => handleRoleChange(role.id)}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? 'bg-indigo-50/80 border-[#2B4C9D] ring-2 ring-[#2B4C9D]/30 shadow-xs'
-                            : 'bg-slate-50/60 border-slate-200 hover:bg-slate-100/70 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <span className="text-xs font-bold text-slate-900 block leading-tight">
-                              {role.title}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              {role.category}
-                            </span>
-                          </div>
-                          {isSelected ? (
-                            <span className="w-4 h-4 rounded-full bg-[#2B4C9D] text-white flex items-center justify-center shrink-0">
-                              <Check className="w-2.5 h-2.5 stroke-[3]" />
-                            </span>
-                          ) : (
-                            <span className="w-4 h-4 rounded-full border border-slate-300 shrink-0" />
-                          )}
-                        </div>
-                        <div className="mt-2 flex items-center space-x-1.5">
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${role.badgeColor}`}>
-                            {role.defaultAccessLevel === 'ADMINISTRATOR' ? 'Admin Level' : 'Standard User'}
-                          </span>
-                          <span className="text-[9px] text-slate-400">
-                            {role.responsibilities.length} Core Capabilities
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
+            </div>
 
-              {/* Administrative Security Privilege Override */}
-              <div className="pt-2">
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Access Level Privilege
+            {/* System Role Selection Dropdown */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="system-role-select" className="block text-xs font-bold text-slate-800">
+                  2. Select System Role Profile <span className="text-rose-500">*</span>
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setAccessLevel('ADMINISTRATOR')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      accessLevel === 'ADMINISTRATOR'
-                        ? 'border-[#2B4C9D] bg-indigo-50/70 text-[#2B4C9D] ring-1 ring-[#2B4C9D]'
-                        : 'border-slate-200 bg-slate-50/40 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-1.5 font-bold text-xs">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#2B4C9D]" />
-                      <span>Administrator Access</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                      Can provision logins, manage master payer requirements, view all entities, and configure SLA workflows.
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAccessLevel('USER')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      accessLevel === 'USER'
-                        ? 'border-[#2B4C9D] bg-indigo-50/70 text-[#2B4C9D] ring-1 ring-[#2B4C9D]'
-                        : 'border-slate-200 bg-slate-50/40 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-1.5 font-bold text-xs">
-                      <User className="w-3.5 h-3.5 text-slate-700" />
-                      <span>Standard User Access</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                      Scoped operational access according to assigned role responsibilities and clinical disciplines.
-                    </p>
-                  </button>
-                </div>
-              </div>
-
-              {/* Discipline Scoping */}
-              <div className="pt-2">
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Assigned Clinical Disciplines
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {(['ABA', 'Speech', 'OT'] as Discipline[]).map((disc) => {
-                    const active = assignedDisciplines.includes(disc);
-                    return (
-                      <button
-                        type="button"
-                        key={disc}
-                        onClick={() => toggleDiscipline(disc)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center space-x-1.5 ${
-                          active
-                            ? 'bg-[#2B4C9D] text-white border-[#2B4C9D]'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {active && <Check className="w-3 h-3 stroke-[3]" />}
-                        <span>{disc === 'ABA' ? 'Applied Behavior Analysis (ABA)' : disc === 'Speech' ? 'Speech-Language Pathology (Speech)' : 'Occupational Therapy (OT)'}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center space-x-3">
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-[#2B4C9D] hover:bg-[#203a7a] text-white font-bold rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-2"
-                >
-                  <UserCheck className="w-4 h-4" />
-                  <span>{isEditing ? 'Save User Account Changes' : 'Create & Provision User Login'}</span>
-                </button>
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleOpenCreateNew}
-                    className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-
-          {/* Right Column: Active Role Capabilities Preview & Customizer */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4 sticky top-24">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Access Capabilities</span>
-                  <h3 className="text-xs font-bold text-slate-900 mt-0.5 flex items-center space-x-1.5">
-                    <span>{currentRoleDef.title} Scope</span>
-                  </h3>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentRoleDef.badgeColor}`}>
-                  {customPermissions.length} Active
+                <span className="text-[11px] text-slate-500">
+                  Role automatically determines access capabilities in code
                 </span>
               </div>
 
-              <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
-                {currentRoleDef.description}
-              </p>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-800">
-                    Role Responsibilities & Access Items:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCustomPermissions([...currentRoleDef.responsibilities])}
-                    className="text-[10px] text-[#2B4C9D] font-bold hover:underline flex items-center space-x-1"
-                  >
-                    <RefreshCw className="w-2.5 h-2.5" />
-                    <span>Reset Default</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                  {currentRoleDef.responsibilities.map((resp, idx) => {
-                    const isGranted = customPermissions.includes(resp);
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => togglePermission(resp)}
-                        className={`p-2.5 rounded-xl border text-xs transition-all cursor-pointer flex items-start space-x-2.5 ${
-                          isGranted
-                            ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950 font-medium'
-                            : 'bg-slate-50/50 border-slate-200 text-slate-400 line-through'
-                        }`}
-                      >
-                        <div className={`mt-0.5 w-4 h-4 rounded-md flex items-center justify-center shrink-0 text-white ${
-                          isGranted ? 'bg-emerald-600' : 'bg-slate-300'
-                        }`}>
-                          {isGranted && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                        </div>
-                        <span className="text-[11px] leading-snug flex-1">
-                          {resp}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="relative">
+                <Shield className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                <select
+                  id="system-role-select"
+                  value={selectedRole}
+                  onChange={(e) => handleRoleChange(e.target.value as SystemRole)}
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D] appearance-none cursor-pointer"
+                >
+                  {SYSTEM_ROLES.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.title} — {role.category} ({role.defaultAccessLevel === 'ADMINISTRATOR' ? 'Admin Access' : 'Standard User'})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
               </div>
 
-              <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-[11px] text-[#2B4C9D] space-y-1">
-                <div className="font-bold flex items-center space-x-1">
-                  <Shield className="w-3.5 h-3.5 text-[#2B4C9D]" />
-                  <span>Audit Trail & Role Compliance</span>
+              {/* Selected Role Summary Card */}
+              {currentRoleDef && (
+                <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-slate-900">{currentRoleDef.title}</span>
+                      <span className="text-[10px] text-slate-500 font-medium">• {currentRoleDef.category}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      {currentRoleDef.description}
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex flex-col items-end space-y-1">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentRoleDef.badgeColor}`}>
+                      {currentRoleDef.defaultAccessLevel === 'ADMINISTRATOR' ? 'Admin Level' : 'Standard User'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">Programmed RBAC</span>
+                  </div>
                 </div>
-                <p className="text-[10px] text-slate-600 leading-snug">
-                  Role assignments and custom permission modifications are recorded in the system audit log with timestamps and administrator ID.
-                </p>
+              )}
+            </div>
+
+            {/* Administrative Security Privilege Override */}
+            <div className="space-y-3 pt-2">
+              <label className="block text-xs font-bold text-slate-800">
+                3. Access Level Privilege
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAccessLevel('ADMINISTRATOR')}
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    accessLevel === 'ADMINISTRATOR'
+                      ? 'border-[#2B4C9D] bg-indigo-50/70 text-[#2B4C9D] ring-1 ring-[#2B4C9D]'
+                      : 'border-slate-200 bg-slate-50/40 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1.5 font-bold text-xs">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#2B4C9D]" />
+                    <span>Administrator Access</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Can provision logins, manage master payer requirements, view all entities, and configure SLA workflows.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAccessLevel('USER')}
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    accessLevel === 'USER'
+                      ? 'border-[#2B4C9D] bg-indigo-50/70 text-[#2B4C9D] ring-1 ring-[#2B4C9D]'
+                      : 'border-slate-200 bg-slate-50/40 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1.5 font-bold text-xs">
+                    <User className="w-3.5 h-3.5 text-slate-700" />
+                    <span>Standard User Access</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Scoped operational access according to assigned system role profile.
+                  </p>
+                </button>
               </div>
             </div>
-          </div>
+
+            {/* Submit Buttons */}
+            <div className="pt-4 border-t border-slate-100 flex items-center space-x-3">
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-[#2B4C9D] hover:bg-[#203a7a] text-white font-bold rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>{isEditing ? 'Save User Account Changes' : 'Create & Provision User Login'}</span>
+              </button>
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleOpenCreateNew}
+                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
         </div>
       )}
 
@@ -669,6 +611,19 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
       {/* ========================================================= */}
       {activeSubTab === 'roster' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          {/* Super Admin Access Notification Banner */}
+          {isCurrentSuperAdmin && (
+            <div className="px-5 py-3 bg-amber-50/80 border-b border-amber-200/80 flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs text-amber-900 font-semibold">
+                <Crown className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Super Administrator Privilege Active — You have exclusive authority to inspect system-wide stored user passwords & first sign-on status.</span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200/60 text-amber-900 border border-amber-300 shrink-0">
+                AUDIT PERMITTED
+              </span>
+            </div>
+          )}
+
           {/* Controls Bar */}
           <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
             <div className="flex flex-wrap items-center gap-2">
@@ -773,8 +728,50 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                             </span>
                           )}
                           <span className="text-slate-400 font-medium">
-                            • {activePermsCount} Active Capabilities
+                            • {acc.status || 'Active'}
                           </span>
+                        </div>
+
+                        {/* First Sign-On Status & Password Audit Box */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {acc.mustChangePasswordOnFirstLogin ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center space-x-1">
+                              <Key className="w-2.5 h-2.5 text-amber-600" />
+                              <span>First Sign-on Password Change: Required</span>
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center space-x-1">
+                              <Check className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>First Sign-on Password: Completed</span>
+                            </span>
+                          )}
+
+                          {/* Password viewing - Exclusive to Super Admin */}
+                          {isCurrentSuperAdmin ? (
+                            <div className="inline-flex items-center space-x-1 bg-amber-50/60 border border-amber-200/90 px-2 py-0.5 rounded text-[10px]">
+                              <span className="text-amber-800 font-semibold">Password:</span>
+                              <span className="font-mono text-slate-800 font-bold">
+                                {revealedPasswords[acc.id] ? (acc.password || 'proficio') : '••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => togglePasswordReveal(acc.id)}
+                                className="ml-1 text-amber-700 hover:text-amber-900 cursor-pointer"
+                                title={revealedPasswords[acc.id] ? 'Hide Password' : 'Super Admin: Reveal Stored Password'}
+                              >
+                                {revealedPasswords[acc.id] ? (
+                                  <EyeOff className="w-3 h-3" />
+                                ) : (
+                                  <Eye className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center space-x-1 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-500">
+                              <Lock className="w-2.5 h-2.5 text-slate-400" />
+                              <span>Password: •••••••• (Super Admin Only)</span>
+                            </div>
+                          )}
                         </div>
 
                         {acc.assignedDisciplines && (

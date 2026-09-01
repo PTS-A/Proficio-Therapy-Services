@@ -192,7 +192,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
   const exportToCSV = () => {
     const headers = [
       'Application ID',
-      'Provider Name',
+      'Staff Name',
       'NPI',
       'Discipline',
       'Payer Name',
@@ -253,7 +253,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
               <Layers className="w-5 h-5 text-[#2B4C9D]" />
-              <span>Provider × Payer Credentialing Pipeline</span>
+              <span>Clinical Staff × Payer Credentialing Pipeline</span>
             </h2>
             <p className="text-xs text-slate-500">
               Showing <strong>{filteredRecords.length}</strong> of {records.length} applications
@@ -507,7 +507,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
               <thead>
                 <tr className="bg-slate-50/90 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Application ID</th>
-                  <th className="py-3 px-3">Provider</th>
+                  <th className="py-3 px-3">Clinical Staff</th>
                   <th className="py-3 px-3">Discipline</th>
                   <th className="py-3 px-3">Payer & Type</th>
                   <th className="py-3 px-3">Legal Entity & Location</th>
@@ -549,10 +549,10 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
                           {rec.id}
                         </td>
 
-                        {/* Provider */}
+                        {/* Staff */}
                         <td className="py-3 px-3 whitespace-nowrap">
                           <div className="font-bold text-slate-900">
-                            {provider ? `${provider.firstName} ${provider.lastName}` : 'Unknown Provider'}
+                            {provider ? `${provider.firstName} ${provider.lastName}` : 'Unknown Staff'}
                           </div>
                           <div className="text-[10px] text-slate-400 font-mono">
                             NPI: {provider?.npi}

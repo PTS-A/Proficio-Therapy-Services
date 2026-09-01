@@ -396,7 +396,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
             <Users className="w-5 h-5 text-sky-600" />
-            <span>Provider Directory & 360° Credentialing Profile</span>
+            <span>Clinical Staff Directory & 360° Profile</span>
           </h2>
           <p className="text-xs text-slate-500">
             Comprehensive capture of Basic Info, Employment/Group Affiliation, Multi-Location Delivery, CAQH, PAVE, and Payer Contracts.
@@ -408,7 +408,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
           className="bg-[#2B4C9D] hover:bg-[#223E80] text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 shadow-xs cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>Add New Provider</span>
+          <span>Add Clinical Staff</span>
         </button>
       </div>
 
@@ -535,14 +535,14 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                   <button
                     onClick={() => handleOpenEdit(activeProvider)}
                     className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                    title={isAdmin ? "Edit Provider Master Record (Administrator Access)" : "Edit Provider Details"}
+                    title={isAdmin ? "Edit Clinical Staff Record (Administrator Access)" : "Edit Staff Details"}
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => {
                       if (!isAdmin) {
-                        alert("Deleting provider records requires ADMINISTRATOR access level.");
+                        alert("Deleting staff records requires ADMINISTRATOR access level.");
                         return;
                       }
                       setDeleteConfirmProvider(activeProvider);
@@ -552,7 +552,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                         ? 'text-rose-500 hover:bg-rose-50'
                         : 'text-slate-300 hover:text-slate-400 cursor-not-allowed'
                     }`}
-                    title={isAdmin ? "Delete Provider (Administrator Only)" : "Deleting providers requires Administrator access"}
+                    title={isAdmin ? "Delete Staff Member (Administrator Only)" : "Deleting staff requires Administrator access"}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -1102,7 +1102,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
             </>
           ) : (
             <div className="text-center py-12 text-slate-400 text-xs">
-              Select a provider to view 360° profile.
+              Select a clinical staff member to view 360° profile.
             </div>
           )}
         </div>
@@ -1115,7 +1115,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  {editingProvider ? 'Edit Provider Master Record' : 'Add New Provider Master Record'}
+                  {editingProvider ? 'Edit Clinical Staff Record' : 'Add New Clinical Staff Record'}
                 </h3>
                 <p className="text-[11px] text-slate-500">
                   Capture Basic Info, Employment/Group Affiliation, Practice Locations, CAQH & Credentialing.
@@ -1469,20 +1469,30 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                       value={formData.primaryLocationId}
                       onChange={(e) => {
                         const newPrim = e.target.value;
+                        const targetLoc = locations.find(l => l.id === newPrim);
+                        let updatedServices = [...formData.serviceTypes];
+                        if (targetLoc?.serviceTypes?.includes('In-Home') && !updatedServices.includes('In-Home')) {
+                          updatedServices.push('In-Home');
+                        }
                         setFormData({
                           ...formData,
                           primaryLocationId: newPrim,
+                          serviceTypes: updatedServices,
                           locationIds: Array.from(new Set([newPrim, ...formData.locationIds]))
                         });
                       }}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
                       required
                     >
-                      {locations.map(loc => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name} ({loc.city}, {loc.state})
-                        </option>
-                      ))}
+                      {locations.map(loc => {
+                        const isInHome = loc.locationType === 'In-Home / Mobile' || loc.serviceTypes?.includes('In-Home');
+                        return (
+                          <option key={loc.id} value={loc.id}>
+                            {isInHome ? '🏠 [In-Home / Mobile] ' : '🏥 [Clinic] '}
+                            {loc.name} ({loc.city}, {loc.state})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -1499,7 +1509,9 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                             key={st}
                             onClick={() => toggleServiceType(st)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
-                              isSel ? 'bg-sky-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              isSel 
+                                ? st === 'In-Home' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-sky-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                           >
                             {isSel && <Check className="w-3.5 h-3.5" />}
@@ -1511,25 +1523,46 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                   </div>
 
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">
-                      All Assigned Service Locations (Multi-Select)
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-700">
+                        All Assigned Service Locations (Multi-Select)
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {formData.locationIds.length} of {locations.length} selected
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
                       {locations.map(loc => {
                         const isChecked = formData.locationIds.includes(loc.id);
+                        const isInHome = loc.locationType === 'In-Home / Mobile' || loc.serviceTypes?.includes('In-Home');
                         return (
                           <div
                             key={loc.id}
                             onClick={() => toggleLocation(loc.id)}
-                            className={`p-2.5 rounded-lg border text-xs transition-all cursor-pointer flex items-center justify-between ${
-                              isChecked ? 'bg-white border-sky-500 shadow-xs' : 'bg-slate-100/60 border-transparent text-slate-500'
+                            className={`p-2.5 rounded-xl border text-xs transition-all cursor-pointer flex items-center justify-between ${
+                              isChecked 
+                                ? isInHome 
+                                  ? 'bg-emerald-50/80 border-emerald-500 shadow-xs ring-1 ring-emerald-500/20' 
+                                  : 'bg-white border-sky-500 shadow-xs ring-1 ring-sky-500/20' 
+                                : 'bg-slate-100/60 border-transparent text-slate-500 hover:bg-slate-100'
                             }`}
                           >
-                            <div>
-                              <div className="font-bold text-slate-900">{loc.name}</div>
-                              <div className="text-[10px] text-slate-500">{loc.city}, {loc.state}</div>
+                            <div className="min-w-0 pr-2">
+                              <div className="flex items-center space-x-1.5">
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                                  isInHome ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'
+                                }`}>
+                                  {isInHome ? 'In-Home' : 'Clinic'}
+                                </span>
+                                <span className="font-bold text-slate-900 truncate">{loc.name}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                {loc.city}, {loc.state} {loc.countiesServed && loc.countiesServed.length > 0 ? `• ${loc.countiesServed.slice(0, 2).join(', ')}` : ''}
+                              </div>
                             </div>
-                            {isChecked && <CheckCircle2 className="w-4 h-4 text-sky-600" />}
+                            {isChecked && (
+                              <CheckCircle2 className={`w-4 h-4 shrink-0 ${isInHome ? 'text-emerald-600' : 'text-sky-600'}`} />
+                            )}
                           </div>
                         );
                       })}
@@ -1719,7 +1752,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                     type="submit"
                     className="px-4 py-1.5 text-xs font-bold text-white bg-[#2B4C9D] hover:bg-[#223E80] rounded-lg shadow-xs cursor-pointer"
                   >
-                    {editingProvider ? 'Save Provider Record' : 'Create Provider Record'}
+                    {editingProvider ? 'Save Staff Record' : 'Create Staff Record'}
                   </button>
                 </div>
               </div>
@@ -1736,15 +1769,15 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
               <div className="p-2 bg-red-100 rounded-xl">
                 <Trash2 className="w-5 h-5" />
               </div>
-              <h3 className="text-sm font-bold text-slate-900">Confirm Provider Removal</h3>
+              <h3 className="text-sm font-bold text-slate-900">Confirm Staff Removal</h3>
             </div>
             
             <p className="text-slate-600 mb-4">
-              Are you sure you want to permanently delete <strong>{deleteConfirmProvider.firstName} {deleteConfirmProvider.lastName} ({deleteConfirmProvider.credentials})</strong> from the Provider Master Roster?
+              Are you sure you want to permanently delete <strong>{deleteConfirmProvider.firstName} {deleteConfirmProvider.lastName} ({deleteConfirmProvider.credentials})</strong> from the Clinical Staff Roster?
             </p>
             
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] mb-4">
-              <strong>Admin Notice:</strong> This will remove the provider's linked roster records and affiliations across all legal entities.
+              <strong>Admin Notice:</strong> This will remove the staff member's linked roster records and affiliations across all legal entities.
             </div>
 
             <div className="flex justify-end space-x-2">
@@ -1766,7 +1799,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                 }}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
               >
-                Permanently Delete Provider
+                Permanently Delete Staff Member
               </button>
             </div>
           </div>

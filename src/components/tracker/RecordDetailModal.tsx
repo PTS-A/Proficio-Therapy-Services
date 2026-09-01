@@ -304,7 +304,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
             { id: 'overview', label: 'Overview & Validation', icon: ShieldCheck },
             { id: 'checklist', label: 'Payer Checklist', icon: CheckCircle2, count: (record.checklist || []).length },
             { id: 'followups', label: 'Follow-ups & SLA', icon: Clock, count: (record.followUps || []).length },
-            { id: 'linking', label: 'Provider Linking', icon: Link2 },
+            { id: 'linking', label: 'Staff Linking', icon: Link2 },
             { id: 'documents', label: 'Document Vault', icon: FileText, count: (record.documents || []).length },
             { id: 'audit', label: 'Audit Trail', icon: History, count: (record.auditTrail || []).length },
           ].map((tab) => {
@@ -863,16 +863,16 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
           {/* TAB 4: PROVIDER LINKING (FR-014) & CONTRACTING (FR-030) */}
           {activeTab === 'linking' && (
             <div className="space-y-6">
-              {/* Provider Linking Card */}
+              {/* Staff Linking Card */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                 <div className="flex items-center space-x-2 pb-3 border-b border-slate-100">
                   <Link2 className="w-5 h-5 text-purple-600" />
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">
-                      Provider-to-Group Linking Management
+                      Staff-to-Group Linking Management
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Linking connects credentialed providers to billing group NPIs and locations inside payer systems.
+                      Linking connects credentialed clinical staff to billing group NPIs and locations inside payer systems.
                     </p>
                   </div>
                 </div>
@@ -1139,7 +1139,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
             className="text-sky-700 hover:text-sky-900 font-bold flex items-center space-x-1"
           >
             <UserCheck className="w-4 h-4" />
-            <span>Open Provider 360 Profile ({provider?.firstName} {provider?.lastName})</span>
+            <span>Open Clinical Staff 360 Profile ({provider?.firstName} {provider?.lastName})</span>
           </button>
 
           <div className="flex items-center space-x-2">

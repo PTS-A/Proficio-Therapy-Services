@@ -7,6 +7,7 @@ import { RecordDetailModal } from './components/tracker/RecordDetailModal';
 import { ProviderMaster } from './components/providers/ProviderMaster';
 import { PayerMaster } from './components/payers/PayerMaster';
 import { EntityLocationMaster } from './components/entities/EntityLocationMaster';
+import { LocationsMaster } from './components/locations/LocationsMaster';
 import { LinkingContractingTracker } from './components/linking/LinkingContractingTracker';
 import { ReportsView } from './components/reports/ReportsView';
 import { NotificationDrawer } from './components/notifications/NotificationDrawer';
@@ -16,7 +17,9 @@ import { NewUserView } from './components/admin/NewUserView';
 import { DataImportView } from './components/admin/DataImportView';
 import { SystemConfigView } from './components/admin/SystemConfigView';
 import { LoginPage } from './components/auth/LoginPage';
+import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { Discipline } from './types';
+import { canAccessTab, getAllowedTabs } from './utils/rbac';
 
 const MainContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTabType>('dashboard');
@@ -28,6 +31,16 @@ const MainContent: React.FC = () => {
   const [isNewAppModalOpen, setIsNewAppModalOpen] = useState<boolean>(false);
 
   const { setFilters, currentAccount } = useCredentialing();
+
+  // Enforce RBAC navigation constraints: if current activeTab is not allowed, fallback to first authorized tab
+  React.useEffect(() => {
+    if (currentAccount && !canAccessTab(currentAccount, activeTab)) {
+      const allowed = getAllowedTabs(currentAccount);
+      if (allowed.length > 0) {
+        setActiveTab(allowed[0]);
+      }
+    }
+  }, [currentAccount, activeTab]);
 
   // If user is not logged in, display the clean dedicated Login Page
   if (!currentAccount) {
@@ -78,8 +91,7 @@ const MainContent: React.FC = () => {
             onSelectProvider={handleSelectProvider}
             onNavigateToTracker={handleNavigateToTracker}
             onNavigateToLinking={handleNavigateToLinking}
-            onOpenImportModal={() => setActiveTab('import')}
-            onOpenUserManagementModal={() => setActiveTab('users')}
+            onNavigateToLocations={() => setActiveTab('locations')}
             onOpenAddProvider={handleOpenAddProvider}
           />
         )}
@@ -112,6 +124,24 @@ const MainContent: React.FC = () => {
               }}
             />
           </div>
+        )}
+
+        {activeTab === 'locations' && (
+          <LocationsMaster
+            onSelectRecord={handleSelectRecord}
+            onNavigateToStaff={(locationId) => {
+              if (locationId) {
+                setFilters((prev) => ({ ...prev, locationId }));
+              }
+              setActiveTab('providers');
+            }}
+            onNavigateToTracker={(locationId) => {
+              if (locationId) {
+                setFilters((prev) => ({ ...prev, locationId }));
+              }
+              setActiveTab('tracker');
+            }}
+          />
         )}
 
         {activeTab === 'entities' && (
@@ -182,6 +212,9 @@ const MainContent: React.FC = () => {
         onClose={() => setIsNewAppModalOpen(false)}
         onSelectRecord={handleSelectRecord}
       />
+
+      {/* Mandatory First Sign-On Password Setup Modal */}
+      <ForcePasswordChangeModal />
     </div>
   );
 };

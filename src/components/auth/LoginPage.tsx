@@ -141,73 +141,102 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+        </div>
 
-          {/* Quick Sign-In Selection (Preview & Production) */}
-          <div className="pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-              Quick One-Click Sign In
-            </p>
-            <div className="space-y-2">
+        {/* Quick Role Profile Quick-Select & Constraint Inspector */}
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Test System Role Profiles & Constraints
+            </h3>
+            <span className="text-[10px] text-slate-400 font-mono">8 Profiles</span>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Click any profile below to populate credentials and test role-restricted tab constraints and first-login password updates:
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            {[
+              {
+                role: 'Super Administrator',
+                email: 'superadmin@proficiotherapy.com',
+                pw: 'superadmin123',
+                badge: 'bg-amber-50 text-amber-900 border-amber-200',
+                scope: 'Full Access & View Passwords',
+              },
+              {
+                role: 'Credentialing Lead',
+                email: 'manager@proficiotherapy.com',
+                pw: 'proficioadmin',
+                badge: 'bg-blue-50 text-blue-800 border-blue-200',
+                scope: 'Workflow & User Admin',
+              },
+              {
+                role: 'Credentialing Specialist',
+                email: 'specialist@proficiotherapy.com',
+                pw: 'user123',
+                badge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                scope: 'Apps, Providers, Linking',
+              },
+              {
+                role: 'Billing & Claims',
+                email: 'billing@proficiotherapy.com',
+                pw: 'user123',
+                badge: 'bg-cyan-50 text-cyan-800 border-cyan-200',
+                scope: 'Linking, Payers, Reports',
+              },
+              {
+                role: 'HR/Operations',
+                email: 'hroperations@proficiotherapy.com',
+                pw: 'user123',
+                badge: 'bg-violet-50 text-violet-800 border-violet-200',
+                scope: 'Providers, Locations, Entities',
+              },
+              {
+                role: 'Clinical Team',
+                email: 'clinical@proficiotherapy.com',
+                pw: 'user123',
+                badge: 'bg-teal-50 text-teal-800 border-teal-200',
+                scope: 'Clinical Staff & Reports',
+              },
+              {
+                role: 'Leadership / Mgmt',
+                email: 'leadership@proficiotherapy.com',
+                pw: 'proficio',
+                badge: 'bg-purple-50 text-purple-800 border-purple-200',
+                scope: 'Reports & Dashboard',
+              },
+              {
+                role: 'Rendering Provider',
+                email: 'provider@proficiotherapy.com',
+                pw: 'user123',
+                badge: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+                scope: 'Self Profile & Apps',
+              },
+            ].map((p) => (
               <button
+                key={p.email}
                 type="button"
                 onClick={() => {
-                  setEmail('demo@proficiotherapy.com');
-                  setPassword('proficio');
-                  login('demo@proficiotherapy.com', 'proficio');
+                  setEmail(p.email);
+                  setPassword(p.pw);
+                  setError(null);
                 }}
-                className="w-full p-2.5 bg-slate-50 hover:bg-sky-50/80 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition-all flex items-center justify-between group cursor-pointer"
+                className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 hover:border-[#2B4C9D]/40 text-left transition-all cursor-pointer group"
               >
-                <div>
-                  <div className="text-xs font-bold text-slate-800 group-hover:text-[#2B4C9D]">
-                    Proficio Administrator (Admin Authority)
-                  </div>
-                  <div className="text-[11px] text-slate-400">demo@proficiotherapy.com</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-800 group-hover:text-[#2B4C9D] truncate">
+                    {p.role}
+                  </span>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${p.badge}`}>
+                    {p.scope}
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold bg-[#2B4C9D]/10 text-[#2B4C9D] px-2 py-0.5 rounded-full">
-                  Admin
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('admin@example.com');
-                  setPassword('admin');
-                  login('admin@example.com', 'admin');
-                }}
-                className="w-full p-2.5 bg-slate-50 hover:bg-sky-50/80 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <div>
-                  <div className="text-xs font-bold text-slate-800 group-hover:text-[#2B4C9D]">
-                    Executive Administrator (Full Access)
-                  </div>
-                  <div className="text-[11px] text-slate-400">admin@example.com</div>
+                <div className="text-[10px] text-slate-400 font-mono truncate mt-0.5">
+                  {p.email}
                 </div>
-                <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
-                  Admin
-                </span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('sanjay.tom@ageslearningsolutions.com');
-                  setPassword('user123');
-                  login('sanjay.tom@ageslearningsolutions.com', 'user123');
-                }}
-                className="w-full p-2.5 bg-slate-50 hover:bg-sky-50/80 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <div>
-                  <div className="text-xs font-bold text-slate-800 group-hover:text-[#2B4C9D]">
-                    Sanjay Tom (Specialist)
-                  </div>
-                  <div className="text-[11px] text-slate-400">sanjay.tom@ageslearningsolutions.com</div>
-                </div>
-                <span className="text-[10px] font-bold bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">
-                  Specialist
-                </span>
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       </div>

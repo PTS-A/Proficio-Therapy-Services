@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { isSuperAdmin } from '../utils/rbac';
 import {
   AccessLevel,
   AppAccount,
   ApplicationType,
   AuditEntry,
   ChecklistItem,
+  ContractStatus,
   CredentialingRecord,
   CredentialingStage,
   Discipline,
@@ -73,8 +75,10 @@ interface CredentialingContextType {
   accounts: AppAccount[];
   currentAccount: AppAccount | null;
   isAdmin: boolean;
+  isSuperAdminUser: boolean;
   login: (email: string, password?: string) => { success: boolean; error?: string };
   logout: (reason?: string) => void;
+  changePassword: (newPassword: string) => { success: boolean; error?: string };
   sessionTimeoutMessage: string | null;
   sessionSecondsLeft: number;
   resetSessionTimer: () => void;
@@ -146,6 +150,19 @@ interface CredentialingContextType {
     assignedSpecialistId?: string;
     intakeDate?: string;
     notes?: string;
+    // Additional comprehensive fields from intake form
+    discipline?: Discipline;
+    stage?: CredentialingStage;
+    linkingStatus?: LinkingStatus;
+    linkEffectiveDate?: string;
+    contractStatus?: ContractStatus;
+    contractEffectiveDate?: string;
+    paveTrackingNumber?: string;
+    dhcsApprovalDate?: string;
+    paveNotes?: string;
+    caqhStatusAtSubmission?: string;
+    // Provider Profile Updates to persist
+    providerUpdates?: Partial<Provider>;
   }) => CredentialingRecord;
   updateRecord: (id: string, updates: Partial<CredentialingRecord>) => void;
   advanceRecordStage: (
@@ -177,6 +194,8 @@ interface CredentialingContextType {
   updateEntity: (id: string, updates: Partial<LegalEntity>) => void;
   addLocation: (locData: Omit<Location, 'id'>) => Location;
   updateLocation: (id: string, updates: Partial<Location>) => void;
+  deleteLocation: (id: string) => { success: boolean; error?: string };
+  toggleLocationStatus: (id: string) => void;
 
   // Notifications
   markNotificationRead: (id: string) => void;
@@ -202,20 +221,29 @@ interface CredentialingContextType {
 const CredentialingContext = createContext<CredentialingContextType | undefined>(undefined);
 
 export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts State
+  // Accounts State - Ensure all 8 system role profiles exist
   const [accounts, setAccounts] = useState<AppAccount[]>(() => {
     const saved = localStorage.getItem('cred_accounts');
     if (saved) {
       try {
         const parsed: AppAccount[] = JSON.parse(saved);
         let list = [...parsed];
-        // Ensure both clean admin and demo admin accounts are always present
-        if (!list.some((a) => a.email.toLowerCase() === 'admin@example.com')) {
-          list = [INITIAL_ACCOUNTS[0], ...list];
-        }
-        if (!list.some((a) => a.email.toLowerCase() === 'demo@proficiotherapy.com')) {
-          list = [...list, INITIAL_ACCOUNTS[1]];
-        }
+        
+        // Ensure all 8 system role profiles from INITIAL_ACCOUNTS are present
+        INITIAL_ACCOUNTS.forEach((initAcc) => {
+          const index = list.findIndex((a) => a.email.toLowerCase() === initAcc.email.toLowerCase());
+          if (index === -1) {
+            list.push(initAcc);
+          } else {
+            // Keep existing password/customizations but ensure role metadata & Super Admin flags
+            list[index] = {
+              ...initAcc,
+              ...list[index],
+              systemRole: list[index].systemRole || initAcc.systemRole,
+              isSuperAdmin: initAcc.isSuperAdmin ?? list[index].isSuperAdmin,
+            };
+          }
+        });
         return list;
       } catch (e) {
         return INITIAL_ACCOUNTS;
@@ -290,8 +318,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     const saved = localStorage.getItem('cred_locations');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const parsed: Location[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure new initial in-home locations are merged if missing
+          const existingIds = new Set(parsed.map((l) => l.id));
+          const missingInitials = INITIAL_LOCATIONS.filter((l) => !existingIds.has(l.id));
+          if (missingInitials.length > 0) {
+            return [...parsed, ...missingInitials];
+          }
+          return parsed;
+        }
       } catch (e) {}
     }
     return INITIAL_LOCATIONS;
@@ -356,7 +392,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
+  const isSuperAdminUser = isSuperAdmin(currentAccount);
+
   const isAdmin = 
+    isSuperAdminUser ||
     currentAccount?.accessLevel === 'ADMINISTRATOR' || 
     currentUser.role === 'Admin' || 
     currentUser.role === 'Manager' || 
@@ -562,20 +601,52 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const changePassword = (newPassword: string): { success: boolean; error?: string } => {
+    if (!currentAccount) {
+      return { success: false, error: 'No active user session found.' };
+    }
+    const cleanPwd = newPassword.trim();
+    if (cleanPwd.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters in length.' };
+    }
+
+    const updated: AppAccount = {
+      ...currentAccount,
+      password: cleanPwd,
+      mustChangePasswordOnFirstLogin: false,
+      hasChangedInitialPassword: true,
+    };
+
+    setCurrentAccount(updated);
+    setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    return { success: true };
+  };
+
   const createAccount = (accData: Omit<AppAccount, 'id' | 'createdAt'>): { success: boolean; account?: AppAccount; error?: string } => {
     const cleanEmail = accData.email.trim().toLowerCase();
     if (accounts.some((a) => a.email.toLowerCase() === cleanEmail)) {
       return { success: false, error: 'An account with this email already exists.' };
     }
 
+    const isRoleSuperAdmin = accData.systemRole === 'System Administrator';
+
     const newAcc: AppAccount = {
+      ...accData,
       id: `acc-${Date.now()}`,
       name: accData.name.trim(),
       email: cleanEmail,
       password: accData.password || 'proficio',
-      accessLevel: accData.accessLevel || 'USER',
+      accessLevel: accData.accessLevel || (isRoleSuperAdmin ? 'ADMINISTRATOR' : 'USER'),
+      systemRole: accData.systemRole,
       roleTitle: accData.roleTitle || (accData.accessLevel === 'ADMINISTRATOR' ? 'Credentialing Administrator' : 'Credentialing Specialist'),
       department: accData.department || 'Proficio Therapy Credentialing Hub',
+      assignedDisciplines: accData.assignedDisciplines,
+      assignedEntities: accData.assignedEntities,
+      permissions: accData.permissions,
+      status: accData.status || 'Active',
+      mustChangePasswordOnFirstLogin: accData.mustChangePasswordOnFirstLogin ?? true,
+      hasChangedInitialPassword: accData.hasChangedInitialPassword ?? false,
+      isSuperAdmin: accData.isSuperAdmin ?? isRoleSuperAdmin,
       createdAt: new Date().toISOString().split('T')[0],
       lastLogin: new Date().toISOString().split('T')[0],
     };
@@ -666,7 +737,34 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     assignedSpecialistId?: string;
     intakeDate?: string;
     notes?: string;
+    discipline?: Discipline;
+    stage?: CredentialingStage;
+    linkingStatus?: LinkingStatus;
+    linkEffectiveDate?: string;
+    contractStatus?: ContractStatus;
+    contractEffectiveDate?: string;
+    paveTrackingNumber?: string;
+    dhcsApprovalDate?: string;
+    paveNotes?: string;
+    caqhStatusAtSubmission?: string;
+    providerUpdates?: Partial<Provider>;
   }): CredentialingRecord => {
+    // If provider updates were provided in the intake form, apply them directly to provider profile
+    if (data.providerUpdates && Object.keys(data.providerUpdates).length > 0) {
+      setProviders((prev) =>
+        prev.map((p) => {
+          if (p.id === data.providerId) {
+            return {
+              ...p,
+              ...data.providerUpdates,
+              updatedAt: new Date().toISOString().split('T')[0],
+            };
+          }
+          return p;
+        })
+      );
+    }
+
     const provider = providers.find((p) => p.id === data.providerId);
     const payer = payers.find((p) => p.id === data.payerId);
     const assignedUser = users.find((u) => u.id === data.assignedSpecialistId) || currentUser;
@@ -679,9 +777,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Derive automated checklist based on payer requirements (FR-009)
     const checklist: ChecklistItem[] = [
-      { id: `chk-${Date.now()}-1`, title: 'NPI & NPPES Validation', category: 'Validation', isRequired: true, isCompleted: provider?.npiVerified || false },
-      { id: `chk-${Date.now()}-2`, title: 'State Professional License Verified', category: 'Document', isRequired: true, isCompleted: !!provider?.licenseNumber },
-      { id: `chk-${Date.now()}-3`, title: 'CAQH Profile Attestation Verified', category: 'Validation', isRequired: true, isCompleted: provider?.caqhStatus === 'Attested' },
+      { id: `chk-${Date.now()}-1`, title: 'NPI & NPPES Validation', category: 'Validation', isRequired: true, isCompleted: (data.providerUpdates?.npiVerified ?? provider?.npiVerified) || false },
+      { id: `chk-${Date.now()}-2`, title: 'State Professional License Verified', category: 'Document', isRequired: true, isCompleted: !!(data.providerUpdates?.licenseNumber ?? provider?.licenseNumber) },
+      { id: `chk-${Date.now()}-3`, title: 'CAQH Profile Attestation Verified', category: 'Validation', isRequired: true, isCompleted: (data.providerUpdates?.caqhStatus ?? provider?.caqhStatus) === 'Attested' },
       { id: `chk-${Date.now()}-4`, title: 'Entity & DBA Match Confirmation', category: 'Validation', isRequired: true, isCompleted: true },
       { id: `chk-${Date.now()}-5`, title: 'Malpractice / COI Current', category: 'Document', isRequired: true, isCompleted: true },
       ...(payer?.requiredDocuments.map((doc, idx) => ({
@@ -700,8 +798,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       entityId: data.entityId,
       locationId: data.locationId,
       applicationType: data.applicationType,
-      discipline: provider?.disciplines[0] || 'ABA',
-      stage: 'Intake',
+      discipline: data.discipline || provider?.disciplines[0] || 'ABA',
+      stage: data.stage || 'Intake',
       assignedSpecialistId: assignedUser.id,
       assignedSpecialistName: assignedUser.name,
       intakeDate: todayStr,
@@ -709,8 +807,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       isOverdue: false,
       daysInCurrentStage: 0,
       totalCycleDays: 0,
-      linkingStatus: data.applicationType === 'Provider linking' ? 'Pending Approval' : 'Not Applicable',
-      contractStatus: 'Contract Executed',
+      linkingStatus: data.linkingStatus || (data.applicationType === 'Provider linking' ? 'Pending Approval' : 'Not Applicable'),
+      linkEffectiveDate: data.linkEffectiveDate,
+      contractStatus: data.contractStatus || 'Contract Executed',
+      contractEffectiveDate: data.contractEffectiveDate,
+      paveTrackingNumber: data.paveTrackingNumber,
+      dhcsApprovalDate: data.dhcsApprovalDate,
+      paveNotes: data.paveNotes,
+      caqhStatusAtSubmission: data.caqhStatusAtSubmission || provider?.caqhStatus,
       followUps: [],
       checklist,
       documents: [],
@@ -1316,6 +1420,24 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     setLocations((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)));
   };
 
+  const deleteLocation = (id: string): { success: boolean; error?: string } => {
+    const inUseInRecords = records.some((r) => r.locationId === id);
+    if (inUseInRecords) {
+      return {
+        success: false,
+        error: 'Cannot delete location: active credentialing applications are currently linked to this facility or territory.',
+      };
+    }
+    setLocations((prev) => prev.filter((l) => l.id !== id));
+    return { success: true };
+  };
+
+  const toggleLocationStatus = (id: string) => {
+    setLocations((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, active: !l.active } : l))
+    );
+  };
+
   // Notifications
   const markNotificationRead = (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
@@ -1805,8 +1927,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         accounts,
         currentAccount,
         isAdmin,
+        isSuperAdminUser,
         login,
         logout,
+        changePassword,
         sessionTimeoutMessage,
         sessionSecondsLeft,
         resetSessionTimer,
@@ -1856,6 +1980,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         updateEntity,
         addLocation,
         updateLocation,
+        deleteLocation,
+        toggleLocationStatus,
         markNotificationRead,
         markAllNotificationsRead,
         kpis,

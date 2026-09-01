@@ -3,6 +3,13 @@ import { useCredentialing } from '../../context/CredentialingContext';
 import { Discipline } from '../../types';
 import { ProficioLogo } from '../common/ProficioLogo';
 import { 
+  canAccessTab, 
+  isSuperAdmin, 
+  canManageUsers, 
+  canPerformBulkImport, 
+  canEditSystemSettings 
+} from '../../utils/rbac';
+import { 
   Building2, 
   ChevronDown, 
   FileText, 
@@ -16,6 +23,7 @@ import {
   UserPlus,
   LogOut,
   ShieldCheck,
+  ShieldAlert,
   User,
   BarChart3,
   Sliders,
@@ -30,6 +38,7 @@ export type ActiveTabType =
   | 'linking' 
   | 'providers' 
   | 'payers' 
+  | 'locations'
   | 'entities' 
   | 'reports'
   | 'users'
@@ -43,10 +52,6 @@ interface HeaderProps {
   onOpenNewApplication: () => void;
   onOpenAddProvider: () => void;
   onOpenNotificationDrawer: () => void;
-  onOpenImportModal?: () => void;
-  onOpenConfigModal?: () => void;
-  onOpenAuthModal?: () => void;
-  onOpenUserManagementModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -79,15 +84,19 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navItems = [
+  const allNavItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
     { id: 'tracker' as const, label: 'Applications', icon: FileText },
-    { id: 'linking' as const, label: 'Provider Linking', icon: Building2 },
-    { id: 'providers' as const, label: 'Providers', icon: Users },
-    { id: 'payers' as const, label: 'Payers', icon: MapPin },
+    { id: 'linking' as const, label: 'Staff Linking', icon: Building2 },
+    { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
+    { id: 'locations' as const, label: 'Locations', icon: MapPin },
+    { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
-    ...(isAdmin ? [{ id: 'new-user' as const, label: 'New User', icon: UserPlus }] : []),
+    { id: 'new-user' as const, label: 'Users & RBAC', icon: UserPlus },
   ];
+
+  // Strictly filter navigation items so users only see assigned tabs
+  const navItems = allNavItems.filter((item) => canAccessTab(currentAccount, item.id));
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
@@ -176,13 +185,24 @@ export const Header: React.FC<HeaderProps> = ({
               {userMenuOpen && (
                 <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 text-xs text-slate-700 animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="px-3 py-2 border-b border-slate-100">
-                    <p className="font-semibold text-slate-900">{currentAccount?.name || 'Admin User'}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-slate-900">{currentAccount?.name || 'User'}</p>
+                      {isSuperAdmin(currentAccount) && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                          SUPER ADMIN
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-500 truncate">{currentAccount?.email || 'demo@proficiotherapy.com'}</p>
                     <div className="mt-1 flex items-center justify-between">
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                        isAdmin ? 'bg-indigo-50 text-[#2B4C9D] border border-indigo-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded truncate max-w-[140px] ${
+                        isSuperAdmin(currentAccount)
+                          ? 'bg-amber-50 text-amber-900 border border-amber-200'
+                          : isAdmin
+                          ? 'bg-indigo-50 text-[#2B4C9D] border border-indigo-100'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                       }`}>
-                        {isAdmin ? 'Full Administrator' : 'Standard Specialist'}
+                        {currentAccount?.systemRole || (isAdmin ? 'Administrator' : 'Specialist')}
                       </span>
                       <div 
                         title="Session automatically logs out after 20 minutes of inactivity"
@@ -198,7 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                   {/* Subpage Links */}
                   <div className="py-1">
-                    {isAdmin && (
+                    {canManageUsers(currentAccount) && (
                       <button
                         onClick={() => {
                           setUserMenuOpen(false);
@@ -210,40 +230,61 @@ export const Header: React.FC<HeaderProps> = ({
                       >
                         <div className="flex items-center space-x-2">
                           <UserPlus className="w-4 h-4 text-[#2B4C9D]" />
-                          <span>User Management & Permissions</span>
+                          <span>User Profiles & Passwords</span>
                         </div>
                       </button>
                     )}
 
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        setActiveTab('import');
-                      }}
-                      className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
-                        activeTab === 'import' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Database className="w-4 h-4 text-emerald-600" />
-                        <span>Import Excel / Bulk Ingestion</span>
-                      </div>
-                    </button>
+                    {canAccessTab(currentAccount, 'locations') && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('locations');
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                          activeTab === 'locations' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="w-4 h-4 text-[#2B4C9D]" />
+                          <span>Clinic & Practice Locations</span>
+                        </div>
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        setActiveTab('settings');
-                      }}
-                      className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
-                        activeTab === 'settings' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Settings className="w-4 h-4 text-slate-400" />
-                        <span>System Settings & Configuration</span>
-                      </div>
-                    </button>
+                    {canPerformBulkImport(currentAccount) && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('import');
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                          activeTab === 'import' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Database className="w-4 h-4 text-emerald-600" />
+                          <span>Import Excel / Ingestion</span>
+                        </div>
+                      </button>
+                    )}
+
+                    {canEditSystemSettings(currentAccount) && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('settings');
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                          activeTab === 'settings' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Settings className="w-4 h-4 text-slate-400" />
+                          <span>System Settings & Configuration</span>
+                        </div>
+                      </button>
+                    )}
                   </div>
 
                   <div className="border-t border-slate-100 my-1"></div>

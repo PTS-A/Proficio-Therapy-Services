@@ -28,8 +28,7 @@ interface ManagementDashboardProps {
   onSelectProvider: (providerId: string) => void;
   onNavigateToTracker: (discipline?: Discipline) => void;
   onNavigateToLinking: () => void;
-  onOpenImportModal?: () => void;
-  onOpenUserManagementModal?: () => void;
+  onNavigateToLocations?: () => void;
   onOpenAddProvider?: () => void;
 }
 
@@ -40,6 +39,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   onSelectProvider,
   onNavigateToTracker,
   onNavigateToLinking,
+  onNavigateToLocations,
   onOpenAddProvider,
 }) => {
   const { 
@@ -387,7 +387,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Total Providers</span>
+                  <span className="text-[11px] font-medium text-slate-500">Total Clinical Staff</span>
                   <div className="p-1.5 bg-blue-50 text-[#2B4C9D] rounded-lg group-hover:bg-[#2B4C9D] group-hover:text-white transition-colors">
                     <Users className="w-3.5 h-3.5" />
                   </div>
@@ -838,7 +838,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-100 font-semibold">
                   <tr>
-                    <th className="py-3 px-4">Provider</th>
+                    <th className="py-3 px-4">Clinical Staff</th>
                     <th className="py-3 px-4">Discipline</th>
                     <th className="py-3 px-4">Payer</th>
                     <th className="py-3 px-4">Entity</th>
@@ -921,7 +921,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">{stat.name}</h3>
-                    <span className="text-[11px] text-slate-500">{stat.totalProviders} Active Providers</span>
+                    <span className="text-[11px] text-slate-500">{stat.totalProviders} Active Staff</span>
                   </div>
                   {getDisciplinePill(stat.discipline)}
                 </div>
@@ -1251,16 +1251,25 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       {/* ========================================================================= */}
       {activeTab === 'location' && (
         <div className="space-y-6">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                 <MapPin className="w-5 h-5 text-[#2B4C9D]" />
-                <span>Credentialing by Clinical Location & Satellite</span>
+                <span>Credentialing by Clinical Location & In-Home Network</span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Facility readiness &bull; Credentialed providers, pending providers, payer coverage, and location additions.
+                Facility & in-home readiness &bull; Credentialed staff, pending staff, payer coverage, and location additions.
               </p>
             </div>
+            {onNavigateToLocations && (
+              <button
+                onClick={onNavigateToLocations}
+                className="px-3.5 py-1.5 bg-[#2B4C9D] hover:bg-[#203a7a] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center space-x-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Manage & Add Locations</span>
+              </button>
+            )}
           </div>
 
           {/* Locations Table */}
@@ -1271,8 +1280,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   <tr>
                     <th className="py-3 px-4">Clinic / Practice Location</th>
                     <th className="py-3 px-4">Address / Entity</th>
-                    <th className="py-3 px-4 text-center">Credentialed Providers</th>
-                    <th className="py-3 px-4 text-center">Pending Providers</th>
+                    <th className="py-3 px-4 text-center">Credentialed Staff</th>
+                    <th className="py-3 px-4 text-center">Pending Staff</th>
                     <th className="py-3 px-4 text-center">Payer Coverage</th>
                     <th className="py-3 px-4 text-center">Location Addition Status</th>
                     <th className="py-3 px-4 text-right">Actions</th>

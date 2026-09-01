@@ -45,10 +45,10 @@ export const LinkingContractingTracker: React.FC<LinkingContractingTrackerProps>
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
             <Link2 className="w-5 h-5 text-[#2B4C9D]" />
-            <span>Provider-to-Group Linking</span>
+            <span>Staff-to-Group Linking</span>
           </h2>
           <p className="text-xs text-slate-500">
-            Track rendering provider enrollment, group NPI affiliations, and billing readiness.
+            Track rendering clinical staff enrollment, group NPI affiliations, and billing readiness.
           </p>
         </div>
 
@@ -110,7 +110,7 @@ export const LinkingContractingTracker: React.FC<LinkingContractingTrackerProps>
             <thead>
               <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[10px]">
                 <th className="py-3 px-4">Application ID</th>
-                <th className="py-3 px-3">Provider</th>
+                <th className="py-3 px-3">Clinical Staff</th>
                 <th className="py-3 px-3">Discipline</th>
                 <th className="py-3 px-3">Payer</th>
                 <th className="py-3 px-3">Legal Entity & Group NPI</th>

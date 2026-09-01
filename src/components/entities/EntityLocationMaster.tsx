@@ -809,6 +809,7 @@ export const EntityLocationMaster: React.FC = () => {
                   >
                     <option value="Active">Active Lease</option>
                     <option value="Sublease">Active Sublease</option>
+                    <option value="Not Applicable">Not Applicable (In-Home / Mobile)</option>
                     <option value="Missing">Pending / Missing</option>
                     <option value="Expired">Expired</option>
                   </select>

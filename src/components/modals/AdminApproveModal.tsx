@@ -186,7 +186,7 @@ export const AdminApproveModal: React.FC<AdminApproveModalProps> = ({
                       <div className="flex items-center space-x-2">
                         <span className="font-mono font-bold text-[#2B4C9D]">{rec.id}</span>
                         <span className="font-semibold text-slate-900">
-                          {prov ? `${prov.firstName} ${prov.lastName}` : 'Provider'}
+                          {prov ? `${prov.firstName} ${prov.lastName}` : 'Staff Member'}
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono">NPI: {prov?.npi}</span>
                         <span
@@ -322,7 +322,7 @@ export const AdminApproveModal: React.FC<AdminApproveModalProps> = ({
                   className="rounded text-[#2B4C9D] focus:ring-[#2B4C9D] h-4 w-4"
                 />
                 <span className="text-xs text-slate-700">
-                  <strong>Activate Provider Linking & In-Network Status:</strong> Advance application directly to <strong className="text-emerald-700 font-bold">Linked / Effective</strong> and update provider directory enrollments.
+                  <strong>Activate Staff Linking & In-Network Status:</strong> Advance application directly to <strong className="text-emerald-700 font-bold">Linked / Effective</strong> and update clinical staff directory enrollments.
                 </span>
               </label>
             </div>

@@ -126,7 +126,7 @@ export const ReportsView: React.FC = () => {
 
   // Export CSV handler
   const handleExportCsv = () => {
-    const headers = ['Application ID', 'Provider', 'Discipline', 'Payer', 'Entity', 'Stage', 'Intake Date', 'Submission Date', 'Approval Date', 'Effective Date', 'Days in Process', 'Overdue'];
+    const headers = ['Application ID', 'Clinical Staff', 'Discipline', 'Payer', 'Entity', 'Stage', 'Intake Date', 'Submission Date', 'Approval Date', 'Effective Date', 'Days in Process', 'Overdue'];
     const rows = records.map(r => {
       const p = providers.find(prov => prov.id === r.providerId);
       const pay = payers.find(payer => payer.id === r.payerId);
@@ -447,7 +447,7 @@ export const ReportsView: React.FC = () => {
                   return (
                     <div key={rec.id} className="py-2 flex items-center justify-between">
                       <div>
-                        <span className="font-bold text-slate-900">{prov?.fullName || 'Provider'}</span>
+                        <span className="font-bold text-slate-900">{prov?.fullName || 'Staff Member'}</span>
                         <span className="text-slate-500"> • {pay?.name} ({rec.discipline})</span>
                         <p className="text-[11px] text-purple-800 mt-0.5 font-medium">
                           {rec.nextAction || rec.externalDelayReason || 'Follow-up date lapsed; requires specialist re-contact.'}
@@ -549,7 +549,7 @@ export const ReportsView: React.FC = () => {
               <div className="flex items-center space-x-2 pb-2 border-b border-slate-100">
                 <UserCheck className="w-4 h-4 text-[#2B4C9D]" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  1. Provider Updates & Roster Changes
+                  1. Clinical Staff Updates & Roster Changes
                 </h3>
               </div>
               <p className="text-xs text-slate-500">
@@ -590,7 +590,7 @@ export const ReportsView: React.FC = () => {
                   • <strong>Blue Shield of California / Promise Health Plan:</strong> Availity provider portal integration functioning with real-time tracking.
                 </p>
                 <p>
-                  • <strong>Medi-Cal PAVE / DHCS:</strong> Provider enrollment and address updates submitted via PAVE portal with zero unaddressed discrepancies.
+                  • <strong>Medi-Cal PAVE / DHCS:</strong> Clinical staff enrollment and address updates submitted via PAVE portal with zero unaddressed discrepancies.
                 </p>
               </div>
             </div>
@@ -617,7 +617,7 @@ export const ReportsView: React.FC = () => {
                   <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                     <tr>
                       <th className="py-2 px-3">App ID</th>
-                      <th className="py-2 px-3">Provider</th>
+                      <th className="py-2 px-3">Clinical Staff</th>
                       <th className="py-2 px-3">Discipline</th>
                       <th className="py-2 px-3">Payer</th>
                       <th className="py-2 px-3">Submission Date</th>
@@ -631,7 +631,7 @@ export const ReportsView: React.FC = () => {
                       return (
                         <tr key={rec.id} className="hover:bg-slate-50/70">
                           <td className="py-2 px-3 font-mono font-bold text-[#2B4C9D]">{rec.id}</td>
-                          <td className="py-2 px-3 font-semibold text-slate-900">{prov?.fullName || 'Provider'}</td>
+                          <td className="py-2 px-3 font-semibold text-slate-900">{prov?.fullName || 'Staff Member'}</td>
                           <td className="py-2 px-3">{rec.discipline}</td>
                           <td className="py-2 px-3">{pay?.name}</td>
                           <td className="py-2 px-3 text-slate-600">{rec.submissionDate || 'Recently Filed'}</td>
@@ -655,7 +655,7 @@ export const ReportsView: React.FC = () => {
                   </h3>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Provider enrollment approvals granted by payer credentialing committees.
+                  Clinical staff enrollment approvals granted by payer credentialing committees.
                 </p>
 
                 <div className="space-y-2 text-xs">

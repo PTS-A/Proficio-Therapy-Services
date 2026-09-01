@@ -36,6 +36,9 @@ export interface AppAccount {
   assignedEntities?: string[];
   permissions?: string[];
   status?: 'Active' | 'Inactive' | 'Pending Activation';
+  mustChangePasswordOnFirstLogin?: boolean;
+  hasChangedInitialPassword?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 export interface User {
@@ -116,13 +119,18 @@ export interface ProviderContractInfo {
 }
 
 export interface ProviderPayerEnrollment {
+  id?: string;
   payerId: string;
   payerName: string;
-  status: 'In-Network' | 'Application In Progress' | 'Linked' | 'Pending Payer Review' | 'Re-credentialing' | 'Not Enrolled' | string;
+  status: 'In-Network' | 'Application In Progress' | 'In Progress' | 'Linked' | 'Pending Payer Review' | 'Pending Linking' | 'Approved / Active' | 'Re-credentialing' | 'Recredentialing Due' | 'Not Enrolled' | 'Terminated' | string;
+  enrollmentStatus?: 'In-Network' | 'Application In Progress' | 'In Progress' | 'Linked' | 'Pending Payer Review' | 'Pending Linking' | 'Approved / Active' | 'Re-credentialing' | 'Recredentialing Due' | 'Not Enrolled' | 'Terminated' | string;
   effectiveDate?: string;
   recredentialingDate?: string;
+  recredentialingDueDate?: string;
   providerIdNumber?: string;
   networkType?: string;
+  applicationType?: ApplicationType | string;
+  notes?: string;
 }
 
 export interface Provider {
@@ -264,9 +272,12 @@ export interface LegalEntity {
 
 export type ServiceType = 'In-Clinic' | 'In-Home' | 'In-School' | 'Telehealth';
 
+export type LocationType = 'Physical Clinic' | 'In-Home / Mobile' | 'School District' | 'Telehealth Virtual' | 'Satellite';
+
 export interface Location {
   id: string;
   name: string;
+  locationType?: LocationType;
   addressLine1?: string;
   address: string;
   city: string;
@@ -278,7 +289,7 @@ export interface Location {
   dba: string;
   serviceTypes: ServiceType[];
   payerApplicability: string[]; // Payer IDs or 'All'
-  leaseAgreementStatus: 'Active' | 'Sublease' | 'Missing' | 'Expired';
+  leaseAgreementStatus: 'Active' | 'Sublease' | 'Missing' | 'Expired' | 'Not Applicable';
   leaseExpirationDate?: string;
   leaseExpiryDate?: string;
   effectiveDate: string;
@@ -287,6 +298,9 @@ export interface Location {
   insuranceCoverageValid: boolean;
   locationApprovalStatus: 'Approved' | 'Pending' | 'Under Review';
   primaryContact?: string;
+  countiesServed?: string[];
+  serviceRadiusMiles?: number;
+  notes?: string;
   active: boolean;
 }
 

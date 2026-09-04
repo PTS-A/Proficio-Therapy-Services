@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User accounts and profile management
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Credentialing records
+    match /records/{recordId} {
+      allow read, write: if true;
+    }
+
+    // Providers
+    match /providers/{providerId} {
+      allow read, write: if true;
+    }
+
+    // Payers
+    match /payers/{payerId} {
+      allow read, write: if true;
+    }
+
+    // Locations
+    match /locations/{locationId} {
+      allow read, write: if true;
+    }
+
+    // Legal Entities
+    match /entities/{entityId} {
+      allow read, write: if true;
+    }
+
+    // System Notifications
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // Stage Configs
+    match /stage_configs/{stageConfigId} {
+      allow read, write: if true;
+    }
+  }
+}

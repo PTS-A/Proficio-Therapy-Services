@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { isSuperAdmin } from '../utils/rbac';
 import {
   AccessLevel,
@@ -41,6 +41,13 @@ import {
 } from '../data/initialData';
 import { addBusinessDays, calculateBusinessDays, calculateDaysBetween, getAgingBucket, isFollowUpOverdue } from '../utils/slaCalculator';
 import { validateCredentialingRecord } from '../utils/entityValidation';
+import { 
+  testConnection, 
+  fetchCollection, 
+  saveDocument, 
+  deleteDocument, 
+  saveBatch 
+} from '../lib/firebase';
 
 interface FilterState {
   searchQuery: string;
@@ -71,6 +78,10 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 interface CredentialingContextType {
+  // Cloud Database Sync
+  cloudSyncStatus: 'synced' | 'syncing' | 'offline' | 'error';
+  refreshFromCloud: () => Promise<void>;
+
   // Accounts & Authentication
   accounts: AppAccount[];
   currentAccount: AppAccount | null;
@@ -403,13 +414,230 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     currentAccount?.systemRole === 'System Administrator' ||
     currentAccount?.systemRole === 'Credentialing Lead / Manager';
 
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('syncing');
+
+  // Google Cloud Firestore Synchronization
+  const refreshFromCloud = async () => {
+    try {
+      setCloudSyncStatus('syncing');
+      const isOnline = await testConnection();
+      if (!isOnline) {
+        setCloudSyncStatus('offline');
+        return;
+      }
+
+      // Fetch all collections in parallel from Google Cloud Firestore
+      const [
+        cloudAccounts,
+        cloudProviders,
+        cloudPayers,
+        cloudEntities,
+        cloudLocations,
+        cloudRecords,
+        cloudNotifications,
+        cloudStages
+      ] = await Promise.all([
+        fetchCollection<AppAccount>('users').catch(() => []),
+        fetchCollection<Provider>('providers').catch(() => []),
+        fetchCollection<Payer>('payers').catch(() => []),
+        fetchCollection<LegalEntity>('entities').catch(() => []),
+        fetchCollection<Location>('locations').catch(() => []),
+        fetchCollection<CredentialingRecord>('records').catch(() => []),
+        fetchCollection<SystemNotification>('notifications').catch(() => []),
+        fetchCollection<StageConfig>('stage_configs').catch(() => [])
+      ]);
+
+      // Seed if empty or populate state
+      if (!cloudAccounts || cloudAccounts.length === 0) {
+        console.log('[Cloud Database] Seeding initial users to Google Cloud Firestore...');
+        await saveBatch('users', INITIAL_ACCOUNTS);
+        setAccounts(INITIAL_ACCOUNTS);
+      } else {
+        let merged = [...cloudAccounts];
+        let hasNewRole = false;
+        INITIAL_ACCOUNTS.forEach((initAcc) => {
+          const idx = merged.findIndex((a) => a.email.toLowerCase() === initAcc.email.toLowerCase());
+          if (idx === -1) {
+            merged.push(initAcc);
+            saveDocument('users', initAcc.id, initAcc).catch(console.error);
+            hasNewRole = true;
+          }
+        });
+        setAccounts(merged);
+      }
+
+      if (!cloudProviders || cloudProviders.length === 0) {
+        await saveBatch('providers', INITIAL_PROVIDERS);
+        setProviders(INITIAL_PROVIDERS);
+      } else {
+        setProviders(cloudProviders);
+      }
+
+      if (!cloudPayers || cloudPayers.length === 0) {
+        await saveBatch('payers', INITIAL_PAYERS);
+        setPayers(INITIAL_PAYERS);
+      } else {
+        setPayers(cloudPayers);
+      }
+
+      if (!cloudEntities || cloudEntities.length === 0) {
+        await saveBatch('entities', INITIAL_LEGAL_ENTITIES);
+        setEntities(INITIAL_LEGAL_ENTITIES);
+      } else {
+        setEntities(cloudEntities);
+      }
+
+      if (!cloudLocations || cloudLocations.length === 0) {
+        await saveBatch('locations', INITIAL_LOCATIONS);
+        setLocations(INITIAL_LOCATIONS);
+      } else {
+        setLocations(cloudLocations);
+      }
+
+      if (!cloudRecords || cloudRecords.length === 0) {
+        await saveBatch('records', INITIAL_CREDENTIALING_RECORDS);
+        setRecords(INITIAL_CREDENTIALING_RECORDS);
+      } else {
+        setRecords(cloudRecords);
+      }
+
+      if (!cloudNotifications || cloudNotifications.length === 0) {
+        await saveBatch('notifications', INITIAL_NOTIFICATIONS);
+        setNotifications(INITIAL_NOTIFICATIONS);
+      } else {
+        setNotifications(cloudNotifications);
+      }
+
+      if (!cloudStages || cloudStages.length === 0) {
+        await saveBatch('stage_configs', DEFAULT_STAGE_CONFIGS);
+        setStageConfigs(DEFAULT_STAGE_CONFIGS);
+      } else {
+        setStageConfigs(cloudStages.sort((a, b) => a.order - b.order));
+      }
+
+      setCloudSyncStatus('synced');
+      initialLoadDoneRef.current = true;
+      dirtyCollectionsRef.current.clear();
+      console.log('[Cloud Database] Hydration complete. 10-minute automated sync active.');
+    } catch (err) {
+      console.error('[Cloud Database] Error syncing from Firestore:', err);
+      setCloudSyncStatus('offline');
+      initialLoadDoneRef.current = true;
+    }
+  };
+
+  // State refs to guarantee fresh data inside the 10-minute interval callback
+  const accountsRef = useRef(accounts);
+  accountsRef.current = accounts;
+  const providersRef = useRef(providers);
+  providersRef.current = providers;
+  const payersRef = useRef(payers);
+  payersRef.current = payers;
+  const entitiesRef = useRef(entities);
+  entitiesRef.current = entities;
+  const locationsRef = useRef(locations);
+  locationsRef.current = locations;
+  const recordsRef = useRef(records);
+  recordsRef.current = records;
+  const notificationsRef = useRef(notifications);
+  notificationsRef.current = notifications;
+  const stageConfigsRef = useRef(stageConfigs);
+  stageConfigsRef.current = stageConfigs;
+
+  // Track modified collections that need syncing to Google Cloud
+  const dirtyCollectionsRef = useRef<Set<string>>(new Set());
+  const initialLoadDoneRef = useRef<boolean>(false);
+
+  const markDirty = (collection: string) => {
+    if (initialLoadDoneRef.current) {
+      dirtyCollectionsRef.current.add(collection);
+    }
+  };
+
+  // Automated 10-minute Interval Sync
+  const TEN_MINUTES_MS = 10 * 60 * 1000; // 600,000 ms
+
+  const syncChangesToCloud = async () => {
+    if (dirtyCollectionsRef.current.size === 0) {
+      console.log('[Cloud Database Auto-Sync] 10-minute interval: All data is in sync. No local modifications pending.');
+      return;
+    }
+
+    const modified = Array.from(dirtyCollectionsRef.current);
+    console.log(`[Cloud Database Auto-Sync] 10-minute interval reached. Syncing modified collections: ${modified.join(', ')}...`);
+    setCloudSyncStatus('syncing');
+
+    try {
+      const syncTasks: Promise<any>[] = [];
+
+      if (dirtyCollectionsRef.current.has('users')) {
+        syncTasks.push(saveBatch('users', accountsRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('providers')) {
+        syncTasks.push(saveBatch('providers', providersRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('payers')) {
+        syncTasks.push(saveBatch('payers', payersRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('entities')) {
+        syncTasks.push(saveBatch('entities', entitiesRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('locations')) {
+        syncTasks.push(saveBatch('locations', locationsRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('records')) {
+        syncTasks.push(saveBatch('records', recordsRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('notifications')) {
+        syncTasks.push(saveBatch('notifications', notificationsRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('stage_configs')) {
+        syncTasks.push(saveBatch('stage_configs', stageConfigsRef.current));
+      }
+
+      await Promise.all(syncTasks);
+      dirtyCollectionsRef.current.clear();
+      setCloudSyncStatus('synced');
+      console.log('[Cloud Database Auto-Sync] 10-minute sync completed successfully.');
+    } catch (err) {
+      console.error('[Cloud Database Auto-Sync] 10-minute interval sync error:', err);
+      setCloudSyncStatus('error');
+    }
+  };
+
+  // 10-Minute interval timer for automated background syncing
+  useEffect(() => {
+    const timer = setInterval(() => {
+      syncChangesToCloud();
+    }, TEN_MINUTES_MS);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Flush any pending changes when tab or window is closing
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (dirtyCollectionsRef.current.size > 0) {
+        syncChangesToCloud();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  useEffect(() => {
+    refreshFromCloud();
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('cred_stage_configs', JSON.stringify(stageConfigs));
+    markDirty('stage_configs');
   }, [stageConfigs]);
 
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('cred_accounts', JSON.stringify(accounts));
+    markDirty('users');
   }, [accounts]);
 
   useEffect(() => {
@@ -422,26 +650,32 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     localStorage.setItem('cred_providers', JSON.stringify(providers));
+    markDirty('providers');
   }, [providers]);
 
   useEffect(() => {
     localStorage.setItem('cred_payers', JSON.stringify(payers));
+    markDirty('payers');
   }, [payers]);
 
   useEffect(() => {
     localStorage.setItem('cred_entities', JSON.stringify(entities));
+    markDirty('entities');
   }, [entities]);
 
   useEffect(() => {
     localStorage.setItem('cred_locations', JSON.stringify(locations));
+    markDirty('locations');
   }, [locations]);
 
   useEffect(() => {
     localStorage.setItem('cred_records', JSON.stringify(records));
+    markDirty('records');
   }, [records]);
 
   useEffect(() => {
     localStorage.setItem('cred_notifications', JSON.stringify(notifications));
+    markDirty('notifications');
   }, [notifications]);
 
   // Sync currentUser with currentAccount changes
@@ -577,6 +811,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentAccount(updated);
     switchDataForAccount(updated);
     setAccounts((prev) => prev.map((a) => (a.id === found.id ? updated : a)));
+    saveDocument('users', updated.id, updated).catch(console.error);
 
     // Clear timeout reason & start new session activity timer
     localStorage.removeItem('cred_timeout_reason');
@@ -619,6 +854,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setCurrentAccount(updated);
     setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    saveDocument('users', updated.id, updated).catch(console.error);
     return { success: true };
   };
 
@@ -652,6 +888,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     setAccounts((prev) => [...prev, newAcc]);
+    saveDocument('users', newAcc.id, newAcc).catch(console.error);
     return { success: true, account: newAcc };
   };
 
@@ -663,6 +900,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           if (currentAccount && currentAccount.id === id) {
             setCurrentAccount(updated);
           }
+          saveDocument('users', id, updated).catch(console.error);
           return updated;
         }
         return a;
@@ -680,6 +918,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       return { success: false, error: 'Cannot delete the account currently logged in.' };
     }
     setAccounts((prev) => prev.filter((a) => a.id !== id));
+    deleteDocument('users', id).catch(console.error);
     return { success: true };
   };
 
@@ -840,6 +1079,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     newRecord.validationIssues = validateCredentialingRecord(newRecord, provider, payer, entity, location);
 
     setRecords((prev) => [newRecord, ...prev]);
+    saveDocument('records', newRecord.id, newRecord).catch(console.error);
 
     // Send notification
     const newNotif: SystemNotification = {
@@ -854,6 +1094,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       isRead: false,
     };
     setNotifications((prev) => [newNotif, ...prev]);
+    saveDocument('notifications', newNotif.id, newNotif).catch(console.error);
 
     return newRecord;
   };
@@ -876,6 +1117,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           const location = locations.find((l) => l.id === updated.locationId);
           updated.validationIssues = validateCredentialingRecord(updated, provider, payer, entity, location);
 
+          saveDocument('records', id, updated).catch(console.error);
           return updated;
         }
         return rec;
@@ -1352,6 +1594,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       updatedAt: new Date().toISOString().split('T')[0],
     };
     setProviders((prev) => [newProvider, ...prev]);
+    saveDocument('providers', newProvider.id, newProvider).catch(console.error);
 
     // Send notification
     const newNotif: SystemNotification = {
@@ -1365,18 +1608,27 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       isRead: false,
     };
     setNotifications((prev) => [newNotif, ...prev]);
+    saveDocument('notifications', newNotif.id, newNotif).catch(console.error);
 
     return newProvider;
   };
 
   const updateProvider = (id: string, updates: Partial<Provider>) => {
     setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : p))
+      prev.map((p) => {
+        if (p.id === id) {
+          const updated = { ...p, ...updates, updatedAt: new Date().toISOString().split('T')[0] };
+          saveDocument('providers', id, updated).catch(console.error);
+          return updated;
+        }
+        return p;
+      })
     );
   };
 
   const deleteProvider = (id: string) => {
     setProviders((prev) => prev.filter((p) => p.id !== id));
+    deleteDocument('providers', id).catch(console.error);
   };
 
   // Payer CRUD
@@ -1386,11 +1638,21 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       ...payerData,
     };
     setPayers((prev) => [...prev, newPayer]);
+    saveDocument('payers', newPayer.id, newPayer).catch(console.error);
     return newPayer;
   };
 
   const updatePayer = (id: string, updates: Partial<Payer>) => {
-    setPayers((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+    setPayers((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          const updated = { ...p, ...updates };
+          saveDocument('payers', id, updated).catch(console.error);
+          return updated;
+        }
+        return p;
+      })
+    );
   };
 
   // Entity & Location CRUD
@@ -1400,11 +1662,21 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       ...entityData,
     };
     setEntities((prev) => [...prev, newEntity]);
+    saveDocument('entities', newEntity.id, newEntity).catch(console.error);
     return newEntity;
   };
 
   const updateEntity = (id: string, updates: Partial<LegalEntity>) => {
-    setEntities((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
+    setEntities((prev) =>
+      prev.map((e) => {
+        if (e.id === id) {
+          const updated = { ...e, ...updates };
+          saveDocument('entities', id, updated).catch(console.error);
+          return updated;
+        }
+        return e;
+      })
+    );
   };
 
   const addLocation = (locData: Omit<Location, 'id'>): Location => {
@@ -1413,11 +1685,21 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       ...locData,
     };
     setLocations((prev) => [...prev, newLoc]);
+    saveDocument('locations', newLoc.id, newLoc).catch(console.error);
     return newLoc;
   };
 
   const updateLocation = (id: string, updates: Partial<Location>) => {
-    setLocations((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)));
+    setLocations((prev) =>
+      prev.map((l) => {
+        if (l.id === id) {
+          const updated = { ...l, ...updates };
+          saveDocument('locations', id, updated).catch(console.error);
+          return updated;
+        }
+        return l;
+      })
+    );
   };
 
   const deleteLocation = (id: string): { success: boolean; error?: string } => {
@@ -1429,34 +1711,63 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     }
     setLocations((prev) => prev.filter((l) => l.id !== id));
+    deleteDocument('locations', id).catch(console.error);
     return { success: true };
   };
 
   const toggleLocationStatus = (id: string) => {
     setLocations((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, active: !l.active } : l))
+      prev.map((l) => {
+        if (l.id === id) {
+          const updated = { ...l, active: !l.active };
+          saveDocument('locations', id, updated).catch(console.error);
+          return updated;
+        }
+        return l;
+      })
     );
   };
 
   // Notifications
   const markNotificationRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    setNotifications((prev) =>
+      prev.map((n) => {
+        if (n.id === id) {
+          const updated = { ...n, isRead: true };
+          saveDocument('notifications', id, updated).catch(console.error);
+          return updated;
+        }
+        return n;
+      })
+    );
   };
 
   const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, isRead: true }));
+      saveBatch('notifications', updated).catch(console.error);
+      return updated;
+    });
   };
 
   // Stage & Workflow Configuration Management
   const updateStageConfig = (id: string, updates: Partial<StageConfig>) => {
     setStageConfigs((prev) =>
-      prev.map((stg) => (stg.id === id ? { ...stg, ...updates } : stg))
+      prev.map((stg) => {
+        if (stg.id === id) {
+          const updated = { ...stg, ...updates };
+          saveDocument('stage_configs', id, updated).catch(console.error);
+          return updated;
+        }
+        return stg;
+      })
     );
   };
 
   const resetStageConfigs = () => {
     localStorage.removeItem('cred_stage_configs');
     setStageConfigs(DEFAULT_STAGE_CONFIGS);
+    saveBatch('stage_configs', DEFAULT_STAGE_CONFIGS).catch(console.error);
   };
 
   const addCustomStage = (stageData: Omit<StageConfig, 'id' | 'order'>): StageConfig => {
@@ -1466,6 +1777,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       ...stageData,
     };
     setStageConfigs((prev) => [...prev, newStage]);
+    saveDocument('stage_configs', newStage.id, newStage).catch(console.error);
     return newStage;
   };
 
@@ -1480,12 +1792,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       return { success: false, error: `Cannot delete stage "${found.name}" while active applications are assigned to it.` };
     }
     setStageConfigs((prev) => prev.filter((s) => s.id !== id));
+    deleteDocument('stage_configs', id).catch(console.error);
     return { success: true };
   };
 
   const reorderStages = (newOrder: StageConfig[]) => {
     const updated = newOrder.map((stg, idx) => ({ ...stg, order: idx + 1 }));
     setStageConfigs(updated);
+    saveBatch('stage_configs', updated).catch(console.error);
   };
 
   // Filter logic
@@ -1864,6 +2178,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     setNotifications(INITIAL_NOTIFICATIONS);
     setAccounts(INITIAL_ACCOUNTS);
     setCurrentAccount(INITIAL_ACCOUNTS[0]);
+
+    // Reseed Cloud Database
+    saveBatch('providers', INITIAL_PROVIDERS).catch(console.error);
+    saveBatch('payers', INITIAL_PAYERS).catch(console.error);
+    saveBatch('entities', INITIAL_LEGAL_ENTITIES).catch(console.error);
+    saveBatch('locations', INITIAL_LOCATIONS).catch(console.error);
+    saveBatch('records', INITIAL_CREDENTIALING_RECORDS).catch(console.error);
+    saveBatch('notifications', INITIAL_NOTIFICATIONS).catch(console.error);
+    saveBatch('users', INITIAL_ACCOUNTS).catch(console.error);
+    saveBatch('stage_configs', DEFAULT_STAGE_CONFIGS).catch(console.error);
   };
 
   const importBulkData = (
@@ -1880,7 +2204,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           const match = importedProviders.find((ip) => ip.id === p.id || ip.npi === p.npi);
           return match ? { ...p, ...match } : p;
         });
-        return [...newOnes, ...updated];
+        const combined = [...newOnes, ...updated];
+        saveBatch('providers', combined).catch(console.error);
+        return combined;
       });
     }
 
@@ -1888,12 +2214,18 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       setPayers((prev) => {
         const existingNames = new Set(prev.map((p) => p.name.toLowerCase()));
         const newOnes = importedPayers.filter((p) => !existingNames.has(p.name.toLowerCase()));
-        return [...prev, ...newOnes];
+        const combined = [...prev, ...newOnes];
+        saveBatch('payers', combined).catch(console.error);
+        return combined;
       });
     }
 
     if (importedLocations && importedLocations.length > 0) {
-      setLocations((prev) => [...prev, ...importedLocations]);
+      setLocations((prev) => {
+        const combined = [...prev, ...importedLocations];
+        saveBatch('locations', combined).catch(console.error);
+        return combined;
+      });
     }
 
     if (importedRecords && importedRecords.length > 0) {
@@ -1904,7 +2236,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           const match = importedRecords.find((ir) => ir.id === r.id);
           return match ? { ...r, ...match } : r;
         });
-        return [...newOnes, ...updated];
+        const combined = [...newOnes, ...updated];
+        saveBatch('records', combined).catch(console.error);
+        return combined;
       });
     }
 
@@ -1919,11 +2253,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       isRead: false,
     };
     setNotifications((prev) => [notif, ...prev]);
+    saveDocument('notifications', notif.id, notif).catch(console.error);
   };
 
   return (
     <CredentialingContext.Provider
       value={{
+        cloudSyncStatus,
+        refreshFromCloud,
         accounts,
         currentAccount,
         isAdmin,

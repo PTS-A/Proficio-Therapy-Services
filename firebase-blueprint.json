@@ -1,0 +1,139 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "User profile, credentials, and role management record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "accessLevel": { "type": "string", "enum": ["ADMINISTRATOR", "USER"] },
+        "systemRole": { "type": "string" },
+        "roleTitle": { "type": "string" },
+        "department": { "type": "string" },
+        "avatar": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLogin": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Inactive", "Pending Activation"] },
+        "mustChangePasswordOnFirstLogin": { "type": "boolean" },
+        "hasChangedInitialPassword": { "type": "boolean" },
+        "isSuperAdmin": { "type": "boolean" }
+      },
+      "required": ["id", "name", "email", "accessLevel"]
+    },
+    "CredentialingRecord": {
+      "title": "CredentialingRecord",
+      "description": "Credentialing tracking record for a provider and payer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "providerId": { "type": "string" },
+        "providerName": { "type": "string" },
+        "payerId": { "type": "string" },
+        "payerName": { "type": "string" },
+        "discipline": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "providerId", "payerId", "status"]
+    },
+    "Provider": {
+      "title": "Provider",
+      "description": "Therapy clinician or specialist profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "npi": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["id", "fullName"]
+    },
+    "Payer": {
+      "title": "Payer",
+      "description": "Insurance payer or health plan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Location": {
+      "title": "Location",
+      "description": "Practice clinic or service location",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "LegalEntity": {
+      "title": "LegalEntity",
+      "description": "Legal operating corporate entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System alerts and notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["id", "title"]
+    },
+    "StageConfig": {
+      "title": "StageConfig",
+      "description": "Credentialing lifecycle stage configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserAccount",
+      "description": "User profiles, roles, and credential management"
+    },
+    "/records/{recordId}": {
+      "schema": "CredentialingRecord",
+      "description": "Provider credentialing tracking records"
+    },
+    "/providers/{providerId}": {
+      "schema": "Provider",
+      "description": "Healthcare providers roster"
+    },
+    "/payers/{payerId}": {
+      "schema": "Payer",
+      "description": "Insurance payers and health plans"
+    },
+    "/locations/{locationId}": {
+      "schema": "Location",
+      "description": "Operating clinic and service locations"
+    },
+    "/entities/{entityId}": {
+      "schema": "LegalEntity",
+      "description": "Legal contracting entities"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "System and SLA alert notifications"
+    },
+    "/stage_configs/{stageConfigId}": {
+      "schema": "StageConfig",
+      "description": "Credentialing workflow stages"
+    }
+  }
+}

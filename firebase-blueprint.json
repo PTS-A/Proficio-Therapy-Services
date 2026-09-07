@@ -100,12 +100,101 @@
         "name": { "type": "string" }
       },
       "required": ["id", "name"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "General employee organization profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "department": { "type": "string" },
+        "roleTitle": { "type": "string" },
+        "employmentStatus": { "type": "string" }
+      },
+      "required": ["id", "firstName", "lastName", "email"]
+    },
+    "ClinicalStaff": {
+      "title": "ClinicalStaff",
+      "description": "Dedicated clinical staff credentialing and license profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "providerId": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "credentials": { "type": "string" },
+        "licenseNumber": { "type": "string" },
+        "licenseState": { "type": "string" },
+        "npi": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "firstName", "lastName"]
+    },
+    "CredentialingApplication": {
+      "title": "CredentialingApplication",
+      "description": "Provider credentialing application tracking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "providerId": { "type": "string" },
+        "clinicalStaffId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "payerId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "providerId", "status"]
+    },
+    "ApplicationDocument": {
+      "title": "ApplicationDocument",
+      "description": "Document link and verification record for application",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "applicationId": { "type": "string" },
+        "providerId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "documentUrl": { "type": "string" }
+      },
+      "required": ["id", "applicationId", "name", "documentUrl"]
+    },
+    "ApplicationComment": {
+      "title": "ApplicationComment",
+      "description": "Collaboration comments and audit log for application",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "applicationId": { "type": "string" },
+        "providerId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "commentText": { "type": "string" },
+        "dateCreated": { "type": "string" },
+        "timeCreated": { "type": "string" }
+      },
+      "required": ["id", "applicationId", "commentText", "authorName", "dateCreated", "timeCreated"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserAccount",
       "description": "User profiles, roles, and credential management"
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Dedicated collection for employee records"
+    },
+    "/clinical_staff/{staffId}": {
+      "schema": "ClinicalStaff",
+      "description": "Dedicated collection for clinical staff records"
+    },
+    "/applications/{applicationId}": {
+      "schema": "CredentialingApplication",
+      "description": "Dedicated collection for credentialing applications"
     },
     "/records/{recordId}": {
       "schema": "CredentialingRecord",
@@ -118,6 +207,14 @@
     "/payers/{payerId}": {
       "schema": "Payer",
       "description": "Insurance payers and health plans"
+    },
+    "/documents/{documentId}": {
+      "schema": "ApplicationDocument",
+      "description": "Dedicated collection for linked credentialing documents"
+    },
+    "/comments/{commentId}": {
+      "schema": "ApplicationComment",
+      "description": "Dedicated collection for application comments and notes"
     },
     "/locations/{locationId}": {
       "schema": "Location",

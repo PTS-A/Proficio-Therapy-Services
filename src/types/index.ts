@@ -71,6 +71,102 @@ export type CAQHStatus = 'Initial' | 'Complete' | 'Attested' | 'Re-attestation D
 
 export type PAVEStatus = 'Not Started' | 'In Progress' | 'Submitted' | 'Approved' | 'Returned' | 'Additional Docs Requested' | 'Not Required';
 
+export interface Employee {
+  id: string; // Unique Employee ID (e.g. "EMP-2026-001")
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  department: string;
+  roleTitle: string;
+  employmentStatus: 'Full-Time' | 'Part-Time' | 'Contractor' | 'Inactive';
+  startDate: string;
+  officeLocationId?: string;
+  entityId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClinicalStaff {
+  id: string; // Unique Clinical Staff ID (e.g. "CS-2026-001")
+  employeeId?: string; // Reference to Employee
+  providerId?: string; // Reference to Provider
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  credentials: string; // e.g. "MS, BCBA, LBA"
+  disciplines: Discipline[]; // e.g. ["ABA"]
+  providerType: ProviderType; // e.g. "BCBA"
+  licenseNumber: string;
+  licenseState: string;
+  licenseExpiration?: string;
+  npi?: string;
+  taxonomy?: string;
+  specialty?: string;
+  primaryLocationId?: string;
+  locationIds: string[];
+  entityIds: string[];
+  caqhId?: string;
+  paveStatus?: PAVEStatus;
+  status: 'Active' | 'In Credentialing' | 'Pending Documents' | 'On Leave' | 'Inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApplicationDocument {
+  id: string; // Unique Document ID e.g. "DOC-2026-001"
+  applicationId: string; // Reference to CredentialingApplication
+  providerId?: string; // Reference to Provider
+  clinicalStaffId?: string; // Reference to ClinicalStaff
+  name: string;
+  type: string;
+  documentUrl: string;
+  uploadDate: string;
+  expirationDate?: string;
+  verificationStatus?: 'Verified' | 'Pending Verification' | 'Expired' | 'Rejected';
+  notes?: string;
+}
+
+export interface ApplicationComment {
+  id: string; // Unique Comment ID e.g. "COM-2026-001"
+  applicationId: string; // Reference to CredentialingApplication
+  providerId?: string; // Reference to Provider
+  authorId: string;
+  authorName: string;
+  authorRole?: string;
+  commentText: string;
+  dateCreated: string; // e.g. "September 6, 2026"
+  timeCreated: string; // e.g. "6:30 PM"
+  timestamp: string; // ISO 8601
+}
+
+export interface CredentialingApplication {
+  id: string; // Unique Application ID e.g. "APP-2026-0042"
+  providerId: string; // Reference to Provider
+  clinicalStaffId?: string; // Reference to ClinicalStaff
+  employeeId?: string; // Reference to Employee
+  payerIds: string[]; // Reference to selected Payers
+  payerId: string; // Primary payer for backward compatibility
+  entityId: string;
+  locationId: string;
+  applicationType: ApplicationType;
+  discipline: Discipline;
+  stage: CredentialingStage;
+  status: string;
+  assignedSpecialistId: string;
+  assignedSpecialistName: string;
+  intakeDate: string;
+  documentIds: string[]; // Reference to documents
+  documentLinks: { id: string; name: string; url: string; type?: string; uploadDate?: string }[];
+  commentIds: string[]; // Reference to comments
+  comments?: ApplicationComment[];
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DocumentItem {
   id: string;
   name: string;
@@ -107,6 +203,20 @@ export interface DocumentItem {
   providerId?: string;
   payerId?: string;
   notes?: string;
+  documentUrl?: string; // Direct link or drive/cloud document URL
+}
+
+export interface ProviderCommentLog {
+  id: string;
+  timestamp: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  statusFrom?: string;
+  statusTo?: string;
+  comment: string;
+  targetPerson?: string; // Whom the comment or action is directed to / assigned to
+  category?: 'Status Update' | 'Follow-up' | 'Payer Review' | 'Document Missing' | 'Clinical Team' | 'General Note';
 }
 
 export interface ProviderContractInfo {
@@ -185,6 +295,8 @@ export interface Provider {
   payerEnrollments?: ProviderPayerEnrollment[];
   
   documents: DocumentItem[];
+  commentLogs?: ProviderCommentLog[];
+  currentStatus?: string;
   notes?: string;
   active: boolean;
   createdAt: string;
@@ -492,6 +604,16 @@ export interface CredentialingRecord {
   correctiveAction?: string;
   notes?: string;
   auditTrail: AuditEntry[];
+
+  // Database Relationship References (Section 5, 6, 7)
+  clinicalStaffId?: string;
+  employeeId?: string;
+  payerIds?: string[];
+  documentIds?: string[];
+  documentLinks?: { id: string; name: string; url: string; type?: string; uploadDate?: string }[];
+  commentIds?: string[];
+  comments?: ApplicationComment[];
+  applicationId?: string;
   
   createdAt: string;
   updatedAt: string;

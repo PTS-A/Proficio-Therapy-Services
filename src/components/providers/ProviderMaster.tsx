@@ -9,7 +9,10 @@ import {
   CAQHStatus,
   PAVEStatus,
   ProviderContractInfo,
-  ProviderPayerEnrollment
+  ProviderPayerEnrollment,
+  DocumentItem,
+  ProviderCommentLog,
+  ApplicationType
 } from '../../types';
 import { 
   AlertCircle, 
@@ -38,22 +41,38 @@ import {
   Briefcase,
   Award,
   FileCheck,
-  DollarSign
+  DollarSign,
+  MessageSquare,
+  Paperclip,
+  Link,
+  Send,
+  UserCheck2,
+  Sparkles,
+  ChevronRight,
+  Info
 } from 'lucide-react';
+
+import { ClinicalStaffComments } from './ClinicalStaffComments';
+import { ClinicalStaffDocuments } from './ClinicalStaffDocuments';
+import { ClinicalStaffReviewPage } from './ClinicalStaffReviewPage';
 
 interface ProviderMasterProps {
   onSelectRecord: (recordId: string) => void;
   selectedProviderId?: string | null;
   onClearSelectedProvider?: () => void;
+  onNavigateToLinking?: () => void;
+  onNavigateToTracker?: () => void;
 }
 
-type ProfileTab = 'basic' | 'employment' | 'location' | 'credentialing' | 'applications';
+type ProfileTab = 'basic' | 'employment' | 'location' | 'credentialing' | 'comments' | 'documents' | 'applications';
 type ModalTab = 'basic' | 'employment' | 'location' | 'credentialing';
 
 export const ProviderMaster: React.FC<ProviderMasterProps> = ({
   onSelectRecord,
   selectedProviderId,
   onClearSelectedProvider,
+  onNavigateToLinking,
+  onNavigateToTracker,
 }) => {
   const {
     providers,
@@ -61,9 +80,16 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
     payers,
     entities,
     locations,
+    users,
+    currentUser,
+    currentAccount,
     addProvider,
     updateProvider,
     deleteProvider,
+    addProviderCommentLog,
+    addProviderDocument,
+    deleteProviderDocument,
+    createRecord,
     isAdmin,
   } = useCredentialing();
 
@@ -75,6 +101,23 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
   const [modalTab, setModalTab] = useState<ModalTab>('basic');
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [deleteConfirmProvider, setDeleteConfirmProvider] = useState<Provider | null>(null);
+
+  // Newly Added Staff Banner & Quick Link state
+  const [newlyAddedProviderId, setNewlyAddedProviderId] = useState<string | null>(null);
+  const [isReviewPageActive, setIsReviewPageActive] = useState<boolean>(false);
+  const [reviewingStaffId, setReviewingStaffId] = useState<string | null>(null);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkPayerId, setLinkPayerId] = useState<string>('');
+  const [linkEntityId, setLinkEntityId] = useState<string>('');
+  const [linkLocationId, setLinkLocationId] = useState<string>('');
+  const [linkAppType, setLinkAppType] = useState<ApplicationType>('Provider linking');
+  const [linkSpecialistId, setLinkSpecialistId] = useState<string>('');
+  const [linkStatus, setLinkStatus] = useState<'Linked' | 'Pending Approval' | 'In Progress'>('Linked');
+  const [linkEffectiveDate, setLinkEffectiveDate] = useState<string>('');
+  const [linkNotes, setLinkNotes] = useState<string>('');
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkSuccessMsg, setLinkSuccessMsg] = useState<string | null>(null);
+  const [linkSuccessRecordId, setLinkSuccessRecordId] = useState<string | null>(null);
 
   // Form State covering all 4 Core Domains
   const [formData, setFormData] = useState<{
@@ -332,12 +375,118 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
 
     if (editingProvider) {
       updateProvider(editingProvider.id, payload);
+      setNewlyAddedProviderId(null);
     } else {
       const created = addProvider(payload);
       setActiveProfileId(created.id);
+      setActiveProfileTab('basic');
+      setNewlyAddedProviderId(created.id);
+      setReviewingStaffId(created.id);
+      setIsReviewPageActive(true);
+      setLinkSuccessMsg(null);
     }
 
     setIsAddModalOpen(false);
+  };
+
+  const handleOpenLinkModal = (providerToLink?: Provider) => {
+    const target = providerToLink || activeProvider;
+    if (!target) return;
+    setLinkPayerId(payers[0]?.id || '');
+    setLinkEntityId(target.primaryEntityId || target.entityIds?.[0] || entities[0]?.id || '');
+    setLinkLocationId(target.primaryLocationId || target.locationIds?.[0] || locations[0]?.id || '');
+    setLinkAppType('Provider linking');
+    setLinkSpecialistId(users[0]?.id || currentUser.id);
+    setLinkStatus('Linked');
+    setLinkEffectiveDate(new Date().toISOString().split('T')[0]);
+    setLinkNotes('');
+    setLinkError(null);
+    setIsLinkModalOpen(true);
+  };
+
+  const handleQuickLinkProvider = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeProvider) {
+      setLinkError('No active clinical staff member selected.');
+      return;
+    }
+    if (!linkPayerId) {
+      setLinkError('Please select a Payer / Insurance Network to link with.');
+      return;
+    }
+
+    const payer = payers.find((p) => p.id === linkPayerId);
+    const entity = entities.find((e) => e.id === linkEntityId) || entities[0];
+    const location = locations.find((l) => l.id === linkLocationId) || locations[0];
+    const assignedUser = users.find((u) => u.id === linkSpecialistId) || users[0] || currentUser;
+    const today = new Date().toISOString().split('T')[0];
+    const effDate = linkEffectiveDate || today;
+
+    // 1. Create formal Credentialing/Linking Record with linking status so it appears in trackers
+    const newRecord = createRecord({
+      providerId: activeProvider.id,
+      payerId: linkPayerId,
+      entityId: entity?.id || 'ent-1',
+      locationId: location?.id || 'loc-1',
+      applicationType: linkAppType,
+      discipline: activeProvider.disciplines[0] || 'ABA',
+      stage: linkStatus === 'Linked' ? 'Linked' : 'Linking Pending',
+      linkingStatus: linkStatus === 'Linked' ? 'Linked' : 'Pending Approval',
+      linkEffectiveDate: effDate,
+      contractStatus: 'Contract Executed',
+      contractEffectiveDate: effDate,
+      assignedSpecialistId: assignedUser.id,
+      assignedSpecialistName: assignedUser.name,
+      notes: linkNotes || `Linked clinical staff member ${activeProvider.firstName} ${activeProvider.lastName} with ${entity?.dba || entity?.legalName || 'Group'} & ${payer?.name || 'Payer'}.`,
+    });
+
+    // 2. Atomically update provider payer enrollments and entity affiliations
+    const existingEnrollments = activeProvider.payerEnrollments || [];
+    const matchIdx = existingEnrollments.findIndex((e) => e.payerId === linkPayerId);
+    const updatedEnrollments = [...existingEnrollments];
+    if (matchIdx >= 0) {
+      updatedEnrollments[matchIdx] = {
+        ...updatedEnrollments[matchIdx],
+        status: linkStatus === 'Linked' ? 'In-Network' : 'Application In Progress',
+        applicationType: linkAppType,
+        effectiveDate: effDate,
+        payerName: payer?.name || updatedEnrollments[matchIdx].payerName,
+      };
+    } else {
+      updatedEnrollments.push({
+        payerId: linkPayerId,
+        payerName: payer?.name || 'Payer Network',
+        status: linkStatus === 'Linked' ? 'In-Network' : 'Application In Progress',
+        applicationType: linkAppType,
+        effectiveDate: effDate,
+      });
+    }
+
+    const currentEntityIds = activeProvider.entityIds || [];
+    const updatedEntityIds = (entity && !currentEntityIds.includes(entity.id))
+      ? [...currentEntityIds, entity.id]
+      : currentEntityIds;
+
+    updateProvider(activeProvider.id, {
+      payerEnrollments: updatedEnrollments,
+      entityIds: updatedEntityIds,
+      primaryEntityId: activeProvider.primaryEntityId || entity?.id,
+      renderingProviderInfo: activeProvider.renderingProviderInfo || `Type 1 Rendering Clinician affiliated with ${entity?.legalName || 'Group'}.`,
+    });
+
+    // 3. Log audit comment in status logs
+    addProviderCommentLog(activeProvider.id, {
+      comment: `Linked staff member with ${entity?.dba || entity?.legalName || 'Practice'} and ${payer?.name || 'Payer'} (${linkAppType}). Status: ${linkStatus}. Effective: ${effDate}.`,
+      statusTo: linkStatus === 'Linked' ? 'Linked' : 'In Progress',
+      category: 'Payer Review',
+      targetPerson: assignedUser.name,
+    });
+
+    setLinkSuccessRecordId(newRecord?.id || null);
+    setLinkSuccessMsg(`Successfully linked ${activeProvider.firstName} ${activeProvider.lastName} with ${entity?.dba || entity?.legalName} & ${payer?.name}! Record ${newRecord?.id || ''} created.`);
+    setIsLinkModalOpen(false);
+    setLinkNotes('');
+    setLinkError(null);
   };
 
   const toggleDiscipline = (d: Discipline) => {
@@ -388,6 +537,20 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
     }
     return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center space-x-1"><CheckCircle2 className="w-3 h-3" /><span>Active ({diffDays}d left)</span></span>;
   };
+
+  if (isReviewPageActive && reviewingStaffId) {
+    return (
+      <ClinicalStaffReviewPage
+        providerId={reviewingStaffId}
+        onBackToDirectory={() => setIsReviewPageActive(false)}
+        onEditProvider={(p) => {
+          setIsReviewPageActive(false);
+          handleOpenEdit(p);
+        }}
+        onSelectRecord={onSelectRecord}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4 pb-12">
@@ -533,6 +696,25 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
 
                 <div className="flex items-center space-x-2">
                   <button
+                    onClick={() => {
+                      setReviewingStaffId(activeProvider.id);
+                      setIsReviewPageActive(true);
+                    }}
+                    className="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg text-xs font-bold transition-all border border-sky-200 flex items-center space-x-1 cursor-pointer"
+                    title="Open Dedicated Clinical Review & Provider Linking Page"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Review & Link Page</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenLinkModal(activeProvider)}
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1 cursor-pointer"
+                    title="Link this Clinical Staff member with Practice Entities and Payer Networks"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Link with Providers</span>
+                  </button>
+                  <button
                     onClick={() => handleOpenEdit(activeProvider)}
                     className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                     title={isAdmin ? "Edit Clinical Staff Record (Administrator Access)" : "Edit Staff Details"}
@@ -559,7 +741,84 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                 </div>
               </div>
 
-              {/* 4-Tab Navigation for Provider Record Detail */}
+              {/* Newly Added Clinical Staff Confirmation & Quick Link Callout */}
+              {newlyAddedProviderId === activeProvider.id && (
+                <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-900 animate-in fade-in slide-in-from-top duration-300">
+                  <div className="flex items-start sm:items-center space-x-2.5">
+                    <div className="p-1.5 bg-emerald-600 text-white rounded-lg shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold">Clinical Staff Member Successfully Created!</p>
+                      <p className="text-emerald-700 text-[11px] mt-0.5">
+                        You are viewing the current inputted data for <strong>{activeProvider.firstName} {activeProvider.lastName}</strong>. Link them with payers/provider networks below to start credentialing enrollment.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        setReviewingStaffId(activeProvider.id);
+                        setIsReviewPageActive(true);
+                      }}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer text-xs"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Open Review & Linking Page</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenLinkModal(activeProvider)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer text-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Link with Providers</span>
+                    </button>
+                    <button
+                      onClick={() => setNewlyAddedProviderId(null)}
+                      className="p-1.5 text-emerald-700 hover:bg-emerald-100 rounded-lg cursor-pointer"
+                      title="Dismiss notice"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Success notification for linking */}
+              {linkSuccessMsg && (
+                <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-900 animate-in fade-in duration-200">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-semibold">{linkSuccessMsg}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 shrink-0">
+                    {linkSuccessRecordId && (
+                      <button
+                        onClick={() => onSelectRecord(linkSuccessRecordId)}
+                        className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-[11px] shadow-xs cursor-pointer"
+                      >
+                        View Record
+                      </button>
+                    )}
+                    {onNavigateToLinking && (
+                      <button
+                        onClick={onNavigateToLinking}
+                        className="px-2.5 py-1 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px] shadow-xs cursor-pointer"
+                      >
+                        View in Staff Linking
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => { setLinkSuccessMsg(null); setLinkSuccessRecordId(null); }} 
+                      className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Navigation for Provider Record Detail */}
               <div className="flex border-b border-slate-200 overflow-x-auto text-xs font-semibold">
                 <button
                   onClick={() => setActiveProfileTab('basic')}
@@ -604,6 +863,28 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>4. Credentialing & CAQH</span>
+                </button>
+                <button
+                  onClick={() => setActiveProfileTab('comments')}
+                  className={`px-3.5 py-2 border-b-2 transition-all flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                    activeProfileTab === 'comments'
+                      ? 'border-sky-600 text-sky-700 font-bold'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Comments & Status Logs ({(activeProvider.commentLogs || []).length})</span>
+                </button>
+                <button
+                  onClick={() => setActiveProfileTab('documents')}
+                  className={`px-3.5 py-2 border-b-2 transition-all flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                    activeProfileTab === 'documents'
+                      ? 'border-sky-600 text-sky-700 font-bold'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                  <span>Document Links ({(activeProvider.documents || []).length})</span>
                 </button>
                 <button
                   onClick={() => setActiveProfileTab('applications')}
@@ -723,6 +1004,161 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Dedicated Section: Linked Providers, Group Entities & Payer Networks */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 text-xs shadow-xs space-y-3">
+                    <div className="font-bold text-slate-900 border-b border-slate-200 pb-2.5 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-slate-900 font-bold">Linked Providers, Group Entities & Payers</span>
+                            <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                              {records.filter(r => r.providerId === activeProvider.id).length + (activeProvider.payerEnrollments || []).length} Active Link(s)
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-normal block">
+                            Practice group affiliations, Type 2 Group NPI linkages, and enrolled insurance networks
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLinkModal(activeProvider)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                        title="Link this Clinical Staff member with Practice Entities or Payer Networks"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Link with Providers</span>
+                      </button>
+                    </div>
+
+                    {/* Table of Linked Providers / Payers */}
+                    {(() => {
+                      const staffRecords = records.filter(r => r.providerId === activeProvider.id);
+                      const staffEnrollments = activeProvider.payerEnrollments || [];
+
+                      if (staffRecords.length === 0 && staffEnrollments.length === 0) {
+                        return (
+                          <div className="p-6 text-center border-2 border-dashed border-emerald-200 rounded-xl bg-emerald-50/30">
+                            <Building2 className="w-8 h-8 mx-auto text-emerald-600/50 mb-1.5" />
+                            <p className="font-bold text-slate-800 text-xs">No Providers or Payers Linked Yet</p>
+                            <p className="text-[11px] text-slate-500 max-w-md mx-auto mt-0.5 mb-3">
+                              Click the plus sign below to link <strong>{activeProvider.firstName} {activeProvider.lastName}</strong> with practice group entities, billing providers, and insurance payer networks.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLinkModal(activeProvider)}
+                              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Link with Providers</span>
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                              <tr>
+                                <th className="px-3 py-2">Practice Provider / Entity</th>
+                                <th className="px-3 py-2">Payer / Health Plan</th>
+                                <th className="px-3 py-2">Application Type</th>
+                                <th className="px-3 py-2">Linking Status</th>
+                                <th className="px-3 py-2">Effective Date</th>
+                                <th className="px-3 py-2 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {staffRecords.map((rec) => {
+                                const payer = payers.find(p => p.id === rec.payerId);
+                                const entity = entities.find(e => e.id === rec.entityId);
+                                return (
+                                  <tr key={rec.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-3 py-2 font-semibold text-slate-900">
+                                      <div className="flex items-center space-x-1.5">
+                                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span>{entity?.dba || entity?.legalName || 'AGES Learning Solutions'}</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono pl-5">EIN: {entity?.ein || '47-2891234'}</div>
+                                    </td>
+                                    <td className="px-3 py-2 font-medium text-slate-800">
+                                      <div className="font-semibold text-sky-800">{payer?.name || 'Payer Network'}</div>
+                                      <div className="text-[10px] text-slate-400">{payer?.lob.join(', ') || 'Commercial / Medicaid'}</div>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600">
+                                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium text-[11px]">
+                                        {rec.applicationType}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                        rec.linkingStatus === 'Linked' || rec.stage === 'Approved' || rec.stage === 'Effective'
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : 'bg-amber-100 text-amber-800'
+                                      }`}>
+                                        {rec.linkingStatus || rec.stage}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600 font-mono text-[11px]">
+                                      {rec.linkEffectiveDate || rec.contractEffectiveDate || rec.approvalDate || 'Pending'}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => onSelectRecord(rec.id)}
+                                        className="text-sky-600 hover:text-sky-800 font-bold hover:underline cursor-pointer text-[11px] inline-flex items-center space-x-0.5"
+                                      >
+                                        <span>View Details</span>
+                                        <ChevronRight className="w-3 h-3" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {/* Direct enrollments without a record yet */}
+                              {staffEnrollments
+                                .filter(e => !staffRecords.some(r => r.payerId === e.payerId))
+                                .map((enr, idx) => (
+                                  <tr key={`enr-${idx}`} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-3 py-2 font-semibold text-slate-900">
+                                      <div className="flex items-center space-x-1.5">
+                                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span>Primary Practice Group</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2 font-medium text-slate-800">
+                                      <div className="font-semibold text-sky-800">{enr.payerName}</div>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600">
+                                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium text-[11px]">
+                                        {enr.applicationType || 'Direct Enrollment'}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-emerald-100 text-emerald-800">
+                                        {enr.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600 font-mono text-[11px]">
+                                      {enr.effectiveDate || 'Active'}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                      <span className="text-[10px] text-slate-400 font-semibold">Enrolled</span>
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -1041,7 +1477,17 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                 </div>
               )}
 
-              {/* TAB 5: ACTIVE PAYER APPLICATIONS (from Credentialing Engine) */}
+              {/* TAB 5: COMMENTS & STATUS LOGS WITH MULTI-STAFF COLLABORATION */}
+              {activeProfileTab === 'comments' && (
+                <ClinicalStaffComments provider={activeProvider} />
+              )}
+
+              {/* TAB 6: DOCUMENT LINKS & CREDENTIAL REPOSITORY */}
+              {activeProfileTab === 'documents' && (
+                <ClinicalStaffDocuments provider={activeProvider} />
+              )}
+
+              {/* TAB 7: ACTIVE PAYER APPLICATIONS (from Credentialing Engine) */}
               {activeProfileTab === 'applications' && (
                 <div className="space-y-3 pt-1">
                   <div className="flex items-center justify-between">
@@ -1755,6 +2201,204 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                     {editingProvider ? 'Save Staff Record' : 'Create Staff Record'}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Link Clinical Staff with Provider/Payer Modal */}
+      {isLinkModalOpen && activeProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 text-xs overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">Link Clinical Staff with Providers & Payers</h3>
+                  <p className="text-[11px] text-emerald-100">
+                    {activeProvider.firstName} {activeProvider.lastName} ({activeProvider.credentials}) • NPI: {activeProvider.npi}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsLinkModalOpen(false)}
+                className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickLinkProvider} className="p-5 space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-[11px] text-emerald-900">
+                <strong>Credentialing & Provider Linking:</strong> Select the practice group entity and insurance payer network to establish rendering clinician linkage, generate enrollment tracking records, and update status logs.
+              </div>
+
+              {linkError && (
+                <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-rose-800 text-[11px] font-semibold flex items-center space-x-1.5">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{linkError}</span>
+                </div>
+              )}
+
+              {/* 1. Practice Provider Group / Legal Entity */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Practice Provider / Legal Entity *
+                </label>
+                <select
+                  value={linkEntityId}
+                  onChange={(e) => setLinkEntityId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:bg-white"
+                  required
+                >
+                  <option value="">-- Select Practice Entity --</option>
+                  {entities.map((entity) => (
+                    <option key={entity.id} value={entity.id}>
+                      {entity.dba || entity.legalName} (EIN: {entity.ein})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Payer / Health Plan Network */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Payer / Insurance Network to Link *
+                </label>
+                <select
+                  value={linkPayerId}
+                  onChange={(e) => setLinkPayerId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:bg-white"
+                  required
+                >
+                  <option value="">-- Select Payer / Network --</option>
+                  {payers.map((payer) => (
+                    <option key={payer.id} value={payer.id}>
+                      {payer.name} ({payer.lob.join(', ')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 3. Practice Location */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Rendering Location
+                  </label>
+                  <select
+                    value={linkLocationId}
+                    onChange={(e) => setLinkLocationId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="">-- Primary / All Locations --</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} ({loc.city}, {loc.state})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. Application / Link Type */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Link / Application Type
+                  </label>
+                  <select
+                    value={linkAppType}
+                    onChange={(e) => setLinkAppType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="Provider linking">Provider Group Linking</option>
+                    <option value="Initial credentialing">Initial Credentialing</option>
+                    <option value="Re-credentialing">Re-credentialing</option>
+                    <option value="Demographic update">Demographic / Roster Update</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 5. Linking Status */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Initial Linking Status
+                  </label>
+                  <select
+                    value={linkStatus}
+                    onChange={(e) => setLinkStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="Linked">Linked (Active / Effective)</option>
+                    <option value="Pending Approval">Pending Approval / Roster</option>
+                    <option value="In Progress">Application In Progress</option>
+                  </select>
+                </div>
+
+                {/* 6. Effective Date */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Effective Date
+                  </label>
+                  <input
+                    type="date"
+                    value={linkEffectiveDate}
+                    onChange={(e) => setLinkEffectiveDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* 7. Assigned Specialist */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Assigned Credentialing Specialist
+                </label>
+                <select
+                  value={linkSpecialistId}
+                  onChange={(e) => setLinkSpecialistId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500"
+                >
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 8. Notes */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Link Notes / Instructions (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={linkNotes}
+                  onChange={(e) => setLinkNotes(e.target.value)}
+                  placeholder="e.g. Added to Group Type 2 roster, portal enrollment submitted..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500 resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsLinkModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 font-semibold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Save & Link Provider</span>
+                </button>
               </div>
             </form>
           </div>

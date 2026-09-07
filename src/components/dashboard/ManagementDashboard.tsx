@@ -19,7 +19,7 @@ import {
   BarChart3,
   Calendar,
   Search,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
 import { Discipline, CredentialingStage } from '../../types';
 
@@ -273,67 +273,69 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           </p>
         </div>
 
-        {/* View Switcher: Overall, By Discipline, By Payer, By Specialist, By Location */}
-        <div className="flex flex-wrap items-center bg-white p-1 rounded-xl border border-slate-200 shadow-xs text-xs font-semibold gap-1">
-          <button
-            onClick={() => setActiveTab('overall')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'overall'
-                ? 'bg-[#2B4C9D] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Overall</span>
-          </button>
+        {/* View Switcher & Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center bg-white p-1 rounded-xl border border-slate-200 shadow-xs text-xs font-semibold gap-1">
+            <button
+              onClick={() => setActiveTab('overall')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                activeTab === 'overall'
+                  ? 'bg-[#2B4C9D] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Overall</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('discipline')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'discipline'
-                ? 'bg-[#2B4C9D] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>By Discipline</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('discipline')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                activeTab === 'discipline'
+                  ? 'bg-[#2B4C9D] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>By Discipline</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('payer')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'payer'
-                ? 'bg-[#2B4C9D] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>By Payer</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('payer')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                activeTab === 'payer'
+                  ? 'bg-[#2B4C9D] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>By Payer</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('specialist')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'specialist'
-                ? 'bg-[#2B4C9D] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span>By Specialist</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('specialist')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                activeTab === 'specialist'
+                  ? 'bg-[#2B4C9D] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>By Specialist</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('location')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'location'
-                ? 'bg-[#2B4C9D] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <MapPin className="w-3.5 h-3.5" />
-            <span>By Location</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('location')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                activeTab === 'location'
+                  ? 'bg-[#2B4C9D] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>By Location</span>
+            </button>
+          </div>
         </div>
       </div>
 

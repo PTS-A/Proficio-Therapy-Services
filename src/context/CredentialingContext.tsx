@@ -20,6 +20,7 @@ import {
   Location,
   Payer,
   Provider,
+  ProviderCommentLog,
   SavedFilter,
   SLAItem,
   StageCategory,
@@ -27,6 +28,11 @@ import {
   SystemNotification,
   User,
   UserRole,
+  Employee,
+  ClinicalStaff,
+  ApplicationDocument,
+  ApplicationComment,
+  CredentialingApplication,
 } from '../types';
 import {
   DEFAULT_STAGE_CONFIGS,
@@ -38,6 +44,10 @@ import {
   INITIAL_PAYERS,
   INITIAL_PROVIDERS,
   INITIAL_USERS,
+  INITIAL_EMPLOYEES,
+  INITIAL_CLINICAL_STAFF,
+  INITIAL_APPLICATION_DOCUMENTS,
+  INITIAL_APPLICATION_COMMENTS,
 } from '../data/initialData';
 import { addBusinessDays, calculateBusinessDays, calculateDaysBetween, getAgingBucket, isFollowUpOverdue } from '../utils/slaCalculator';
 import { validateCredentialingRecord } from '../utils/entityValidation';
@@ -81,6 +91,7 @@ interface CredentialingContextType {
   // Cloud Database Sync
   cloudSyncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   refreshFromCloud: () => Promise<void>;
+  syncNow: () => Promise<void>;
 
   // Accounts & Authentication
   accounts: AppAccount[];
@@ -195,6 +206,9 @@ interface CredentialingContextType {
   addProvider: (providerData: Omit<Provider, 'id' | 'createdAt' | 'updatedAt' | 'documents'>) => Provider;
   updateProvider: (id: string, updates: Partial<Provider>) => void;
   deleteProvider: (id: string) => void;
+  addProviderCommentLog: (providerId: string, log: Omit<ProviderCommentLog, 'id' | 'timestamp' | 'authorId' | 'authorName' | 'authorRole'>) => void;
+  addProviderDocument: (providerId: string, doc: Omit<DocumentItem, 'id' | 'uploadDate'>) => void;
+  deleteProviderDocument: (providerId: string, docId: string) => void;
 
   // Payer CRUD
   addPayer: (payerData: Omit<Payer, 'id'>) => Payer;
@@ -223,6 +237,36 @@ interface CredentialingContextType {
   addCustomStage: (stage: Omit<StageConfig, 'id'>) => StageConfig;
   deleteCustomStage: (id: string) => { success: boolean; error?: string };
   reorderStages: (newOrder: StageConfig[]) => void;
+
+  // Dedicated Separate Database Collections (Section 5)
+  employees: Employee[];
+  clinicalStaff: ClinicalStaff[];
+  documentsList: ApplicationDocument[];
+  commentsList: ApplicationComment[];
+
+  // Employee & Clinical Staff operations
+  addEmployee: (empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => Employee;
+  updateEmployee: (id: string, updates: Partial<Employee>) => void;
+  addClinicalStaff: (staffData: Omit<ClinicalStaff, 'id' | 'createdAt' | 'updatedAt'>) => ClinicalStaff;
+  updateClinicalStaff: (id: string, updates: Partial<ClinicalStaff>) => void;
+
+  // Comments & Documents operations
+  addApplicationComment: (comment: { applicationId: string; providerId?: string; commentText: string }) => ApplicationComment;
+  addApplicationDocument: (doc: { applicationId: string; providerId?: string; name: string; type: string; documentUrl: string; expirationDate?: string }) => ApplicationDocument;
+  deleteApplicationDocument: (docId: string) => void;
+
+  // Automated Multi-Step Credentialing Workflow (Section 6, 7 & 8)
+  startCredentialingWorkflow: (data: {
+    field1_name: string;
+    field2_contact: string;
+    field4_location: string;
+    field5_discipline: string;
+    field3_npi_license: string;
+    field6_caqh_specialty: string;
+    documents: { name: string; type: string; url: string; expirationDate?: string }[];
+    payerIds: string[];
+    comments: { commentText: string; authorName: string; dateCreated: string; timeCreated: string; timestamp: string }[];
+  }) => Promise<{ success: boolean; applicationId: string; record: CredentialingRecord; error?: string }>;
 
   // System Tools
   resetToDefaultData: () => void;
@@ -297,7 +341,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((p: Provider) => {
+            const initMatch = INITIAL_PROVIDERS.find((ip) => ip.id === p.id);
+            return {
+              ...p,
+              commentLogs: (p.commentLogs && p.commentLogs.length > 0) ? p.commentLogs : (initMatch?.commentLogs || []),
+              documents: (p.documents && p.documents.length > 0) ? p.documents : (initMatch?.documents || []),
+            };
+          });
+        }
       } catch (e) {}
     }
     return INITIAL_PROVIDERS;
@@ -353,6 +406,51 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch (e) {}
     }
     return INITIAL_CREDENTIALING_RECORDS;
+  });
+
+  // Dedicated Database Collections (Section 5)
+  const [employees, setEmployees] = useState<Employee[]>(() => {
+    const saved = localStorage.getItem('cred_employees');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_EMPLOYEES;
+  });
+
+  const [clinicalStaff, setClinicalStaff] = useState<ClinicalStaff[]>(() => {
+    const saved = localStorage.getItem('cred_clinical_staff');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_CLINICAL_STAFF;
+  });
+
+  const [documentsList, setDocumentsList] = useState<ApplicationDocument[]>(() => {
+    const saved = localStorage.getItem('cred_documents');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_APPLICATION_DOCUMENTS;
+  });
+
+  const [commentsList, setCommentsList] = useState<ApplicationComment[]>(() => {
+    const saved = localStorage.getItem('cred_comments');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_APPLICATION_COMMENTS;
   });
 
   const [users] = useState<User[]>(INITIAL_USERS);
@@ -435,7 +533,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         cloudLocations,
         cloudRecords,
         cloudNotifications,
-        cloudStages
+        cloudStages,
+        cloudEmployees,
+        cloudClinicalStaff,
+        cloudDocuments,
+        cloudComments,
       ] = await Promise.all([
         fetchCollection<AppAccount>('users').catch(() => []),
         fetchCollection<Provider>('providers').catch(() => []),
@@ -444,7 +546,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         fetchCollection<Location>('locations').catch(() => []),
         fetchCollection<CredentialingRecord>('records').catch(() => []),
         fetchCollection<SystemNotification>('notifications').catch(() => []),
-        fetchCollection<StageConfig>('stage_configs').catch(() => [])
+        fetchCollection<StageConfig>('stage_configs').catch(() => []),
+        fetchCollection<Employee>('employees').catch(() => []),
+        fetchCollection<ClinicalStaff>('clinical_staff').catch(() => []),
+        fetchCollection<ApplicationDocument>('documents').catch(() => []),
+        fetchCollection<ApplicationComment>('comments').catch(() => []),
       ]);
 
       // Seed if empty or populate state
@@ -515,6 +621,34 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         setStageConfigs(cloudStages.sort((a, b) => a.order - b.order));
       }
 
+      if (!cloudEmployees || cloudEmployees.length === 0) {
+        await saveBatch('employees', INITIAL_EMPLOYEES);
+        setEmployees(INITIAL_EMPLOYEES);
+      } else {
+        setEmployees(cloudEmployees);
+      }
+
+      if (!cloudClinicalStaff || cloudClinicalStaff.length === 0) {
+        await saveBatch('clinical_staff', INITIAL_CLINICAL_STAFF);
+        setClinicalStaff(INITIAL_CLINICAL_STAFF);
+      } else {
+        setClinicalStaff(cloudClinicalStaff);
+      }
+
+      if (!cloudDocuments || cloudDocuments.length === 0) {
+        await saveBatch('documents', INITIAL_APPLICATION_DOCUMENTS);
+        setDocumentsList(INITIAL_APPLICATION_DOCUMENTS);
+      } else {
+        setDocumentsList(cloudDocuments);
+      }
+
+      if (!cloudComments || cloudComments.length === 0) {
+        await saveBatch('comments', INITIAL_APPLICATION_COMMENTS);
+        setCommentsList(INITIAL_APPLICATION_COMMENTS);
+      } else {
+        setCommentsList(cloudComments);
+      }
+
       setCloudSyncStatus('synced');
       initialLoadDoneRef.current = true;
       dirtyCollectionsRef.current.clear();
@@ -543,6 +677,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   notificationsRef.current = notifications;
   const stageConfigsRef = useRef(stageConfigs);
   stageConfigsRef.current = stageConfigs;
+  const employeesRef = useRef(employees);
+  employeesRef.current = employees;
+  const clinicalStaffRef = useRef(clinicalStaff);
+  clinicalStaffRef.current = clinicalStaff;
+  const documentsListRef = useRef(documentsList);
+  documentsListRef.current = documentsList;
+  const commentsListRef = useRef(commentsList);
+  commentsListRef.current = commentsList;
 
   // Track modified collections that need syncing to Google Cloud
   const dirtyCollectionsRef = useRef<Set<string>>(new Set());
@@ -594,6 +736,18 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       if (dirtyCollectionsRef.current.has('stage_configs')) {
         syncTasks.push(saveBatch('stage_configs', stageConfigsRef.current));
       }
+      if (dirtyCollectionsRef.current.has('employees')) {
+        syncTasks.push(saveBatch('employees', employeesRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('clinical_staff')) {
+        syncTasks.push(saveBatch('clinical_staff', clinicalStaffRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('documents')) {
+        syncTasks.push(saveBatch('documents', documentsListRef.current));
+      }
+      if (dirtyCollectionsRef.current.has('comments')) {
+        syncTasks.push(saveBatch('comments', commentsListRef.current));
+      }
 
       await Promise.all(syncTasks);
       dirtyCollectionsRef.current.clear();
@@ -602,6 +756,33 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       console.error('[Cloud Database Auto-Sync] 10-minute interval sync error:', err);
       setCloudSyncStatus('error');
+    }
+  };
+
+  // Immediate full sync to cloud
+  const syncNow = async () => {
+    setCloudSyncStatus('syncing');
+    try {
+      await Promise.all([
+        saveBatch('users', accountsRef.current),
+        saveBatch('providers', providersRef.current),
+        saveBatch('payers', payersRef.current),
+        saveBatch('entities', entitiesRef.current),
+        saveBatch('locations', locationsRef.current),
+        saveBatch('records', recordsRef.current),
+        saveBatch('notifications', notificationsRef.current),
+        saveBatch('stage_configs', stageConfigsRef.current),
+        saveBatch('employees', employeesRef.current),
+        saveBatch('clinical_staff', clinicalStaffRef.current),
+        saveBatch('documents', documentsListRef.current),
+        saveBatch('comments', commentsListRef.current),
+      ]);
+      dirtyCollectionsRef.current.clear();
+      setCloudSyncStatus('synced');
+    } catch (err) {
+      console.error('[Cloud Database Manual Sync] Error:', err);
+      setCloudSyncStatus('error');
+      throw err;
     }
   };
 
@@ -677,6 +858,26 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem('cred_notifications', JSON.stringify(notifications));
     markDirty('notifications');
   }, [notifications]);
+
+  useEffect(() => {
+    localStorage.setItem('cred_employees', JSON.stringify(employees));
+    markDirty('employees');
+  }, [employees]);
+
+  useEffect(() => {
+    localStorage.setItem('cred_clinical_staff', JSON.stringify(clinicalStaff));
+    markDirty('clinical_staff');
+  }, [clinicalStaff]);
+
+  useEffect(() => {
+    localStorage.setItem('cred_documents', JSON.stringify(documentsList));
+    markDirty('documents');
+  }, [documentsList]);
+
+  useEffect(() => {
+    localStorage.setItem('cred_comments', JSON.stringify(commentsList));
+    markDirty('comments');
+  }, [commentsList]);
 
   // Sync currentUser with currentAccount changes
   useEffect(() => {
@@ -1631,6 +1832,83 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     deleteDocument('providers', id).catch(console.error);
   };
 
+  const addProviderCommentLog = (
+    providerId: string, 
+    logData: Omit<ProviderCommentLog, 'id' | 'timestamp' | 'authorId' | 'authorName' | 'authorRole'>
+  ) => {
+    const authorName = currentAccount?.name || currentUser.name || 'System User';
+    const authorId = currentAccount?.id || currentUser.id || 'user-1';
+    const authorRole = currentAccount?.systemRole || currentUser.role || 'Specialist';
+
+    const newLog: ProviderCommentLog = {
+      id: `pcl-${Date.now()}`,
+      timestamp: new Date().toLocaleString(),
+      authorId,
+      authorName,
+      authorRole,
+      ...logData,
+    };
+
+    setProviders((prev) =>
+      prev.map((p) => {
+        if (p.id === providerId) {
+          const currentLogs = p.commentLogs || [];
+          const updated = {
+            ...p,
+            commentLogs: [newLog, ...currentLogs],
+            currentStatus: logData.statusTo || p.currentStatus,
+            updatedAt: new Date().toISOString().split('T')[0]
+          };
+          saveDocument('providers', providerId, updated).catch(console.error);
+          return updated;
+        }
+        return p;
+      })
+    );
+  };
+
+  const addProviderDocument = (providerId: string, docData: Omit<DocumentItem, 'id' | 'uploadDate'>) => {
+    const newDoc: DocumentItem = {
+      id: `pdoc-${Date.now()}`,
+      uploadDate: new Date().toISOString().split('T')[0],
+      providerId,
+      ...docData,
+    };
+
+    setProviders((prev) =>
+      prev.map((p) => {
+        if (p.id === providerId) {
+          const currentDocs = p.documents || [];
+          const updated = {
+            ...p,
+            documents: [newDoc, ...currentDocs],
+            updatedAt: new Date().toISOString().split('T')[0]
+          };
+          saveDocument('providers', providerId, updated).catch(console.error);
+          return updated;
+        }
+        return p;
+      })
+    );
+  };
+
+  const deleteProviderDocument = (providerId: string, docId: string) => {
+    setProviders((prev) =>
+      prev.map((p) => {
+        if (p.id === providerId) {
+          const updated = {
+            ...p,
+            documents: (p.documents || []).filter((d) => d.id !== docId),
+            updatedAt: new Date().toISOString().split('T')[0]
+          };
+          saveDocument('providers', providerId, updated).catch(console.error);
+          return updated;
+        }
+        return p;
+      })
+    );
+  };
+
   // Payer CRUD
   const addPayer = (payerData: Omit<Payer, 'id'>): Payer => {
     const newPayer: Payer = {
@@ -2256,11 +2534,543 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     saveDocument('notifications', notif.id, notif).catch(console.error);
   };
 
+  // Dedicated Database Collections CRUD & Operations (Section 5)
+  const addEmployee = (empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Employee => {
+    const id = `emp-${Date.now()}`;
+    const newEmp: Employee = {
+      ...empData,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setEmployees((prev) => [newEmp, ...prev]);
+    saveDocument('employees', id, newEmp).catch(console.error);
+    return newEmp;
+  };
+
+  const updateEmployee = (id: string, updates: Partial<Employee>) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
+      )
+    );
+    saveDocument('employees', id, updates).catch(console.error);
+  };
+
+  const addClinicalStaff = (
+    staffData: Omit<ClinicalStaff, 'id' | 'createdAt' | 'updatedAt'>
+  ): ClinicalStaff => {
+    const id = `cs-${Date.now()}`;
+    const newStaff: ClinicalStaff = {
+      ...staffData,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setClinicalStaff((prev) => [newStaff, ...prev]);
+    saveDocument('clinical_staff', id, newStaff).catch(console.error);
+    return newStaff;
+  };
+
+  const updateClinicalStaff = (id: string, updates: Partial<ClinicalStaff>) => {
+    setClinicalStaff((prev) =>
+      prev.map((staff) =>
+        staff.id === id ? { ...staff, ...updates, updatedAt: new Date().toISOString() } : staff
+      )
+    );
+    saveDocument('clinical_staff', id, updates).catch(console.error);
+  };
+
+  const addApplicationComment = (comment: {
+    applicationId: string;
+    providerId?: string;
+    commentText: string;
+  }): ApplicationComment => {
+    const id = `com-${Date.now()}`;
+    const now = new Date();
+    const newComment: ApplicationComment = {
+      id,
+      applicationId: comment.applicationId,
+      providerId: comment.providerId,
+      authorId: currentAccount?.id || currentUser.id,
+      authorName: currentAccount?.name || currentUser.name,
+      authorRole: currentAccount?.systemRole || currentUser.role,
+      commentText: comment.commentText,
+      dateCreated: now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      timeCreated: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      timestamp: now.toISOString(),
+    };
+
+    setCommentsList((prev) => [newComment, ...prev]);
+    saveDocument('comments', id, newComment).catch(console.error);
+
+    setRecords((prev) =>
+      prev.map((rec) => {
+        if (rec.id === comment.applicationId) {
+          const existingComments = rec.comments || [];
+          const existingIds = rec.commentIds || [];
+          return {
+            ...rec,
+            comments: [newComment, ...existingComments],
+            commentIds: [id, ...existingIds],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return rec;
+      })
+    );
+
+    return newComment;
+  };
+
+  const addApplicationDocument = (doc: {
+    applicationId: string;
+    providerId?: string;
+    name: string;
+    type: string;
+    documentUrl: string;
+    expirationDate?: string;
+  }): ApplicationDocument => {
+    const id = `doc-${Date.now()}`;
+    const newDoc: ApplicationDocument = {
+      id,
+      applicationId: doc.applicationId,
+      providerId: doc.providerId,
+      name: doc.name,
+      type: doc.type,
+      documentUrl: doc.documentUrl,
+      uploadDate: new Date().toISOString().split('T')[0],
+      expirationDate: doc.expirationDate,
+      verificationStatus: 'Verified',
+      notes: 'Added via document manager link.',
+    };
+
+    setDocumentsList((prev) => [newDoc, ...prev]);
+    saveDocument('documents', id, newDoc).catch(console.error);
+
+    setRecords((prev) =>
+      prev.map((rec) => {
+        if (rec.id === doc.applicationId) {
+          const existingDocs = rec.documentLinks || [];
+          const existingIds = rec.documentIds || [];
+          return {
+            ...rec,
+            documentLinks: [
+              {
+                id,
+                name: doc.name,
+                url: doc.documentUrl,
+                type: doc.type,
+                uploadDate: newDoc.uploadDate,
+              },
+              ...existingDocs,
+            ],
+            documentIds: [id, ...existingIds],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return rec;
+      })
+    );
+
+    return newDoc;
+  };
+
+  const deleteApplicationDocument = (docId: string) => {
+    setDocumentsList((prev) => prev.filter((d) => d.id !== docId));
+    deleteDocument('documents', docId).catch(console.error);
+
+    setRecords((prev) =>
+      prev.map((rec) => ({
+        ...rec,
+        documentLinks: rec.documentLinks?.filter((d) => d.id !== docId),
+        documentIds: rec.documentIds?.filter((id) => id !== docId),
+      }))
+    );
+  };
+
+  // Automated Multi-Step Credentialing Workflow (Section 6, 7 & 8)
+  const startCredentialingWorkflow = async (data: {
+    field1_name: string;
+    field2_contact: string;
+    field4_location: string;
+    field5_discipline: string;
+    field3_npi_license: string;
+    field6_caqh_specialty: string;
+    documents: { name: string; type: string; url: string; expirationDate?: string }[];
+    payerIds: string[];
+    comments: { commentText: string; authorName: string; dateCreated: string; timeCreated: string; timestamp: string }[];
+  }): Promise<{ success: boolean; applicationId: string; record: CredentialingRecord; error?: string }> => {
+    try {
+      // 1. Generate unique IDs
+      const year = new Date().getFullYear();
+      const randNum = Math.floor(1000 + Math.random() * 9000);
+      const applicationId = `APP-${year}-${randNum}`;
+      const providerId = `prv-${Date.now().toString().slice(-6)}`;
+      const employeeId = `emp-${providerId}`;
+      const clinicalStaffId = `cs-${providerId}`;
+
+      // 2. Parse Name (Field 1)
+      let rawName = data.field1_name.trim();
+      let extractedCredentials = '';
+      if (rawName.includes(',')) {
+        const parts = rawName.split(',');
+        rawName = parts[0].trim();
+        extractedCredentials = parts.slice(1).join(', ').trim();
+      }
+      const cleanName = rawName.replace(/^Dr\.\s+/i, '');
+      const nameParts = cleanName.split(' ');
+      const firstName = nameParts[0] || 'New';
+      const lastName = nameParts.slice(1).join(' ') || 'Provider';
+      const fullName = `${firstName} ${lastName}`;
+
+      // 3. Parse Contact (Field 2)
+      const contactText = data.field2_contact.trim();
+      const emailMatch = contactText.match(/[\w.-]+@[\w.-]+\.\w+/);
+      const email = emailMatch
+        ? emailMatch[0]
+        : `${firstName.toLowerCase()}.${lastName.toLowerCase()}@ageslearningsolutions.com`;
+      const phoneMatch = contactText.match(/(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/);
+      const phone = phoneMatch ? phoneMatch[0] : '(408) 555-0199';
+
+      // 4. Resolve Location (Field 4)
+      let targetLocationId = locations[0]?.id || 'loc-1';
+      const locMatch = locations.find(
+        (l) =>
+          l.id === data.field4_location ||
+          l.name.toLowerCase().includes(data.field4_location.toLowerCase()) ||
+          data.field4_location.toLowerCase().includes(l.city.toLowerCase())
+      );
+      if (locMatch) {
+        targetLocationId = locMatch.id;
+      }
+      const targetEntityId = locMatch?.entityId || entities[0]?.id || 'ent-1';
+
+      // 5. Discipline & Provider Type (Field 5)
+      let targetDiscipline: Discipline = 'ABA';
+      if (
+        data.field5_discipline.toUpperCase().includes('SPEECH') ||
+        data.field5_discipline.toUpperCase().includes('SLP')
+      ) {
+        targetDiscipline = 'Speech';
+      } else if (
+        data.field5_discipline.toUpperCase().includes('OT') ||
+        data.field5_discipline.toUpperCase().includes('OCCUPATIONAL')
+      ) {
+        targetDiscipline = 'OT';
+      }
+
+      let targetProviderType: any = 'BCBA';
+      if (targetDiscipline === 'Speech') targetProviderType = 'SLP';
+      if (targetDiscipline === 'OT') targetProviderType = 'OTR/L';
+
+      // 6. Professional identifiers (Field 3 & Field 6)
+      const npiMatch = data.field3_npi_license.match(/\b\d{10}\b/);
+      const npi = npiMatch ? npiMatch[0] : `1${Math.floor(100000000 + Math.random() * 900000000)}`;
+
+      let licenseNumber = data.field3_npi_license
+        .replace(npi, '')
+        .replace(/NPI:?/i, '')
+        .replace(/License:?/i, '')
+        .trim();
+      if (!licenseNumber || licenseNumber.length < 2) {
+        licenseNumber = `LBA-CA-${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      const caqhMatch = data.field6_caqh_specialty.match(/\b\d{8}\b/);
+      const caqhId = caqhMatch ? caqhMatch[0] : `${Math.floor(10000000 + Math.random() * 90000000)}`;
+      let specialty = data.field6_caqh_specialty
+        .replace(caqhId, '')
+        .replace(/CAQH:?/i, '')
+        .replace(/Taxonomy:?/i, '')
+        .trim();
+      if (!specialty) {
+        specialty =
+          targetDiscipline === 'ABA'
+            ? 'Applied Behavior Analysis (ABA)'
+            : targetDiscipline === 'Speech'
+            ? 'Speech-Language Pathology'
+            : 'Occupational Therapy';
+      }
+
+      const credentials =
+        extractedCredentials ||
+        (targetDiscipline === 'ABA'
+          ? 'MS, BCBA, LBA'
+          : targetDiscipline === 'Speech'
+          ? 'MS, CCC-SLP'
+          : 'MS, OTR/L');
+
+      // 7. Step 1 (DB): Automatically create Employee record
+      const newEmployee: Employee = {
+        id: employeeId,
+        firstName,
+        lastName,
+        fullName,
+        email,
+        phone,
+        department: 'Clinical Services',
+        roleTitle: `${targetProviderType} (${targetDiscipline})`,
+        employmentStatus: 'Full-Time',
+        startDate: new Date().toISOString().split('T')[0],
+        officeLocationId: targetLocationId,
+        entityId: targetEntityId,
+        notes: `Clinical staff member. Created via credentialing workflow for Application ${applicationId}.`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 8. Step 2 (DB): Automatically create Clinical Staff record
+      const newClinicalStaff: ClinicalStaff = {
+        id: clinicalStaffId,
+        employeeId,
+        providerId,
+        firstName,
+        lastName,
+        fullName,
+        credentials,
+        disciplines: [targetDiscipline],
+        providerType: targetProviderType,
+        licenseNumber,
+        licenseState: 'CA',
+        licenseExpiration: '2028-12-31',
+        npi,
+        taxonomy:
+          targetDiscipline === 'ABA'
+            ? '103K00000X'
+            : targetDiscipline === 'Speech'
+            ? '235Z00000X'
+            : '225X00000X',
+        specialty,
+        primaryLocationId: targetLocationId,
+        locationIds: [targetLocationId],
+        entityIds: [targetEntityId],
+        caqhId,
+        paveStatus: 'In Progress',
+        status: 'In Credentialing',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 9. Step 3 (DB): Automatically create Application Document records
+      const newDocuments: ApplicationDocument[] = data.documents.map((doc, idx) => ({
+        id: `doc-${applicationId}-${idx + 1}`,
+        applicationId,
+        providerId,
+        clinicalStaffId,
+        name: doc.name || `Credentialing Document ${idx + 1}`,
+        type: doc.type || 'Other',
+        documentUrl: doc.url || '',
+        uploadDate: new Date().toISOString().split('T')[0],
+        expirationDate: doc.expirationDate || '',
+        verificationStatus: 'Verified',
+        notes: 'Linked during new application credentialing intake.',
+      }));
+
+      const docItems: DocumentItem[] = newDocuments.map((d) => ({
+        id: d.id,
+        name: d.name,
+        type: d.type as any,
+        fileName: d.name.endsWith('.pdf') ? d.name : `${d.name}.pdf`,
+        fileSize: '1.2 MB',
+        uploadDate: d.uploadDate,
+        expirationDate: d.expirationDate,
+        verificationStatus: 'Verified',
+        documentUrl: d.documentUrl,
+        providerId,
+      }));
+
+      // 10. Step 4 (DB): Automatically create Application Comments
+      const newComments: ApplicationComment[] = data.comments.map((c, idx) => ({
+        id: `com-${applicationId}-${idx + 1}`,
+        applicationId,
+        providerId,
+        authorId: currentAccount?.id || currentUser.id,
+        authorName: c.authorName || currentAccount?.name || currentUser.name,
+        authorRole: currentAccount?.systemRole || currentUser.role,
+        commentText: c.commentText,
+        dateCreated:
+          c.dateCreated ||
+          new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        timeCreated:
+          c.timeCreated ||
+          new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        timestamp: c.timestamp || new Date().toISOString(),
+      }));
+
+      // 11. Step 5 (DB): Selected Payers
+      const selectedPayerList = payers.filter((p) => data.payerIds.includes(p.id));
+      const targetPayerId = data.payerIds[0] || payers[0]?.id || 'pyr-aetna';
+
+      // 12. Step 6 (DB): Automatically create Provider record
+      const newProvider: Provider = {
+        id: providerId,
+        npi,
+        firstName,
+        lastName,
+        credentials,
+        disciplines: [targetDiscipline],
+        providerType: targetProviderType,
+        email,
+        phone,
+        licenseNumber,
+        licenseState: 'CA',
+        licenseExpiration: '2028-12-31',
+        taxonomy: newClinicalStaff.taxonomy,
+        specialty,
+        entityIds: [targetEntityId],
+        primaryEntityId: targetEntityId,
+        employmentStatus: 'Full-Time',
+        contractStatus: 'W-2 Full-Time',
+        startDate: new Date().toISOString().split('T')[0],
+        primaryLocationId: targetLocationId,
+        locationIds: [targetLocationId],
+        caqhId,
+        caqhStatus: 'Complete',
+        paveStatus: 'In Progress',
+        npiVerified: true,
+        nppesRecordMatch: true,
+        documents: docItems,
+        payerEnrollments: selectedPayerList.map((p) => ({
+          payerId: p.id,
+          payerName: p.name,
+          status: 'Application In Progress',
+          notes: `Application initiated via ${applicationId}`,
+        })),
+        currentStatus: 'In Credentialing',
+        active: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 13. Step 7 (DB): Automatically create Credentialing Application record
+      const newRecord: CredentialingRecord = {
+        id: applicationId,
+        providerId,
+        payerId: targetPayerId,
+        entityId: targetEntityId,
+        locationId: targetLocationId,
+        applicationType: 'New provider credentialing',
+        discipline: targetDiscipline,
+        stage: 'Application Submitted',
+        assignedSpecialistId: currentAccount?.id || currentUser.id,
+        assignedSpecialistName: currentAccount?.name || currentUser.name,
+        intakeDate: new Date().toISOString().split('T')[0],
+        documentsRequestedDate: new Date().toISOString().split('T')[0],
+        documentsReceivedDate: new Date().toISOString().split('T')[0],
+        documentsCompleteDate: new Date().toISOString().split('T')[0],
+        submissionDate: new Date().toISOString().split('T')[0],
+        targetTurnaroundDate: addBusinessDays(new Date().toISOString().split('T')[0], 60),
+        followUps: [],
+        isOverdue: false,
+        daysInCurrentStage: 0,
+        totalCycleDays: 0,
+        checklist: [
+          {
+            id: 'chk-1',
+            title: 'Intake and baseline verification',
+            category: 'Administrative',
+            isRequired: true,
+            isCompleted: true,
+            completedDate: new Date().toISOString().split('T')[0],
+          },
+          {
+            id: 'chk-2',
+            title: 'CAQH profile attestation and NPI match',
+            category: 'Validation',
+            isRequired: true,
+            isCompleted: true,
+            completedDate: new Date().toISOString().split('T')[0],
+          },
+          {
+            id: 'chk-3',
+            title: 'Payer application packets submitted',
+            category: 'Portal',
+            isRequired: true,
+            isCompleted: true,
+            completedDate: new Date().toISOString().split('T')[0],
+          },
+          { id: 'chk-4', title: 'Payer committee credentialing approval', category: 'Administrative', isRequired: true, isCompleted: false },
+          { id: 'chk-5', title: 'Provider linking to group TIN and location', category: 'Administrative', isRequired: true, isCompleted: false },
+          { id: 'chk-6', title: 'Effective date confirmation and billing release', category: 'Administrative', isRequired: true, isCompleted: false },
+        ],
+        documents: docItems,
+        validationIssues: [],
+        linkingStatus: 'Linking In Progress',
+        contractStatus: 'Not Started',
+        paveTrackingNumber: `PAVE-${Math.floor(100000 + Math.random() * 900000)}`,
+        auditTrail: [
+          {
+            id: `aud-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            userId: currentAccount?.id || currentUser.id,
+            userName: currentAccount?.name || currentUser.name,
+            action: 'Credentialing Application Created',
+            notes: `Application ${applicationId} initiated with ${data.payerIds.length} payers, linked to Employee ${employeeId} and Clinical Staff ${clinicalStaffId}.`,
+          },
+        ],
+        clinicalStaffId,
+        employeeId,
+        payerIds: data.payerIds,
+        documentIds: newDocuments.map((d) => d.id),
+        documentLinks: newDocuments.map((d) => ({
+          id: d.id,
+          name: d.name,
+          url: d.documentUrl,
+          type: d.type,
+          uploadDate: d.uploadDate,
+        })),
+        commentIds: newComments.map((c) => c.id),
+        comments: newComments,
+        applicationId,
+        notes: `Credentialing initiated for ${fullName}. Associated with ${data.payerIds.length} payers, ${newDocuments.length} document links, and ${newComments.length} notes.`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 14. Step 8: Update React state atomically
+      setEmployees((prev) => [newEmployee, ...prev]);
+      setClinicalStaff((prev) => [newClinicalStaff, ...prev]);
+      setProviders((prev) => [newProvider, ...prev]);
+      setRecords((prev) => [newRecord, ...prev]);
+      if (newDocuments.length > 0) {
+        setDocumentsList((prev) => [...newDocuments, ...prev]);
+      }
+      if (newComments.length > 0) {
+        setCommentsList((prev) => [...newComments, ...prev]);
+      }
+
+      // 15. Step 9: Automatic Firestore background persistence
+      saveDocument('employees', employeeId, newEmployee).catch(console.error);
+      saveDocument('clinical_staff', clinicalStaffId, newClinicalStaff).catch(console.error);
+      saveDocument('providers', providerId, newProvider).catch(console.error);
+      saveDocument('records', applicationId, newRecord).catch(console.error);
+      saveDocument('applications', applicationId, newRecord).catch(console.error);
+      newDocuments.forEach((d) => saveDocument('documents', d.id, d).catch(console.error));
+      newComments.forEach((c) => saveDocument('comments', c.id, c).catch(console.error));
+
+      return {
+        success: true,
+        applicationId,
+        record: newRecord,
+      };
+    } catch (err: any) {
+      console.error('Error starting credentialing workflow:', err);
+      return {
+        success: false,
+        applicationId: '',
+        record: {} as any,
+        error: err.message || 'Failed to complete credentialing application.',
+      };
+    }
+  };
+
   return (
     <CredentialingContext.Provider
       value={{
         cloudSyncStatus,
         refreshFromCloud,
+        syncNow,
         accounts,
         currentAccount,
         isAdmin,
@@ -2311,6 +3121,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         addProvider,
         updateProvider,
         deleteProvider,
+        addProviderCommentLog,
+        addProviderDocument,
+        deleteProviderDocument,
         addPayer,
         updatePayer,
         addEntity,
@@ -2331,6 +3144,18 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         reorderStages,
         resetToDefaultData,
         importBulkData,
+        employees,
+        clinicalStaff,
+        documentsList,
+        commentsList,
+        addEmployee,
+        updateEmployee,
+        addClinicalStaff,
+        updateClinicalStaff,
+        addApplicationComment,
+        addApplicationDocument,
+        deleteApplicationDocument,
+        startCredentialingWorkflow,
       }}
     >
       {children}

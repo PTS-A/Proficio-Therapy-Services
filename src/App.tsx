@@ -111,6 +111,8 @@ const MainContent: React.FC = () => {
               onSelectRecord={handleSelectRecord}
               selectedProviderId={selectedProviderId}
               onClearSelectedProvider={() => setSelectedProviderId(null)}
+              onNavigateToLinking={() => setActiveTab('linking')}
+              onNavigateToTracker={() => setActiveTab('tracker')}
             />
           </div>
         )}
@@ -211,6 +213,11 @@ const MainContent: React.FC = () => {
         isOpen={isNewAppModalOpen}
         onClose={() => setIsNewAppModalOpen(false)}
         onSelectRecord={handleSelectRecord}
+        onNavigateToLinking={handleNavigateToLinking}
+        onNavigateToProviders={(pId) => {
+          if (pId) setSelectedProviderId(pId);
+          setActiveTab('providers');
+        }}
       />
 
       {/* Mandatory First Sign-On Password Setup Modal */}

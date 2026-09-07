@@ -7,21 +7,31 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // Initialize Firestore with specific database ID if configured
-export const db = firebaseConfig.firestoreDatabaseId 
+export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)')
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);
 
-// Auto-authenticate anonymously if not already signed in to satisfy rule checks
+let authAttempted = false;
+let authAvailable = true;
+
+// Auto-authenticate anonymously if not already signed in (if enabled in project)
 export async function ensureAuth() {
+  if (authAttempted && !authAvailable) return;
   try {
     if (!auth.currentUser) {
       await signInAnonymously(auth);
+      authAvailable = true;
     }
-  } catch (err) {
-    console.warn('[Firebase Auth] Anonymous sign-in notice:', err);
+  } catch (err: any) {
+    authAttempted = true;
+    authAvailable = false;
+    // Suppress expected configuration notice when anonymous provider is disabled in Firebase console
+    if (err?.code !== 'auth/configuration-not-found' && err?.code !== 'auth/admin-restricted-operation') {
+      console.warn('[Firebase Auth] Notice:', err?.message || err);
+    }
   }
 }
 

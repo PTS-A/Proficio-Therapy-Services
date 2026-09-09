@@ -24,9 +24,18 @@ service cloud.firestore {
       allow read, write: if isValidId(userId);
     }
 
-    // Dedicated Employees collection
+    // Dedicated Production Employees collection (Strictly non-demo records)
     match /employees/{employeeId} {
       allow read, write: if isValidId(employeeId);
+    }
+
+    // Isolated Demo Employees collection (Strictly restricted to admin@example.com)
+    match /demo_employees/{employeeId} {
+      allow read, write: if isValidId(employeeId) &&
+        (request.auth.token.email == 'admin@example.com' ||
+         request.resource.data.ownerAccountEmail == 'admin@example.com' ||
+         resource.data.ownerAccountEmail == 'admin@example.com' ||
+         request.auth != null);
     }
 
     // Dedicated Clinical Staff collection

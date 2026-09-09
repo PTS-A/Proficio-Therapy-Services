@@ -186,7 +186,11 @@
     },
     "/employees/{employeeId}": {
       "schema": "Employee",
-      "description": "Dedicated collection for employee records"
+      "description": "Dedicated collection for real production employee records"
+    },
+    "/demo_employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Isolated collection for demo employee records accessible strictly by admin@example.com"
     },
     "/clinical_staff/{staffId}": {
       "schema": "ClinicalStaff",

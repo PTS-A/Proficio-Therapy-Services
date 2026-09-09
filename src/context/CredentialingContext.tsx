@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react';
 import { isSuperAdmin } from '../utils/rbac';
 import {
   AccessLevel,
@@ -45,6 +45,8 @@ import {
   INITIAL_PROVIDERS,
   INITIAL_USERS,
   INITIAL_EMPLOYEES,
+  DEMO_EMPLOYEES,
+  isDemoEmployee,
   INITIAL_CLINICAL_STAFF,
   INITIAL_APPLICATION_DOCUMENTS,
   INITIAL_APPLICATION_COMMENTS,
@@ -240,6 +242,8 @@ interface CredentialingContextType {
 
   // Dedicated Separate Database Collections (Section 5)
   employees: Employee[];
+  demoEmployees: Employee[];
+  isDemoEmployee: (emp: Partial<Employee>) => boolean;
   clinicalStaff: ClinicalStaff[];
   documentsList: ApplicationDocument[];
   commentsList: ApplicationComment[];
@@ -409,15 +413,37 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   // Dedicated Database Collections (Section 5)
+  // Production Employees: Strictly real non-demo employees
   const [employees, setEmployees] = useState<Employee[]>(() => {
     const saved = localStorage.getItem('cred_employees');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((e: any) => !isDemoEmployee(e));
+        }
       } catch (e) {}
     }
     return INITIAL_EMPLOYEES;
+  });
+
+  // Isolated Demo Employees: Strictly accessible and populated only for admin@example.com
+  const [demoEmployees, setDemoEmployees] = useState<Employee[]>(() => {
+    const savedAccount = localStorage.getItem('cred_current_account');
+    if (savedAccount) {
+      try {
+        const acc = JSON.parse(savedAccount);
+        if (acc?.email?.toLowerCase() === 'admin@example.com') {
+          const savedDemo = localStorage.getItem('cred_demo_employees_admin');
+          if (savedDemo) {
+            const parsedDemo = JSON.parse(savedDemo);
+            if (Array.isArray(parsedDemo) && parsedDemo.length > 0) return parsedDemo;
+          }
+          return DEMO_EMPLOYEES;
+        }
+      } catch (e) {}
+    }
+    return [];
   });
 
   const [clinicalStaff, setClinicalStaff] = useState<ClinicalStaff[]>(() => {
@@ -538,6 +564,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         cloudClinicalStaff,
         cloudDocuments,
         cloudComments,
+        cloudDemoEmployees,
       ] = await Promise.all([
         fetchCollection<AppAccount>('users').catch(() => []),
         fetchCollection<Provider>('providers').catch(() => []),
@@ -551,6 +578,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         fetchCollection<ClinicalStaff>('clinical_staff').catch(() => []),
         fetchCollection<ApplicationDocument>('documents').catch(() => []),
         fetchCollection<ApplicationComment>('comments').catch(() => []),
+        fetchCollection<Employee>('demo_employees').catch(() => []),
       ]);
 
       // Seed if empty or populate state
@@ -621,11 +649,26 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         setStageConfigs(cloudStages.sort((a, b) => a.order - b.order));
       }
 
-      if (!cloudEmployees || cloudEmployees.length === 0) {
-        await saveBatch('employees', INITIAL_EMPLOYEES);
-        setEmployees(INITIAL_EMPLOYEES);
+      // Sanitize production employees: strictly real employees, never demo records
+      const sanitizedProductionEmployees = (cloudEmployees || []).filter((e) => !isDemoEmployee(e));
+      setEmployees(sanitizedProductionEmployees);
+
+      // Isolated Demo Employees collection: Only accessible if active account is admin@example.com
+      const savedAccountStr = localStorage.getItem('cred_current_account');
+      let activeEmail = '';
+      try {
+        if (savedAccountStr) activeEmail = JSON.parse(savedAccountStr)?.email?.toLowerCase() || '';
+      } catch {}
+
+      if (activeEmail === 'admin@example.com') {
+        if (!cloudDemoEmployees || cloudDemoEmployees.length === 0) {
+          await saveBatch('demo_employees', DEMO_EMPLOYEES);
+          setDemoEmployees(DEMO_EMPLOYEES);
+        } else {
+          setDemoEmployees(cloudDemoEmployees);
+        }
       } else {
-        setEmployees(cloudEmployees);
+        setDemoEmployees([]);
       }
 
       if (!cloudClinicalStaff || cloudClinicalStaff.length === 0) {
@@ -679,6 +722,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   stageConfigsRef.current = stageConfigs;
   const employeesRef = useRef(employees);
   employeesRef.current = employees;
+  const demoEmployeesRef = useRef(demoEmployees);
+  demoEmployeesRef.current = demoEmployees;
+  const currentAccountRef = useRef(currentAccount);
+  currentAccountRef.current = currentAccount;
   const clinicalStaffRef = useRef(clinicalStaff);
   clinicalStaffRef.current = clinicalStaff;
   const documentsListRef = useRef(documentsList);
@@ -737,7 +784,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         syncTasks.push(saveBatch('stage_configs', stageConfigsRef.current));
       }
       if (dirtyCollectionsRef.current.has('employees')) {
-        syncTasks.push(saveBatch('employees', employeesRef.current));
+        const realEmployeesOnly = employeesRef.current.filter((e) => !isDemoEmployee(e));
+        syncTasks.push(saveBatch('employees', realEmployeesOnly));
+      }
+      if (dirtyCollectionsRef.current.has('demo_employees') && currentAccountRef.current?.email?.toLowerCase() === 'admin@example.com') {
+        syncTasks.push(saveBatch('demo_employees', demoEmployeesRef.current));
       }
       if (dirtyCollectionsRef.current.has('clinical_staff')) {
         syncTasks.push(saveBatch('clinical_staff', clinicalStaffRef.current));
@@ -772,10 +823,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         saveBatch('records', recordsRef.current),
         saveBatch('notifications', notificationsRef.current),
         saveBatch('stage_configs', stageConfigsRef.current),
-        saveBatch('employees', employeesRef.current),
+        saveBatch('employees', employeesRef.current.filter((e) => !isDemoEmployee(e))),
         saveBatch('clinical_staff', clinicalStaffRef.current),
         saveBatch('documents', documentsListRef.current),
         saveBatch('comments', commentsListRef.current),
+        ...(currentAccountRef.current?.email?.toLowerCase() === 'admin@example.com'
+          ? [saveBatch('demo_employees', demoEmployeesRef.current)]
+          : []),
       ]);
       dirtyCollectionsRef.current.clear();
       setCloudSyncStatus('synced');
@@ -860,9 +914,18 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [notifications]);
 
   useEffect(() => {
-    localStorage.setItem('cred_employees', JSON.stringify(employees));
+    // Only save strictly real non-demo employees to cred_employees
+    const realEmployeesOnly = employees.filter((e) => !isDemoEmployee(e));
+    localStorage.setItem('cred_employees', JSON.stringify(realEmployeesOnly));
     markDirty('employees');
   }, [employees]);
+
+  useEffect(() => {
+    if (currentAccount?.email?.toLowerCase() === 'admin@example.com') {
+      localStorage.setItem('cred_demo_employees_admin', JSON.stringify(demoEmployees));
+      markDirty('demo_employees');
+    }
+  }, [demoEmployees, currentAccount]);
 
   useEffect(() => {
     localStorage.setItem('cred_clinical_staff', JSON.stringify(clinicalStaff));
@@ -989,6 +1052,34 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const savedNotifications = localStorage.getItem('cred_notifications');
     setNotifications(savedNotifications ? JSON.parse(savedNotifications) : INITIAL_NOTIFICATIONS);
+
+    // Enforce Demo Employee Data Isolation: Strictly available only to admin@example.com
+    if (_targetAccount.email.toLowerCase() === 'admin@example.com') {
+      const savedDemo = localStorage.getItem('cred_demo_employees_admin');
+      if (savedDemo) {
+        try {
+          const parsed = JSON.parse(savedDemo);
+          setDemoEmployees(Array.isArray(parsed) && parsed.length > 0 ? parsed : DEMO_EMPLOYEES);
+        } catch {
+          setDemoEmployees(DEMO_EMPLOYEES);
+        }
+      } else {
+        setDemoEmployees(DEMO_EMPLOYEES);
+      }
+    } else {
+      // Remove and isolate demo employees completely for all other accounts & new users
+      setDemoEmployees([]);
+      setEmployees((prev) => prev.filter((e) => !isDemoEmployee(e)));
+      const saved = localStorage.getItem('cred_employees');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem('cred_employees', JSON.stringify(parsed.filter((e: any) => !isDemoEmployee(e))));
+          }
+        } catch {}
+      }
+    }
   };
 
   // Auth Operations
@@ -1026,6 +1117,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = (reason?: string) => {
     setCurrentAccount(null);
+    setDemoEmployees([]);
     localStorage.removeItem('cred_current_account');
     localStorage.removeItem('cred_last_activity');
     if (reason) {
@@ -1802,7 +1894,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       id: `notif-${Date.now()}`,
       type: 'MISSING_DOCS',
       title: `Provider Added: ${newProvider.firstName} ${newProvider.lastName}`,
-      message: `${newProvider.providerType} (${newProvider.disciplines.join(', ')}) registered in Master Directory.`,
+      message: `${newProvider.providerType} (${(newProvider.disciplines || []).join(', ')}) registered in Master Directory.`,
       timestamp: new Date().toLocaleString(),
       providerId: newProvider.id,
       severity: 'info',
@@ -2447,6 +2539,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem('cred_notifications');
     localStorage.removeItem('cred_accounts');
     localStorage.removeItem('cred_stage_configs');
+    localStorage.removeItem('cred_employees');
     setStageConfigs(DEFAULT_STAGE_CONFIGS);
     setProviders(INITIAL_PROVIDERS);
     setPayers(INITIAL_PAYERS);
@@ -2456,6 +2549,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     setNotifications(INITIAL_NOTIFICATIONS);
     setAccounts(INITIAL_ACCOUNTS);
     setCurrentAccount(INITIAL_ACCOUNTS[0]);
+    setEmployees(INITIAL_EMPLOYEES);
+    setDemoEmployees(DEMO_EMPLOYEES);
 
     // Reseed Cloud Database
     saveBatch('providers', INITIAL_PROVIDERS).catch(console.error);
@@ -2466,6 +2561,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     saveBatch('notifications', INITIAL_NOTIFICATIONS).catch(console.error);
     saveBatch('users', INITIAL_ACCOUNTS).catch(console.error);
     saveBatch('stage_configs', DEFAULT_STAGE_CONFIGS).catch(console.error);
+    saveBatch('employees', INITIAL_EMPLOYEES).catch(console.error);
+    saveBatch('demo_employees', DEMO_EMPLOYEES).catch(console.error);
   };
 
   const importBulkData = (
@@ -2537,24 +2634,46 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   // Dedicated Database Collections CRUD & Operations (Section 5)
   const addEmployee = (empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Employee => {
     const id = `emp-${Date.now()}`;
+    const isAdmin = currentAccount?.email?.toLowerCase() === 'admin@example.com';
+    const isDemo = isAdmin && (empData.isDemo === true || isDemoEmployee(empData as any));
     const newEmp: Employee = {
       ...empData,
       id,
+      isDemo: isDemo || false,
+      ownerAccountEmail: isDemo ? 'admin@example.com' : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setEmployees((prev) => [newEmp, ...prev]);
-    saveDocument('employees', id, newEmp).catch(console.error);
+
+    if (isDemo && isAdmin) {
+      setDemoEmployees((prev) => [newEmp, ...prev]);
+      saveDocument('demo_employees', id, newEmp).catch(console.error);
+    } else {
+      setEmployees((prev) => [newEmp, ...prev]);
+      saveDocument('employees', id, newEmp).catch(console.error);
+    }
     return newEmp;
   };
 
   const updateEmployee = (id: string, updates: Partial<Employee>) => {
-    setEmployees((prev) =>
-      prev.map((emp) =>
-        emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
-      )
-    );
-    saveDocument('employees', id, updates).catch(console.error);
+    const isAdmin = currentAccount?.email?.toLowerCase() === 'admin@example.com';
+    const isDemo = demoEmployees.some((e) => e.id === id);
+
+    if (isDemo && isAdmin) {
+      setDemoEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
+        )
+      );
+      saveDocument('demo_employees', id, updates).catch(console.error);
+    } else {
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
+        )
+      );
+      saveDocument('employees', id, updates).catch(console.error);
+    }
   };
 
   const addClinicalStaff = (
@@ -3065,6 +3184,17 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Enforce Demo Employee Data Separation:
+  // Visible employees for current account: Only admin@example.com has access to demo employees.
+  // All other accounts (and unauthenticated/new users) receive strictly real employees.
+  const visibleEmployees = useMemo(() => {
+    const realEmployees = employees.filter((e) => !isDemoEmployee(e));
+    if (currentAccount?.email?.toLowerCase() === 'admin@example.com') {
+      return [...realEmployees, ...demoEmployees];
+    }
+    return realEmployees;
+  }, [employees, demoEmployees, currentAccount]);
+
   return (
     <CredentialingContext.Provider
       value={{
@@ -3144,7 +3274,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         reorderStages,
         resetToDefaultData,
         importBulkData,
-        employees,
+        employees: visibleEmployees,
+        demoEmployees,
+        isDemoEmployee,
         clinicalStaff,
         documentsList,
         commentsList,

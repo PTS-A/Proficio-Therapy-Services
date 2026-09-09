@@ -2047,8 +2047,17 @@ export const DEFAULT_STAGE_CONFIGS: StageConfig[] = [
   },
 ];
 
-// Dedicated Separate Database for Employees (Section 5)
-export const INITIAL_EMPLOYEES: Employee[] = [
+// Helper function to check if an employee record is demo data
+export const isDemoEmployee = (emp: Partial<Employee>): boolean => {
+  if (!emp) return false;
+  if (emp.isDemo) return true;
+  if (emp.ownerAccountEmail && emp.ownerAccountEmail.toLowerCase() === 'admin@example.com') return true;
+  if (emp.id && (emp.id.startsWith('emp-prv-') || emp.id.startsWith('emp-usr-'))) return true;
+  return false;
+};
+
+// Isolated Demo Employee Database - Strictly reserved for admin@example.com testing
+export const DEMO_EMPLOYEES: Employee[] = [
   ...INITIAL_PROVIDERS.map((p) => ({
     id: `emp-${p.id}`,
     firstName: p.firstName,
@@ -2057,12 +2066,14 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     email: p.email,
     phone: p.phone,
     department: 'Clinical Services',
-    roleTitle: `${p.providerType} (${p.disciplines.join(', ')})`,
+    roleTitle: `${p.providerType} (${(p.disciplines || []).join(', ')})`,
     employmentStatus: (p.employmentStatus as any) || 'Full-Time',
     startDate: p.startDate || '2023-01-01',
     officeLocationId: p.primaryLocationId,
     entityId: p.primaryEntityId,
     notes: `Direct clinical staff employed at ${p.dba || 'Group Practice'}. Linked to provider ${p.id}.`,
+    isDemo: true,
+    ownerAccountEmail: 'admin@example.com',
     createdAt: '2026-01-01',
     updatedAt: '2026-08-26',
   })),
@@ -2080,6 +2091,8 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     officeLocationId: 'loc-1',
     entityId: 'ent-1',
     notes: 'Handles initial intakes, CAQH attestation, PAVE tracking, and payer submissions.',
+    isDemo: true,
+    ownerAccountEmail: 'admin@example.com',
     createdAt: '2026-01-15',
     updatedAt: '2026-08-26',
   },
@@ -2097,6 +2110,8 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     officeLocationId: 'loc-1',
     entityId: 'ent-1',
     notes: 'Oversees credentialing workflow quality control, payer escalations, and team KPIs.',
+    isDemo: true,
+    ownerAccountEmail: 'admin@example.com',
     createdAt: '2026-01-10',
     updatedAt: '2026-08-26',
   },
@@ -2114,10 +2129,15 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     officeLocationId: 'loc-1',
     entityId: 'ent-1',
     notes: 'Coordinates clinic leases, facility licensing, and utility attestations.',
+    isDemo: true,
+    ownerAccountEmail: 'admin@example.com',
     createdAt: '2025-11-01',
     updatedAt: '2026-08-26',
   },
 ];
+
+// Production Employees Database (Default empty for real production accounts & new users)
+export const INITIAL_EMPLOYEES: Employee[] = [];
 
 // Dedicated Separate Database for Clinical Staff (Section 5)
 export const INITIAL_CLINICAL_STAFF: ClinicalStaff[] = INITIAL_PROVIDERS.map((p) => ({

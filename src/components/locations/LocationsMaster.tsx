@@ -555,7 +555,7 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
               onChange={(e) => setSelectedStateFilter(e.target.value)}
               className="w-full py-1.5 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2B4C9D] focus:bg-white"
             >
-              <option value="all">All States ({uniqueStates.join(', ')})</option>
+              <option value="all">All States {uniqueStates && uniqueStates.length > 0 ? `(${uniqueStates.join(', ')})` : ''}</option>
               {uniqueStates.map(st => (
                 <option key={st} value={st}>{st}</option>
               ))}
@@ -667,7 +667,7 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
                       <div className="pt-1 border-t border-slate-200/60 text-[11px]">
                         <span className="font-semibold text-slate-600">Coverage Territory: </span>
                         <span className="text-emerald-800 font-medium">
-                          {loc.countiesServed.join(', ')} ({loc.serviceRadiusMiles || 30} mi radius)
+                          {(loc.countiesServed || []).join(', ')} ({loc.serviceRadiusMiles || 30} mi radius)
                         </span>
                       </div>
                     )}
@@ -816,7 +816,7 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
                         <div className="font-medium text-slate-800">{loc.city}, {loc.state} {loc.zip}</div>
                         {loc.countiesServed && loc.countiesServed.length > 0 && (
                           <div className="text-[10px] text-emerald-700 font-semibold truncate max-w-xs">
-                            Counties: {loc.countiesServed.join(', ')}
+                            Counties: {(loc.countiesServed || []).join(', ')}
                           </div>
                         )}
                       </td>

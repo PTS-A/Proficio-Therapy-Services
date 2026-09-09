@@ -85,6 +85,8 @@ export interface Employee {
   officeLocationId?: string;
   entityId?: string;
   notes?: string;
+  isDemo?: boolean; // True if record is demo data, strictly isolated for admin@example.com
+  ownerAccountEmail?: string; // Restricted to admin@example.com for demo records
   createdAt: string;
   updatedAt: string;
 }
@@ -103,6 +105,8 @@ export interface ClinicalStaff {
   licenseState: string;
   licenseExpiration?: string;
   npi?: string;
+  isDemo?: boolean;
+  ownerAccountEmail?: string;
   taxonomy?: string;
   specialty?: string;
   primaryLocationId?: string;

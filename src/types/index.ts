@@ -36,6 +36,9 @@ export interface AppAccount {
   assignedEntities?: string[];
   permissions?: string[];
   status?: 'Active' | 'Inactive' | 'Pending Activation';
+  assignedLocations?: string[];
+  authProvider?: 'google' | 'password';
+  googleId?: string;
   mustChangePasswordOnFirstLogin?: boolean;
   hasChangedInitialPassword?: boolean;
   isSuperAdmin?: boolean;
@@ -781,4 +784,34 @@ export interface SavedFilter {
   applicationType?: ApplicationType | 'All';
   specialistId?: string;
   isOverdueOnly?: boolean;
+}
+
+export interface HolidayItem {
+  id: string;
+  name: string;
+  date: string;
+  affectsSla: boolean;
+  type: 'Federal' | 'Corporate' | 'State';
+}
+
+export interface NotificationTemplate {
+  id: string;
+  name: string;
+  triggerEvent: string;
+  subject: string;
+  recipientRoles: string[];
+  bodyTemplate: string;
+  isActive: boolean;
+}
+
+export interface SystemSettings {
+  slaSubmissionDays: number;
+  slaFollowUpMinDays: number;
+  slaFollowUpMaxDays: number;
+  caqhReattestationDays: number;
+  licenseExpAdvanceAlertDays: number;
+  autoReminderPayerAging: boolean;
+  autoEscalateOverdueFollowup: boolean;
+  enableDailySummaryEmail: boolean;
+  nppesAutoValidation: boolean;
 }

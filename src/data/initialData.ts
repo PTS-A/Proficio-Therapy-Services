@@ -11,8 +11,7 @@ import {
   Employee,
   ClinicalStaff,
   ApplicationDocument,
-  ApplicationComment,
-  CredentialingApplication
+  ApplicationComment
 } from '../types';
 
 export const INITIAL_ACCOUNTS: AppAccount[] = [

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Provider, DocumentItem } from '../../types';
 import { useCredentialing } from '../../context/CredentialingContext';
+import { uploadStorageFile } from '../../lib/supabase';
 import { 
   FileText, 
   ExternalLink, 
@@ -10,12 +11,13 @@ import {
   Trash2, 
   Search, 
   Filter, 
-  Calendar, 
   ShieldCheck, 
   AlertTriangle, 
   Clock, 
   Link as LinkIcon,
-  X
+  X,
+  UploadCloud,
+  Loader2
 } from 'lucide-react';
 
 interface ClinicalStaffDocumentsProps {
@@ -35,6 +37,37 @@ export const ClinicalStaffDocuments: React.FC<ClinicalStaffDocumentsProps> = ({ 
   const [copiedDocId, setCopiedDocId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('All');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadProgress(`Uploading ${file.name} to Supabase Storage...`);
+
+    try {
+      const cleanFileName = `${provider.id}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const result = await uploadStorageFile('credentialing-documents', `providers/${cleanFileName}`, file);
+
+      if (result.publicUrl) {
+        setDocUrl(result.publicUrl);
+        if (!docName.trim()) {
+          setDocName(file.name.replace(/\.[^/.]+$/, ''));
+        }
+        setUploadProgress('Uploaded to Supabase Cloud Storage successfully!');
+      } else if (result.error) {
+        setUploadProgress(`Upload warning: ${result.error.message}`);
+      }
+    } catch (err: any) {
+      setUploadProgress(`Upload failed: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      setTimeout(() => setUploadProgress(null), 4000);
+    }
+  };
 
   const documentTypes: DocumentItem['type'][] = [
     'State License',
@@ -206,19 +239,47 @@ export const ClinicalStaffDocuments: React.FC<ClinicalStaffDocumentsProps> = ({ 
                 />
               </div>
 
-              {/* Document Link / URL */}
+              {/* Document Link / URL & Supabase Storage Uploader */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Document Link URL *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    Document Link URL *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="text-[10px] font-bold text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded flex items-center space-x-1 cursor-pointer transition-colors"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-sky-600" />
+                    ) : (
+                      <UploadCloud className="w-3 h-3 text-sky-600" />
+                    )}
+                    <span>{isUploading ? 'Uploading...' : 'Upload File (Supabase Storage)'}</span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                    onChange={handleFileUpload}
+                  />
+                </div>
                 <input
                   type="url"
                   required
-                  placeholder="https://drive.google.com/file/d/... or web link"
+                  placeholder="https://drive.google.com/file/d/... or click Upload File above"
                   value={docUrl}
                   onChange={(e) => setDocUrl(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-sky-500 focus:bg-white"
                 />
+                {uploadProgress && (
+                  <p className="text-[10px] text-sky-700 mt-1 font-medium flex items-center space-x-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                    <span>{uploadProgress}</span>
+                  </p>
+                )}
               </div>
 
               {/* Document Type */}
@@ -360,9 +421,16 @@ export const ClinicalStaffDocuments: React.FC<ClinicalStaffDocumentsProps> = ({ 
                           <div className="flex items-start space-x-2">
                             <FileText className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                             <div>
-                              <span className="font-bold text-slate-800 block text-xs">
-                                {doc.name}
-                              </span>
+                              <div className="flex items-center space-x-1.5">
+                                <span className="font-bold text-slate-800 block text-xs">
+                                  {doc.name}
+                                </span>
+                                {doc.documentUrl?.includes('supabase.co/storage') && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                                    Supabase Storage
+                                  </span>
+                                )}
+                              </div>
                               {doc.notes && (
                                 <span className="text-[11px] text-slate-500 block line-clamp-1">
                                   {doc.notes}

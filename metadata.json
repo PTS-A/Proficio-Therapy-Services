@@ -1,5 +1,5 @@
 {
-  "name": "Provider Credentialing & Payer Enrollment Management System",
+  "name": "Proficio Therapy Services",
   "description": "Centralized credentialing and payer enrollment platform for ABA, Speech Therapy, and Occupational Therapy across multiple legal entities and locations.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

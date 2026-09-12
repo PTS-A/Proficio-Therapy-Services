@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { 
-  BarChart3, 
   Calendar, 
   CheckCircle2, 
   Clock, 
@@ -9,24 +8,19 @@ import {
   Copy, 
   Download, 
   FileSpreadsheet, 
-  FileText, 
-  Layers, 
   Printer, 
   RefreshCw, 
   AlertCircle,
   AlertTriangle,
   UserCheck,
   Building2,
-  ChevronRight,
   TrendingUp,
-  ShieldCheck,
   Award,
   CalendarDays,
   FileCheck,
-  XCircle,
   ArrowRight
 } from 'lucide-react';
-import { Discipline, CredentialingStage } from '../../types';
+import { Discipline } from '../../types';
 
 export const ReportsView: React.FC = () => {
   const { records, providers, payers, entities, locations, kpis, currentUser } = useCredentialing();

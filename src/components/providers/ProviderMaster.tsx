@@ -10,8 +10,6 @@ import {
   PAVEStatus,
   ProviderContractInfo,
   ProviderPayerEnrollment,
-  DocumentItem,
-  ProviderCommentLog,
   ApplicationType
 } from '../../types';
 import { 
@@ -25,7 +23,6 @@ import {
   ExternalLink, 
   FileSpreadsheet, 
   FileText, 
-  Globe, 
   Layers, 
   Mail, 
   MapPin, 
@@ -34,22 +31,15 @@ import {
   Search, 
   ShieldCheck, 
   Trash2, 
-  UserCheck, 
   Users, 
   X,
   Check,
   Briefcase,
   Award,
   FileCheck,
-  DollarSign,
   MessageSquare,
   Paperclip,
-  Link,
-  Send,
-  UserCheck2,
-  Sparkles,
-  ChevronRight,
-  Info
+  ChevronRight
 } from 'lucide-react';
 
 import { ClinicalStaffComments } from './ClinicalStaffComments';
@@ -82,13 +72,10 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
     locations,
     users,
     currentUser,
-    currentAccount,
     addProvider,
     updateProvider,
     deleteProvider,
     addProviderCommentLog,
-    addProviderDocument,
-    deleteProviderDocument,
     createRecord,
     isAdmin,
   } = useCredentialing();
@@ -613,8 +600,6 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
           <div className="divide-y divide-slate-100 max-h-[640px] overflow-y-auto pr-1">
             {filteredProviders.map((p) => {
               const isSelected = activeProvider?.id === p.id;
-              const providerRecords = records.filter((r) => r.providerId === p.id);
-              const approvedCount = providerRecords.filter((r) => ['Approved', 'Linked', 'Effective'].includes(r.stage)).length;
 
               return (
                 <div

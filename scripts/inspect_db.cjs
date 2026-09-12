@@ -1,25 +1,47 @@
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, getDocs } = require('firebase/firestore');
+const { getAuth, signInAnonymously } = require('firebase/auth');
 const firebaseConfig = require('../firebase-applet-config.json');
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-async function inspectAll() {
-  const collections = ['employees', 'clinical_staff', 'providers', 'records', 'applications', 'users', 'documents', 'comments'];
-  for (const col of collections) {
+async function inspect() {
+  console.log('Connecting to Firestore...');
+
+  const collectionsToCheck = [
+    'users',
+    'providers',
+    'records',
+    'clinical_staff',
+    'employees',
+    'demo_employees',
+    'documents',
+    'comments',
+    'payers',
+    'entities',
+    'locations',
+    'stage_configs',
+    'system_config'
+  ];
+
+  for (const col of collectionsToCheck) {
     try {
       const snap = await getDocs(collection(db, col));
-      console.log(`=== Collection: ${col} (Count: ${snap.size}) ===`);
-      snap.forEach((d) => {
-        const data = d.data();
-        console.log(`  [${d.id}] name: ${data.fullName || data.name || data.id} ${data.email || ''} employeeId: ${data.employeeId || ''}`);
+      console.log(`Collection "${col}": ${snap.size} documents`);
+      snap.docs.forEach((doc) => {
+        const data = doc.data();
+        const label = data.name || data.email || data.title || (data.firstName ? `${data.firstName} ${data.lastName}` : doc.id);
+        console.log(`  - [${doc.id}]: ${label}`);
       });
-    } catch (err) {
-      console.log(`Failed to fetch ${col}: ${err.message}`);
+    } catch (e) {
+      console.error(`Error fetching collection ${col}:`, e.message);
     }
   }
-  process.exit(0);
 }
 
-inspectAll();
+inspect().then(() => process.exit(0)).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

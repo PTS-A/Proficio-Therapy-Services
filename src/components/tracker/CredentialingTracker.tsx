@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { 
-  ApplicationType, 
   CredentialingRecord, 
   CredentialingStage, 
   Discipline 
@@ -9,26 +8,20 @@ import {
 import { 
   AlertCircle, 
   AlertTriangle, 
-  ArrowUpDown, 
   Bookmark, 
   Calendar, 
   CheckCircle2, 
   Clock, 
   Download, 
   Eye, 
-  Filter, 
   Grid, 
   Layers, 
   Link2, 
-  ListFilter, 
   Plus, 
-  RefreshCw, 
   Search, 
   ShieldAlert, 
   ShieldCheck, 
-  Sparkles, 
   Table, 
-  UserCheck, 
   X 
 } from 'lucide-react';
 import { AdminApproveModal } from '../modals/AdminApproveModal';
@@ -48,7 +41,6 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
     payers,
     entities,
     locations,
-    users,
     isAdmin,
     filters,
     setFilters,
@@ -86,21 +78,6 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
     'Closed / Not Contracted',
     'Recredentialing Due',
     'Overdue',
-  ];
-
-  const APPLICATION_TYPES: ApplicationType[] = [
-    'Initial credentialing',
-    'Recredentialing',
-    'Enrollment',
-    'Re-enrollment',
-    'Group addition',
-    'Provider addition',
-    'Location addition',
-    'Provider linking',
-    'Contracting',
-    'Demographic update',
-    'Taxonomy update',
-    'Entity update',
   ];
 
   const getStageBadge = (stage: CredentialingStage, isOverdue: boolean) => {

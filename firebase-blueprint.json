@@ -177,12 +177,26 @@
         "timeCreated": { "type": "string" }
       },
       "required": ["id", "applicationId", "commentText", "authorName", "dateCreated", "timeCreated"]
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "System-wide SLAs, holiday calendar rules, email templates, and administrative settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "data": { "type": "object" }
+      },
+      "required": ["id"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserAccount",
       "description": "User profiles, roles, and credential management"
+    },
+    "/system_config/{configId}": {
+      "schema": "SystemConfig",
+      "description": "System configuration, SLAs, holidays, and administrative templates"
     },
     "/employees/{employeeId}": {
       "schema": "Employee",

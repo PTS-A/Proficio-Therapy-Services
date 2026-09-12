@@ -1,0 +1,996 @@
+-- ============================================================================
+-- PROFICIO THERAPY SERVICES: COMPLETE SUPABASE MIGRATION + INITIAL SEED
+-- Run this in your Supabase SQL Editor: https://supabase.com/dashboard/project/uqaiotacheqjvfbanxtp/sql/new
+-- ============================================================================
+
+-- ============================================================================
+-- PROFICIO THERAPY SERVICES — SUPABASE POSTGRESQL SCHEMA MIGRATION
+-- Migration: 20260910000000_initial_schema.sql
+-- Description: Core relational schema, RLS policies, audit logging, and indexes.
+-- ============================================================================
+
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ----------------------------------------------------------------------------
+-- 1. ENTITIES / ORGANIZATIONS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.entities (
+    id TEXT PRIMARY KEY,
+    legal_name TEXT NOT NULL,
+    dba TEXT,
+    ein TEXT,
+    npi_type_2 TEXT,
+    taxonomy TEXT,
+    ownership_details TEXT,
+    w9_on_file BOOLEAN DEFAULT true,
+    general_liability_policy TEXT,
+    workers_comp_policy TEXT,
+    primary_contact TEXT,
+    email TEXT,
+    phone TEXT,
+    address TEXT,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 2. LOCATIONS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.locations (
+    id TEXT PRIMARY KEY,
+    entity_id TEXT REFERENCES public.entities(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    location_type TEXT DEFAULT 'CLINIC',
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    zip TEXT,
+    phone TEXT,
+    service_types TEXT[] DEFAULT '{}',
+    payer_applicability TEXT[] DEFAULT '{}',
+    lease_status TEXT,
+    pave_status TEXT,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 3. PAYERS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.payers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT,
+    portal_url TEXT,
+    states_served TEXT[] DEFAULT '{}',
+    contacts JSONB DEFAULT '[]'::jsonb,
+    required_documents TEXT[] DEFAULT '{}',
+    average_tat_days INTEGER DEFAULT 60,
+    follow_up_cadence_days INTEGER DEFAULT 14,
+    submission_method TEXT DEFAULT 'PORTAL',
+    requires_pave BOOLEAN DEFAULT false,
+    requires_caqh BOOLEAN DEFAULT true,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 4. APPLICATION USERS / PROFILES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    auth_user_id UUID, -- References auth.users(id) when Supabase Auth user is created
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    full_name TEXT,
+    access_level TEXT NOT NULL DEFAULT 'USER', -- 'ADMINISTRATOR' or 'USER'
+    system_role TEXT NOT NULL DEFAULT 'CREDENTIALING_SPECIALIST',
+    role TEXT,
+    role_title TEXT,
+    department TEXT,
+    avatar_url TEXT,
+    assigned_disciplines TEXT[] DEFAULT '{}',
+    assigned_entities TEXT[] DEFAULT '{}',
+    permissions JSONB DEFAULT '{}'::jsonb,
+    status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'INACTIVE', 'SUSPENDED'
+    is_active BOOLEAN DEFAULT true,
+    must_change_password BOOLEAN DEFAULT false,
+    has_changed_password BOOLEAN DEFAULT true,
+    is_super_admin BOOLEAN DEFAULT false,
+    password_hash TEXT,
+    last_login TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ensure backwards-compatibility if table already existed in earlier session
+ALTER TABLE IF EXISTS public.users ADD COLUMN IF NOT EXISTS full_name TEXT;
+ALTER TABLE IF EXISTS public.users ADD COLUMN IF NOT EXISTS role TEXT;
+ALTER TABLE IF EXISTS public.users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+-- ----------------------------------------------------------------------------
+-- 5. EMPLOYEES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.employees (
+    id TEXT PRIMARY KEY,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    department TEXT,
+    role_title TEXT,
+    employment_status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'ONBOARDING', 'SUSPENDED', 'TERMINATED'
+    start_date DATE,
+    office_location_id TEXT REFERENCES public.locations(id) ON DELETE SET NULL,
+    entity_id TEXT REFERENCES public.entities(id) ON DELETE SET NULL,
+    is_demo BOOLEAN DEFAULT false,
+    owner_email TEXT, -- e.g. 'admin@example.com' for demo records
+    raw_profile JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 6. PROVIDERS (CLINICIANS)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.providers (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE SET NULL,
+    npi TEXT,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    credentials TEXT,
+    disciplines TEXT[] DEFAULT '{}',
+    provider_type TEXT,
+    email TEXT,
+    phone TEXT,
+    license_number TEXT,
+    license_state TEXT,
+    license_expiration DATE,
+    entity_ids TEXT[] DEFAULT '{}',
+    location_ids TEXT[] DEFAULT '{}',
+    caqh_id TEXT,
+    caqh_status TEXT,
+    caqh_reattestation_date DATE,
+    pave_status TEXT,
+    pave_enrollment_id TEXT,
+    contract_info JSONB DEFAULT '{}'::jsonb,
+    payer_enrollments JSONB DEFAULT '[]'::jsonb,
+    is_demo BOOLEAN DEFAULT false,
+    owner_email TEXT,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 7. CLINICAL STAFF (CREDENTIALING / ONBOARDING VIEW OF EMPLOYEES)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.clinical_staff (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
+    provider_id TEXT REFERENCES public.providers(id) ON DELETE SET NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    credentials TEXT,
+    disciplines TEXT[] DEFAULT '{}',
+    provider_type TEXT,
+    license_number TEXT,
+    license_state TEXT,
+    license_expiration DATE,
+    npi TEXT,
+    caqh_id TEXT,
+    pave_status TEXT,
+    status TEXT DEFAULT 'ACTIVE',
+    is_demo BOOLEAN DEFAULT false,
+    owner_email TEXT,
+    raw_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 8. STAGE CONFIGURATIONS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.stage_configs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    sla_turnaround_target_days INTEGER DEFAULT 14,
+    display_order INTEGER DEFAULT 1,
+    badge_color TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 9. CREDENTIALING RECORDS / APPLICATIONS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.credentialing_records (
+    id TEXT PRIMARY KEY,
+    provider_id TEXT REFERENCES public.providers(id) ON DELETE CASCADE,
+    payer_id TEXT REFERENCES public.payers(id) ON DELETE RESTRICT,
+    entity_id TEXT REFERENCES public.entities(id) ON DELETE SET NULL,
+    location_id TEXT REFERENCES public.locations(id) ON DELETE SET NULL,
+    clinical_staff_id TEXT REFERENCES public.clinical_staff(id) ON DELETE SET NULL,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE SET NULL,
+    assigned_specialist_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
+    application_type TEXT DEFAULT 'INITIAL', -- 'INITIAL', 'RECREDENTIALING', 'ROSTER_UPDATE'
+    discipline TEXT,
+    stage TEXT NOT NULL DEFAULT 'Intake',
+    status TEXT NOT NULL DEFAULT 'IN_PROGRESS', -- 'IN_PROGRESS', 'APPROVED', 'DENIED', 'WITHDRAWN', 'EXPIRED'
+    intake_date DATE DEFAULT CURRENT_DATE,
+    submission_date DATE,
+    approval_date DATE,
+    effective_date DATE,
+    expiration_date DATE,
+    recredential_due_date DATE,
+    is_overdue BOOLEAN DEFAULT false,
+    cycle_days INTEGER DEFAULT 0,
+    linking_status TEXT DEFAULT 'PENDING',
+    contract_status TEXT DEFAULT 'NOT_APPLICABLE',
+    is_demo BOOLEAN DEFAULT false,
+    owner_email TEXT,
+    raw_record JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Alias table / view for applications
+CREATE TABLE IF NOT EXISTS public.applications (
+    id TEXT PRIMARY KEY REFERENCES public.credentialing_records(id) ON DELETE CASCADE,
+    details JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 10. APPLICATION FOLLOW-UPS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.application_follow_ups (
+    id TEXT PRIMARY KEY,
+    record_id TEXT NOT NULL REFERENCES public.credentialing_records(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    next_follow_up_date DATE,
+    method TEXT DEFAULT 'PHONE',
+    contact_person TEXT,
+    reference_number TEXT,
+    payer_response TEXT,
+    next_action TEXT,
+    is_escalated BOOLEAN DEFAULT false,
+    specialist_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 11. APPLICATION DOCUMENTS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.application_documents (
+    id TEXT PRIMARY KEY,
+    record_id TEXT REFERENCES public.credentialing_records(id) ON DELETE CASCADE,
+    provider_id TEXT REFERENCES public.providers(id) ON DELETE CASCADE,
+    clinical_staff_id TEXT REFERENCES public.clinical_staff(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    type TEXT,
+    document_url TEXT,
+    storage_path TEXT,
+    file_name TEXT,
+    file_size INTEGER,
+    mime_type TEXT,
+    verification_status TEXT DEFAULT 'PENDING', -- 'PENDING', 'VERIFIED', 'REJECTED', 'EXPIRED'
+    upload_date TIMESTAMPTZ DEFAULT NOW(),
+    expiration_date DATE,
+    is_demo BOOLEAN DEFAULT false,
+    owner_email TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 12. APPLICATION COMMENTS / COLLABORATION NOTES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.application_comments (
+    id TEXT PRIMARY KEY,
+    record_id TEXT REFERENCES public.credentialing_records(id) ON DELETE CASCADE,
+    provider_id TEXT REFERENCES public.providers(id) ON DELETE CASCADE,
+    author_id TEXT,
+    author_name TEXT NOT NULL,
+    author_role TEXT,
+    comment_text TEXT NOT NULL,
+    is_internal BOOLEAN DEFAULT true,
+    is_demo BOOLEAN DEFAULT false,
+    owner_email TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 13. SYSTEM NOTIFICATIONS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.system_notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    severity TEXT DEFAULT 'INFO', -- 'INFO', 'WARNING', 'ERROR', 'SUCCESS'
+    record_id TEXT REFERENCES public.credentialing_records(id) ON DELETE CASCADE,
+    provider_id TEXT REFERENCES public.providers(id) ON DELETE CASCADE,
+    is_read BOOLEAN DEFAULT false,
+    recipient_email TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 14. SYSTEM CONFIGURATION, HOLIDAYS & TEMPLATES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.system_config (
+    id TEXT PRIMARY KEY, -- 'settings', 'holidays', 'templates'
+    config_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
+-- 15. AUDIT LOGS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id TEXT,
+    actor_email TEXT,
+    action TEXT NOT NULL, -- 'CREATE', 'UPDATE', 'DELETE', 'APPROVE', 'SUSPEND', etc.
+    table_name TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Protect audit logs from modification or deletion
+CREATE OR REPLACE FUNCTION protect_audit_logs()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Audit log entries cannot be modified or deleted.';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_protect_audit_logs ON public.audit_logs;
+CREATE TRIGGER trg_protect_audit_logs
+BEFORE UPDATE OR DELETE ON public.audit_logs
+FOR EACH ROW EXECUTE FUNCTION protect_audit_logs();
+
+-- ----------------------------------------------------------------------------
+-- 16. AUTOMATIC UPDATED_AT TRIGGER
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_entities_updated_at ON public.entities;
+CREATE TRIGGER trg_entities_updated_at BEFORE UPDATE ON public.entities FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_locations_updated_at ON public.locations;
+CREATE TRIGGER trg_locations_updated_at BEFORE UPDATE ON public.locations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_payers_updated_at ON public.payers;
+CREATE TRIGGER trg_payers_updated_at BEFORE UPDATE ON public.payers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users;
+CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_employees_updated_at ON public.employees;
+CREATE TRIGGER trg_employees_updated_at BEFORE UPDATE ON public.employees FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_providers_updated_at ON public.providers;
+CREATE TRIGGER trg_providers_updated_at BEFORE UPDATE ON public.providers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_clinical_staff_updated_at ON public.clinical_staff;
+CREATE TRIGGER trg_clinical_staff_updated_at BEFORE UPDATE ON public.clinical_staff FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_credentialing_records_updated_at ON public.credentialing_records;
+CREATE TRIGGER trg_credentialing_records_updated_at BEFORE UPDATE ON public.credentialing_records FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_application_documents_updated_at ON public.application_documents;
+CREATE TRIGGER trg_application_documents_updated_at BEFORE UPDATE ON public.application_documents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ----------------------------------------------------------------------------
+-- 17. PERFORMANCE INDEXES
+-- ----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_employees_entity ON public.employees(entity_id);
+CREATE INDEX IF NOT EXISTS idx_employees_location ON public.employees(office_location_id);
+CREATE INDEX IF NOT EXISTS idx_employees_demo ON public.employees(is_demo, owner_email);
+
+CREATE INDEX IF NOT EXISTS idx_providers_npi ON public.providers(npi);
+CREATE INDEX IF NOT EXISTS idx_providers_demo ON public.providers(is_demo, owner_email);
+
+CREATE INDEX IF NOT EXISTS idx_clinical_staff_employee ON public.clinical_staff(employee_id);
+CREATE INDEX IF NOT EXISTS idx_clinical_staff_provider ON public.clinical_staff(provider_id);
+CREATE INDEX IF NOT EXISTS idx_clinical_staff_demo ON public.clinical_staff(is_demo, owner_email);
+
+CREATE INDEX IF NOT EXISTS idx_records_provider ON public.credentialing_records(provider_id);
+CREATE INDEX IF NOT EXISTS idx_records_payer ON public.credentialing_records(payer_id);
+CREATE INDEX IF NOT EXISTS idx_records_stage ON public.credentialing_records(stage);
+CREATE INDEX IF NOT EXISTS idx_records_demo ON public.credentialing_records(is_demo, owner_email);
+
+CREATE INDEX IF NOT EXISTS idx_documents_record ON public.application_documents(record_id);
+CREATE INDEX IF NOT EXISTS idx_documents_provider ON public.application_documents(provider_id);
+
+CREATE INDEX IF NOT EXISTS idx_comments_record ON public.application_comments(record_id);
+CREATE INDEX IF NOT EXISTS idx_comments_provider ON public.application_comments(provider_id);
+
+CREATE INDEX IF NOT EXISTS idx_audit_table_record ON public.audit_logs(table_name, record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created_at ON public.audit_logs(created_at);
+
+-- ----------------------------------------------------------------------------
+-- 18. ROW LEVEL SECURITY (RLS) POLICIES
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.entities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stage_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.providers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clinical_staff ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.credentialing_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.application_follow_ups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.application_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.application_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Helper to check if current caller is super admin or admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN (
+        auth.jwt() ->> 'email' = 'admin@example.com'
+        OR (auth.jwt() ->> 'role') = 'service_role'
+        OR (auth.jwt() -> 'app_metadata' ->> 'is_super_admin')::boolean IS TRUE
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Public/Reference data policies: accessible to all authenticated users
+DROP POLICY IF EXISTS entities_policy ON public.entities;
+CREATE POLICY entities_policy ON public.entities FOR ALL USING (true);
+
+DROP POLICY IF EXISTS locations_policy ON public.locations;
+CREATE POLICY locations_policy ON public.locations FOR ALL USING (true);
+
+DROP POLICY IF EXISTS payers_policy ON public.payers;
+CREATE POLICY payers_policy ON public.payers FOR ALL USING (true);
+
+DROP POLICY IF EXISTS stage_configs_policy ON public.stage_configs;
+CREATE POLICY stage_configs_policy ON public.stage_configs FOR ALL USING (true);
+
+DROP POLICY IF EXISTS system_config_policy ON public.system_config;
+CREATE POLICY system_config_policy ON public.system_config FOR ALL USING (true);
+
+DROP POLICY IF EXISTS users_policy ON public.users;
+CREATE POLICY users_policy ON public.users FOR ALL USING (true);
+
+-- Employees Demo Isolation Policy:
+-- Normal employees are visible to all users. Demo employees are strictly restricted to admin@example.com
+DROP POLICY IF EXISTS employees_select_policy ON public.employees;
+CREATE POLICY employees_select_policy ON public.employees
+    FOR SELECT USING (
+        is_demo IS FALSE
+        OR (auth.jwt() ->> 'email' = 'admin@example.com')
+        OR public.is_admin()
+    );
+
+DROP POLICY IF EXISTS employees_modify_policy ON public.employees;
+CREATE POLICY employees_modify_policy ON public.employees
+    FOR ALL USING (
+        is_demo IS FALSE
+        OR (auth.jwt() ->> 'email' = 'admin@example.com')
+        OR public.is_admin()
+    );
+
+-- Providers Demo Isolation Policy
+DROP POLICY IF EXISTS providers_policy ON public.providers;
+CREATE POLICY providers_policy ON public.providers
+    FOR ALL USING (
+        is_demo IS FALSE
+        OR (auth.jwt() ->> 'email' = 'admin@example.com')
+        OR public.is_admin()
+    );
+
+-- Clinical Staff Demo Isolation Policy
+DROP POLICY IF EXISTS clinical_staff_policy ON public.clinical_staff;
+CREATE POLICY clinical_staff_policy ON public.clinical_staff
+    FOR ALL USING (
+        is_demo IS FALSE
+        OR (auth.jwt() ->> 'email' = 'admin@example.com')
+        OR public.is_admin()
+    );
+
+-- Credentialing Records Demo Isolation Policy
+DROP POLICY IF EXISTS records_policy ON public.credentialing_records;
+CREATE POLICY records_policy ON public.credentialing_records
+    FOR ALL USING (
+        is_demo IS FALSE
+        OR (auth.jwt() ->> 'email' = 'admin@example.com')
+        OR public.is_admin()
+    );
+
+DROP POLICY IF EXISTS applications_policy ON public.applications;
+CREATE POLICY applications_policy ON public.applications
+    FOR ALL USING (true);
+
+DROP POLICY IF EXISTS follow_ups_policy ON public.application_follow_ups;
+CREATE POLICY follow_ups_policy ON public.application_follow_ups
+    FOR ALL USING (true);
+
+DROP POLICY IF EXISTS documents_policy ON public.application_documents;
+CREATE POLICY documents_policy ON public.application_documents
+    FOR ALL USING (
+        is_demo IS FALSE
+        OR (auth.jwt() ->> 'email' = 'admin@example.com')
+        OR public.is_admin()
+    );
+
+DROP POLICY IF EXISTS comments_policy ON public.application_comments;
+CREATE POLICY comments_policy ON public.application_comments
+    FOR ALL USING (
+        is_demo IS FALSE
+        OR (auth.jwt() ->> 'email' = 'admin@example.com')
+        OR public.is_admin()
+    );
+
+DROP POLICY IF EXISTS notifications_policy ON public.system_notifications;
+CREATE POLICY notifications_policy ON public.system_notifications
+    FOR ALL USING (true);
+
+-- Audit log: anyone authenticated can insert audit logs, only admins can view
+DROP POLICY IF EXISTS audit_insert_policy ON public.audit_logs;
+CREATE POLICY audit_insert_policy ON public.audit_logs
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS audit_select_policy ON public.audit_logs;
+CREATE POLICY audit_select_policy ON public.audit_logs
+    FOR SELECT USING (public.is_admin());
+
+
+-- ============================================================================
+-- PROFICIO THERAPY SERVICES: SUPABASE SEED DATA (MIGRATED FROM FIREBASE)
+-- Generated on: 2026-09-10T11:14:14.026Z
+-- Total Records Migrated: 103
+-- ============================================================================
+
+SET session_replication_role = 'replica';
+
+-- Entities (3)
+INSERT INTO public.entities (id, legal_name, dba, ein, npi_type_2, taxonomy, ownership_details, primary_contact, email, phone, address, active)
+VALUES ('ent-1', 'Ages Learning Solutions LLC', 'AGES Learning Solutions', '47-2891234', NULL, NULL, '100% Owned by AGES Healthcare Group Inc.', 'Namitha Narayanan', 'credentialing@ageslearningsolutions.com', '(408) 555-0192', '2105 S Bascom Ave, Suite 150, San Jose, CA 95124', true)
+ON CONFLICT (id) DO UPDATE SET legal_name = EXCLUDED.legal_name, updated_at = NOW();
+
+INSERT INTO public.entities (id, legal_name, dba, ein, npi_type_2, taxonomy, ownership_details, primary_contact, email, phone, address, active)
+VALUES ('ent-2', 'Proficio Speech Therapy Group INC', 'Proficio Speech Therapy', '82-4198271', NULL, NULL, 'Physician & Clinician Owned Professional Corp', 'Elena Rostova', 'admin@proficiotherapy.com', '(925) 555-0144', '1220 Airway Blvd, Suite 200, Livermore, CA 94551', true)
+ON CONFLICT (id) DO UPDATE SET legal_name = EXCLUDED.legal_name, updated_at = NOW();
+
+INSERT INTO public.entities (id, legal_name, dba, ein, npi_type_2, taxonomy, ownership_details, primary_contact, email, phone, address, active)
+VALUES ('ent-3', 'Child''s Play Therapy Services PC', 'Child''s Play Therapy', '94-3321876', NULL, NULL, 'Clinical Services Partnership', 'Sarah Jenkins', 'info@childsplaytherapyservices.com', '(925) 555-0188', '8440 Brentwood Blvd, Suite C, Brentwood, CA 94513', true)
+ON CONFLICT (id) DO UPDATE SET legal_name = EXCLUDED.legal_name, updated_at = NOW();
+
+-- Locations (7)
+INSERT INTO public.locations (id, entity_id, name, location_type, address, city, state, zip, phone, lease_status, pave_status, active)
+VALUES ('loc-1', 'ent-2', 'Livermore Clinic', 'Physical Clinic', '1220 Airway Blvd, Suite 200', 'Livermore', 'CA', '94551', '(925) 447-2000', NULL, 'Approved', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.locations (id, entity_id, name, location_type, address, city, state, zip, phone, lease_status, pave_status, active)
+VALUES ('loc-2', 'ent-3', 'Brentwood Center', 'Physical Clinic', '8440 Brentwood Blvd, Suite C', 'Brentwood', 'CA', '94513', '(925) 634-1120', NULL, 'Approved', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.locations (id, entity_id, name, location_type, address, city, state, zip, phone, lease_status, pave_status, active)
+VALUES ('loc-3', 'ent-1', 'San Jose Headquarters & Clinical Center', 'Physical Clinic', '2105 S Bascom Ave, Suite 150', 'San Jose', 'CA', '95124', '(408) 559-8800', NULL, 'Approved', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.locations (id, entity_id, name, location_type, address, city, state, zip, phone, lease_status, pave_status, active)
+VALUES ('loc-4', 'ent-1', 'Vacaville Satellite Clinic', 'Satellite', '750 Mason St, Suite 102', 'Vacaville', 'CA', '95687', '(707) 449-3300', NULL, 'Approved', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.locations (id, entity_id, name, location_type, address, city, state, zip, phone, lease_status, pave_status, active)
+VALUES ('loc-5', 'ent-1', 'South Jordan Center', 'Physical Clinic', '10984 S Jordan Gateway, Suite 400', 'South Jordan', 'UT', '84095', '(801) 876-5400', NULL, 'Not Required', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.locations (id, entity_id, name, location_type, address, city, state, zip, phone, lease_status, pave_status, active)
+VALUES ('loc-inhome-bayarea', 'ent-1', 'Northern California In-Home & Community Delivery', 'In-Home / Mobile', 'Mobile & Community Service Delivery Network', 'San Jose', 'CA', '95124', '(408) 559-8850', NULL, 'Approved', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.locations (id, entity_id, name, location_type, address, city, state, zip, phone, lease_status, pave_status, active)
+VALUES ('loc-inhome-eastbay', 'ent-2', 'East Bay & Tri-Valley In-Home Therapy Network', 'In-Home / Mobile', 'Mobile & In-Home Practice Coverage (Tri-Valley Region)', 'Livermore', 'CA', '94551', '(925) 447-2050', NULL, 'Approved', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+-- Payers (20)
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-aetna', 'Aetna', 'Commercial', 'https://www.availity.com', 60, 7, 'Availity', false, true, '[{"role":"Network Manager","name":"James Martinez","email":"martinezj@aetna.com","phone":"(800) 624-0756","id":"c-1"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-alameda', 'Alameda Alliance', 'Regional / Medicaid', 'https://www.alamedaalliance.org', 90, 7, 'Online Portal', false, true, '[{"role":"Provider Enrollment Lead","email":"tgomez@alamedaalliance.org","phone":"(510) 747-4500","name":"Tanya Gomez","id":"c-7"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-anthem', 'Anthem', 'Commercial', 'https://www.availity.com', 75, 10, 'Availity', false, true, '[{"phone":"(888) 254-2721","id":"c-2","name":"Lisa Ray","role":"Credentialing Lead","email":"lisa.ray@anthem.com"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-ash', 'ASH (American Specialty Health)', 'Network', 'https://www.ashlink.com', 45, 7, 'Online Portal', false, true, '[{"role":"Credentialing Manager","phone":"(800) 972-4226","id":"c-18","name":"Brian Kelly","email":"brian.kelly@ashn.com"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-bsc', 'Blue Shield of California', 'Commercial', 'https://www.blueshieldca.com/provider', 60, 7, 'Online Portal', false, true, '[{"role":"Provider Relations Rep","email":"robert.kim@blueshieldca.com","name":"Robert Kim","id":"c-3","phone":"(800) 258-3091"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-catalight', 'Catalight (Easterseals / Behavioral Health)', 'Network', 'https://www.catalight.org/providers', 30, 5, 'Online Portal', false, true, '[{"role":"Network Relations Lead","email":"rachel.green@catalight.org","phone":"(800) 843-3725","name":"Rachel Green","id":"c-20"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-cchp', 'CCHP (Chinese Community Health Plan)', 'Regional / Medicaid', 'https://www.cchphealthplan.com', 60, 10, 'Email', false, true, '[{"phone":"(415) 834-2100","email":"wling@cchphealthplan.com","name":"Wai Ling","role":"Contracting Manager","id":"c-8"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-ccs', 'CCS (California Children''s Services)', 'State program', 'https://www.dhcs.ca.gov/services/ccs', 90, 14, 'Mail', false, true, '[{"phone":"(916) 552-9105","id":"c-17","name":"Dr. Rebecca Stern","email":"rebecca.stern@dhcs.ca.gov","role":"CCS Panel Coordinator"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-cigna', 'Cigna', 'Commercial', 'https://cignaforhcp.cigna.com', 60, 7, 'Online Portal', false, true, '[{"email":"amber.davis@cigna.com","name":"Amber Davis","phone":"(800) 882-4462","role":"Credentialing Analyst","id":"c-4"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-hill', 'Hill Physicians', 'Network', 'https://www.hillphysicians.com/providers', 60, 7, 'Online Portal', false, true, '[{"id":"c-19","phone":"(800) 445-5647","name":"Megan Foster","email":"megan.foster@hpmg.com","role":"Allied Health Network Rep"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-hpsm', 'HPSM (Health Plan of San Mateo)', 'Regional / Medicaid', 'https://www.hpsm.org', 60, 7, 'Online Portal', false, true, '[{"phone":"(650) 616-2106","id":"c-10","email":"jennifer.wong@hpsm.org","role":"Provider Network Liaison","name":"Jennifer Wong"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-molina', 'Molina', 'Medicaid / Commercial', 'https://provider.molinahealthcare.com', 90, 7, 'Online Portal', false, true, '[{"id":"c-12","phone":"(888) 562-5442","email":"patricia.ramos@molinahealthcare.com","role":"Medicaid Credentialing Rep","name":"Patricia Ramos"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-php', 'PHP (Physicians Health Plan)', 'Regional', 'https://www.phpmichigan.com', 45, 10, 'Email', false, true, '[{"email":"kbrown@php.org","name":"Kevin Brown","phone":"(800) 832-9186","id":"c-11","role":"Provider Services"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-preferred', 'Preferred Therapy', 'Network', 'https://www.preferredtherapy.com', 30, 7, 'Email', false, true, '[{"role":"Network Coordinator","name":"Amanda Hall","email":"ahall@preferredtherapy.com","phone":"(800) 664-5240","id":"c-14"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-regenceut', 'Regence Utah', 'Commercial', 'https://www.regence.com/provider', 45, 7, 'Availity', false, true, '[{"id":"c-16","phone":"(800) 253-0838","role":"Commercial Network Specialist","name":"Emily Clark","email":"emily.clark@regence.com"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-scfhp', 'SCFHP (Santa Clara Family Health Plan)', 'Regional / Medicaid', 'https://www.scfhp.com', 75, 7, 'Online Portal', false, true, '[{"id":"c-9","name":"Carlos Mendez","phone":"(408) 874-1788","email":"cmendez@scfhp.com","role":"Credentialing Coordinator"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-triwest', 'TriWest', 'Government', 'https://www.triwest.com/provider', 90, 10, 'Online Portal', false, true, '[{"role":"VA Network Specialist","phone":"(877) 226-8349","id":"c-13","email":"tmiller@triwest.com","name":"Capt. Thomas Miller"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-uhc', 'UnitedHealthcare (UHC)', 'Commercial', 'https://www.uhcprovider.com', 65, 10, 'Online Portal', false, true, '[{"role":"Network Manager","email":"m_scott@uhc.com","phone":"(877) 842-3210","name":"Michael Scott","id":"c-5"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-utmedicaid', 'Utah Medicaid', 'Medicaid', 'https://medicaid.utah.gov/provider-portal', 60, 7, 'Online Portal', false, true, '[{"id":"c-15","role":"Utah PRISM Enrollment Specialist","phone":"(801) 538-6155","name":"Bradley Young","email":"byoung@utah.gov"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+INSERT INTO public.payers (id, name, type, portal_url, average_tat_days, follow_up_cadence_days, submission_method, requires_pave, requires_caqh, contacts, active)
+VALUES ('pyr-vhp', 'VHP (Valley Health Plan)', 'Regional', 'https://www.valleyhealthplan.org/providers', 45, 7, 'Email', false, true, '[{"id":"c-6","phone":"(408) 885-3560","name":"Maria Santos","email":"maria.santos@vhp.sccgov.org","role":"Credentialing Specialist"}]'::jsonb, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW();
+
+-- Users (10)
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-1788700393824', 'joel.reji@ageslearningsolutions.com', 'Joel Mathew Reji', 'Joel Mathew Reji', 'USER', 'Credentialing Specialist', 'Credentialing Specialist', 'Credentialing Specialist', 'Proficio Therapy Credentialing Hub', '["Provider intake and document verification","CAQH, NPI coordination, PAVE, Medicaid enrollment","Payer applications and follow-ups","Additional documentation and application corrections","Approval and effective-date tracking","Updating credentialing records and monthly reporting","W-9 and group financial information required by payers","Manage discipline, payer, entity, and location master data"]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-admin-clean', 'admin@example.com', 'Administrator', 'Administrator', 'ADMINISTRATOR', 'System Administrator', 'System Administrator', 'System Administrator & IT Governance', 'Executive IT & Compliance Governance', '["Manage users, roles, and permissions","Configure workflow stages, SLAs, notification templates, payer requirements","Manage integrations (email, Power BI dataset)","View system-wide stored user passwords (Super Admin Exclusive)"]'::jsonb, 'Active', true, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-admin-leadership', 'leadership@proficiotherapy.com', 'Katherine Holmes', 'Katherine Holmes', 'ADMINISTRATOR', 'Leadership / Management', 'Leadership / Management', 'Director of Strategic Contracting & Growth', 'Executive Leadership & Strategy', '["Strategic decisions, contracting decisions, and rate negotiations","Payer network expansion and entity / location approvals","Resource allocation","Reviewing credentialing KPIs and escalations"]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-admin-namitha', 'manager@proficiotherapy.com', 'Namitha Narayanan', 'Namitha Narayanan', 'ADMINISTRATOR', 'Credentialing Lead / Manager', 'Credentialing Lead / Manager', 'Credentialing Operations Manager', 'Centralized Credentialing Hub', '["Work allocation and quality control","Escalations and payer issue resolution","KPI monitoring, process improvement, and team training","Management reporting and audit oversight"]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-superadmin-corp', 'superadmin@proficiotherapy.com', 'Super Administrator', 'Super Administrator', 'ADMINISTRATOR', 'System Administrator', 'System Administrator', 'Chief Information & Security Officer', 'Information Security & Administration', '["Manage users, roles, and permissions","Configure workflow stages, SLAs, notification templates, payer requirements","Manage integrations (email, Power BI dataset)","View system-wide stored user passwords (Super Admin Exclusive)"]'::jsonb, 'Active', true, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-user-billing', 'billing@proficiotherapy.com', 'David Patel', 'David Patel', 'USER', 'Billing and Claims', 'Billing and Claims', 'Revenue Cycle & Claims Linkage Analyst', 'Revenue Cycle & Billing Operations', '["Payer contract financial coordination","Coordinate with credentialling team regarding denials."]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-user-clinical', 'clinical@proficiotherapy.com', 'Sarah Jenkins, MS, OTR/L', 'Sarah Jenkins, MS, OTR/L', 'USER', 'Clinical Team', 'Clinical Team', 'Clinical Quality & Peer Review Supervisor', 'Clinical Supervision & Quality', '["Clinical documentation and verification support","License, board certification, and reference support"]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-user-hr', 'hroperations@proficiotherapy.com', 'Marcus Vance', 'Marcus Vance', 'USER', 'HR/Operations', 'HR/Operations', 'People & Clinical Staffing Operations Lead', 'Human Resources & Staffing Operations', '["Provider onboarding information (start date, location, group assignment)","Coordination with credentialing on new-hire timelines"]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-user-provider', 'provider@proficiotherapy.com', 'Dr. Rachel Green, MS, CCC-SLP', 'Dr. Rachel Green, MS, CCC-SLP', 'USER', 'Provider', 'Provider', 'Licensed Speech-Language Pathologist (Rendering Clinician)', 'Clinical Therapy Services', '["Providing accurate information and completing required forms","Maintaining CAQH profile","Providing licenses / certifications / requested documents","Responding to credentialing requests"]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
+VALUES ('acc-user-sanjay', 'specialist@proficiotherapy.com', 'Sanjay Tom', 'Sanjay Tom', 'USER', 'Credentialing Specialist', 'Credentialing Specialist', 'Senior Credentialing Specialist', 'Proficio Therapy Credentialing Hub', '["Provider intake and document verification","CAQH, NPI coordination, PAVE, Medicaid enrollment","Payer applications and follow-ups","Additional documentation and application corrections","Approval and effective-date tracking","Updating credentialing records and monthly reporting"]'::jsonb, 'Active', true, false)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
+
+-- Stage Configs (18)
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-01', 'Intake', 'Pre-Submission', 1, 1, 'slate', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-02', 'Documents Pending', 'Pre-Submission', 3, 2, 'blue', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-03', 'Documents Complete', 'Pre-Submission', 1, 3, 'teal', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-04', 'CAQH Pending', 'Pre-Submission', 2, 4, 'indigo', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-05', 'PAVE Pending', 'Pre-Submission', 3, 5, 'purple', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-06', 'Application Preparation', 'Pre-Submission', 2, 6, 'amber', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-07', 'Application Submitted', 'In-Review', 14, 7, 'sky', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-08', 'Payer Review', 'In-Review', 60, 8, 'sky', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-09', 'Additional Documents Requested', 'In-Review', 2, 9, 'amber', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-10', 'Correction Required', 'In-Review', 2, 10, 'amber', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-11', 'Resubmitted', 'In-Review', 1, 11, 'indigo', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-12', 'Approved', 'Approval & Linking', 1, 12, 'emerald', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-13', 'Linking Pending', 'Approval & Linking', 5, 13, 'purple', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-14', 'Linked', 'Approval & Linking', 2, 14, 'teal', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-15', 'Effective', 'Completed / Closed', 14, 15, 'emerald', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-16', 'Closed / Not Contracted', 'Completed / Closed', 14, 16, 'slate', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-17', 'Recredentialing Due', 'Maintenance / Alert', 30, 17, 'pink', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.stage_configs (id, name, category, sla_turnaround_target_days, display_order, badge_color, is_active)
+VALUES ('stg-18', 'Overdue', 'Maintenance / Alert', 14, 18, 'rose', true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+-- System Config (3)
+INSERT INTO public.system_config (id, config_data)
+VALUES ('holidays', '{"id":"holidays","items":[{"type":"Federal","name":"New Year''s Day","date":"2026-01-01","affectsSla":true,"id":"HOL-1"},{"id":"HOL-2","type":"Federal","name":"Martin Luther King Jr. Day","date":"2026-01-19","affectsSla":true},{"id":"HOL-3","affectsSla":true,"type":"Federal","name":"Presidents'' Day","date":"2026-02-16"},{"id":"HOL-4","affectsSla":true,"type":"Federal","name":"Memorial Day","date":"2026-05-25"},{"name":"Juneteenth National Independence Day","date":"2026-06-19","type":"Federal","affectsSla":true,"id":"HOL-5"},{"id":"HOL-6","affectsSla":true,"name":"Independence Day","date":"2026-07-04","type":"Federal"},{"type":"Federal","affectsSla":true,"name":"Labor Day","date":"2026-09-07","id":"HOL-7"},{"id":"HOL-8","type":"Federal","affectsSla":true,"date":"2026-11-26","name":"Thanksgiving Day"},{"date":"2026-11-27","name":"Day After Thanksgiving","type":"Corporate","affectsSla":true,"id":"HOL-9"},{"affectsSla":true,"type":"Federal","id":"HOL-10","name":"Christmas Day","date":"2026-12-25"}]}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET config_data = EXCLUDED.config_data, updated_at = NOW();
+
+INSERT INTO public.system_config (id, config_data)
+VALUES ('settings', '{"id":"settings","slaFollowUpMaxDays":10,"autoReminderPayerAging":true,"enableDailySummaryEmail":false,"autoEscalateOverdueFollowup":true,"slaFollowUpMinDays":7,"caqhReattestationDays":120,"nppesAutoValidation":true,"slaSubmissionDays":5,"licenseExpAdvanceAlertDays":60}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET config_data = EXCLUDED.config_data, updated_at = NOW();
+
+INSERT INTO public.system_config (id, config_data)
+VALUES ('templates', '{"id":"templates","items":[{"isActive":true,"recipientRoles":["Credentialing Specialist","Provider (Clinician)","Human Resources (HR)"],"name":"License 60-Day Advance Warning","bodyTemplate":"Dear {provider_name},\n\nYour {license_type} license ({license_number}) under state {license_state} is scheduled to expire on {expiration_date}. To prevent clinical credentialing suspension or payer billing hold, please submit renewal documentation immediately to the credentialing team.\n\nThank you,\nAges / Proficio Credentialing Department","id":"TMPL-01","subject":"URGENT: Credentialing License Renewal Notice - {provider_name}","triggerEvent":"Clinician license expires in ≤ 60 calendar days"},{"triggerEvent":"Application pending payer determination ≥ 60 days or follow-up overdue","isActive":true,"name":"Overdue Follow-up & Aging Escalation","id":"TMPL-02","recipientRoles":["Credentialing Manager","Leadership / Executive","Credentialing Specialist"],"bodyTemplate":"Attention Credentialing Leadership,\n\nApplication {application_id} for {provider_name} with {payer_name} has exceeded SLA benchmarks ({days_in_process} days elapsed). Last logged contact with payer representative was on {last_follow_up_date}.\n\nPlease review escalation notes and initiate supervisor outreach.","subject":"ACTION REQUIRED: Escalated Credentialing Application Aging ({payer_name}) - {provider_name}"},{"name":"Payer Approval & Effective Date Broadcast","subject":"CREDENTIALING APPROVED: {provider_name} is now in-network with {payer_name}","isActive":true,"recipientRoles":["Billing and Claims","HR / Operations","Credentialing Specialist","Provider (Clinician)"],"bodyTemplate":"Great news! {provider_name} has been formally approved and linked under {entity_name} for {payer_name}.\n\nEffective Date: {effective_date}\nProvider Rendering NPI: {npi}\nBilling Hold: RELEASED (Ready to bill claims)","id":"TMPL-03","triggerEvent":"Payer status updated to Approved with Effective Date"}]}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET config_data = EXCLUDED.config_data, updated_at = NOW();
+
+-- Demo Employees (10)
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-prv-1', 'Ashley', 'Vanderbilt', 'Ashley Vanderbilt', 'ashley.vanderbilt@ageslearningsolutions.com', '(408) 555-0129', 'Clinical Services', 'BCBA (ABA)', 'Full-Time', true, 'admin@example.com', '{"id":"emp-prv-1","notes":"Direct clinical staff employed at AGES Learning Solutions. Linked to provider prv-1.","employmentStatus":"Full-Time","phone":"(408) 555-0129","migratedAt":"2026-09-07T14:13:54.286Z","department":"Clinical Services","createdAt":"2026-01-01","fullName":"Ashley Vanderbilt","updatedAt":"2026-08-26","entityId":"ent-1","email":"ashley.vanderbilt@ageslearningsolutions.com","isDemo":true,"startDate":"2023-02-15","roleTitle":"BCBA (ABA)","firstName":"Ashley","lastName":"Vanderbilt","ownerAccountEmail":"admin@example.com","officeLocationId":"loc-3"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-prv-2', 'Maya', 'Patel', 'Maya Patel', 'maya.patel@proficiotherapy.com', '(925) 555-0163', 'Clinical Services', 'SLP (Speech)', 'Full-Time', true, 'admin@example.com', '{"id":"emp-prv-2","isDemo":true,"phone":"(925) 555-0163","notes":"Direct clinical staff employed at Proficio Speech Therapy. Linked to provider prv-2.","createdAt":"2026-01-01","officeLocationId":"loc-1","entityId":"ent-2","updatedAt":"2026-08-26","fullName":"Maya Patel","roleTitle":"SLP (Speech)","email":"maya.patel@proficiotherapy.com","startDate":"2022-09-01","firstName":"Maya","lastName":"Patel","migratedAt":"2026-09-07T14:13:55.247Z","department":"Clinical Services","employmentStatus":"Full-Time","ownerAccountEmail":"admin@example.com"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-prv-3', 'Lucas', 'Moreno', 'Lucas Moreno', 'lucas.moreno@childsplaytherapy.com', '(925) 555-0199', 'Clinical Services', 'OTR/L (OT)', 'Full-Time', true, 'admin@example.com', '{"id":"emp-prv-3","email":"lucas.moreno@childsplaytherapy.com","firstName":"Lucas","fullName":"Lucas Moreno","entityId":"ent-3","notes":"Direct clinical staff employed at Child''s Play Therapy. Linked to provider prv-3.","isDemo":true,"phone":"(925) 555-0199","officeLocationId":"loc-2","employmentStatus":"Full-Time","createdAt":"2026-01-01","ownerAccountEmail":"admin@example.com","lastName":"Moreno","migratedAt":"2026-09-07T14:13:55.824Z","department":"Clinical Services","updatedAt":"2026-08-26","roleTitle":"OTR/L (OT)","startDate":"2023-06-10"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-prv-4', 'Kaitlyn', 'Zimmerman', 'Kaitlyn Zimmerman', 'kaitlyn.zimmerman@ageslearningsolutions.com', '(801) 555-0178', 'Clinical Services', 'BCBA (ABA)', 'Full-Time', true, 'admin@example.com', '{"id":"emp-prv-4","phone":"(801) 555-0178","entityId":"ent-1","notes":"Direct clinical staff employed at AGES Learning Solutions Utah. Linked to provider prv-4.","fullName":"Kaitlyn Zimmerman","createdAt":"2026-01-01","isDemo":true,"employmentStatus":"Full-Time","email":"kaitlyn.zimmerman@ageslearningsolutions.com","roleTitle":"BCBA (ABA)","startDate":"2024-10-01","updatedAt":"2026-08-26","firstName":"Kaitlyn","ownerAccountEmail":"admin@example.com","officeLocationId":"loc-5","department":"Clinical Services","lastName":"Zimmerman","migratedAt":"2026-09-07T14:13:56.411Z"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-prv-5', 'Jordan', 'Taylor', 'Jordan Taylor', 'jordan.taylor@proficiotherapy.com', '(925) 555-0182', 'Clinical Services', 'SLP (Speech, ABA)', 'Full-Time', true, 'admin@example.com', '{"id":"emp-prv-5","department":"Clinical Services","migratedAt":"2026-09-07T14:13:57.045Z","lastName":"Taylor","email":"jordan.taylor@proficiotherapy.com","createdAt":"2026-01-01","updatedAt":"2026-08-26","officeLocationId":"loc-1","startDate":"2024-01-15","notes":"Direct clinical staff employed at Proficio Speech & AGES Joint Clinic. Linked to provider prv-5.","roleTitle":"SLP (Speech, ABA)","phone":"(925) 555-0182","firstName":"Jordan","employmentStatus":"Full-Time","ownerAccountEmail":"admin@example.com","fullName":"Jordan Taylor","isDemo":true,"entityId":"ent-2"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-prv-6', 'Derrick', 'Sterling', 'Derrick Sterling', 'derrick.sterling@childsplaytherapy.com', '(925) 555-0133', 'Clinical Services', 'OTR/L (OT)', 'Part-Time', true, 'admin@example.com', '{"id":"emp-prv-6","createdAt":"2026-01-01","entityId":"ent-3","isDemo":true,"fullName":"Derrick Sterling","phone":"(925) 555-0133","notes":"Direct clinical staff employed at Child''s Play Therapy. Linked to provider prv-6.","roleTitle":"OTR/L (OT)","department":"Clinical Services","officeLocationId":"loc-2","startDate":"2023-11-01","migratedAt":"2026-09-07T14:13:57.578Z","email":"derrick.sterling@childsplaytherapy.com","updatedAt":"2026-08-26","employmentStatus":"Part-Time","firstName":"Derrick","ownerAccountEmail":"admin@example.com","lastName":"Sterling"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-prv-954093', 'Marcus', 'Vance', 'Marcus Vance', 'marcus.vance@ageslearning.com', '(510) 555-0144', 'Clinical Services', 'BCBA (ABA)', 'Full-Time', true, 'admin@example.com', '{"id":"emp-prv-954093","migratedAt":"2026-09-07T14:13:58.113Z","department":"Clinical Services","createdAt":"2026-09-06T13:22:34.093Z","email":"marcus.vance@ageslearning.com","lastName":"Vance","updatedAt":"2026-09-06T13:22:34.093Z","officeLocationId":"loc-3","ownerAccountEmail":"admin@example.com","notes":"Clinical staff member. Created via credentialing workflow for Application APP-2026-4951.","phone":"(510) 555-0144","roleTitle":"BCBA (ABA)","startDate":"2026-09-06","firstName":"Marcus","fullName":"Marcus Vance","employmentStatus":"Full-Time","entityId":"ent-1","isDemo":true}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-usr-1', 'Sanjay', 'Tom', 'Sanjay Tom', 'specialist@proficiotherapy.com', '(408) 555-0101', 'Centralized Credentialing Hub', 'Senior Credentialing Specialist', 'Full-Time', true, 'admin@example.com', '{"id":"emp-usr-1","createdAt":"2026-01-15","isDemo":true,"employmentStatus":"Full-Time","department":"Centralized Credentialing Hub","roleTitle":"Senior Credentialing Specialist","startDate":"2026-01-15","migratedAt":"2026-09-07T14:13:58.703Z","updatedAt":"2026-08-26","lastName":"Tom","entityId":"ent-1","fullName":"Sanjay Tom","email":"specialist@proficiotherapy.com","firstName":"Sanjay","notes":"Handles initial intakes, CAQH attestation, PAVE tracking, and payer submissions.","officeLocationId":"loc-1","phone":"(408) 555-0101","ownerAccountEmail":"admin@example.com"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-usr-2', 'Namitha', 'Narayanan', 'Namitha Narayanan', 'manager@proficiotherapy.com', '(408) 555-0102', 'Centralized Credentialing Hub', 'Credentialing Operations Manager', 'Full-Time', true, 'admin@example.com', '{"id":"emp-usr-2","migratedAt":"2026-09-07T14:13:59.256Z","firstName":"Namitha","department":"Centralized Credentialing Hub","employmentStatus":"Full-Time","ownerAccountEmail":"admin@example.com","entityId":"ent-1","fullName":"Namitha Narayanan","lastName":"Narayanan","isDemo":true,"createdAt":"2026-01-10","notes":"Oversees credentialing workflow quality control, payer escalations, and team KPIs.","phone":"(408) 555-0102","officeLocationId":"loc-1","updatedAt":"2026-08-26","roleTitle":"Credentialing Operations Manager","startDate":"2026-01-10","email":"manager@proficiotherapy.com"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+INSERT INTO public.employees (id, first_name, last_name, full_name, email, phone, department, role_title, employment_status, is_demo, owner_email, raw_profile)
+VALUES ('emp-usr-6', 'David', 'Chen', 'David Chen', 'david.chen@ageslearningsolutions.com', '(408) 555-0106', 'Operations & Practice Management', 'Operations & Facilities Coordinator', 'Full-Time', true, 'admin@example.com', '{"id":"emp-usr-6","officeLocationId":"loc-1","entityId":"ent-1","firstName":"David","fullName":"David Chen","roleTitle":"Operations & Facilities Coordinator","isDemo":true,"startDate":"2025-11-01","lastName":"Chen","ownerAccountEmail":"admin@example.com","employmentStatus":"Full-Time","updatedAt":"2026-08-26","email":"david.chen@ageslearningsolutions.com","createdAt":"2025-11-01","department":"Operations & Practice Management","migratedAt":"2026-09-07T14:13:59.817Z","notes":"Coordinates clinic leases, facility licensing, and utility attestations.","phone":"(408) 555-0106"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW();
+
+-- Demo Providers (8)
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-1', '1487920193', 'Ashley', 'Vanderbilt', 'MS, BCBA, LBA', 'BCBA', 'ashley.vanderbilt@ageslearningsolutions.com', '(408) 555-0129', 'LBA-CA-9021', 'CA', '18492011', 'Attested', 'Approved', '{"contractEffectiveDate":"2024-01-01","feeScheduleTier":"Tier 1 Specialty ABA","notes":"Group participating agreement with commercial & Medicaid managed care riders.","contractType":"Group Agreement","contractNumber":"CNT-AGES-AET-2024","recredentialingCycleYears":3}'::jsonb, '[{"status":"In-Network","payerName":"Aetna","recredentialingDate":"2026-10-01","effectiveDate":"2023-04-01","payerId":"pyr-aetna","providerIdNumber":"AET-PRV-9810"},{"payerName":"Cigna","payerId":"pyr-cigna","status":"In-Network","recredentialingDate":"2026-11-15","providerIdNumber":"CG-882109","effectiveDate":"2023-05-15"},{"payerId":"pyr-uhc","providerIdNumber":"UHC-019283","status":"In-Network","payerName":"UnitedHealthcare (UHC)","effectiveDate":"2023-06-01","recredentialingDate":"2026-12-01"},{"providerIdNumber":"AA-44019","status":"In-Network","effectiveDate":"2023-07-01","payerId":"pyr-alameda","recredentialingDate":"2026-10-15","payerName":"Alameda Alliance"}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-1788608145700', '9856533665', 'New', 'Clinical Staff', 'MS, BCBA, LBA', 'BCBA', 'new.clinical staff@ageslearning.com', '(408) 555-0100', 'CA-BCBA-10791', 'CA', '39273555', 'Attested', 'Approved', '{"notes":"","recredentialingCycleYears":3,"contractType":"Group Agreement","contractNumber":"GRP-80458","contractEffectiveDate":"2026-09-05","feeScheduleTier":"Tier 1 Standard"}'::jsonb, '[{"payerId":"pyr-aetna","applicationType":"Initial credentialing","id":"enr-1788608120490-1","recredentialingDueDate":"2029-06-29","status":"In Progress","payerName":"Aetna","notes":"Group participating agreement intake.","enrollmentStatus":"In Progress","effectiveDate":"2026-09-05","providerIdNumber":""}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-2', '1922847102', 'Maya', 'Patel', 'MS, CCC-SLP', 'SLP', 'maya.patel@proficiotherapy.com', '(925) 555-0163', 'SLP-CA-4482', 'CA', '19920144', 'Re-attestation Due', 'Approved', '{"contractNumber":"CNT-PROF-SLP-2023","feeScheduleTier":"Tier 1 Speech Pathology","notes":"Participating provider under Proficio master payer agreements.","recredentialingCycleYears":3,"contractType":"Group Agreement","contractEffectiveDate":"2022-10-01"}'::jsonb, '[{"recredentialingDate":"2026-10-31","payerName":"Blue Shield of California","effectiveDate":"2022-11-01","status":"In-Network","providerIdNumber":"BSC-SP-4482","payerId":"pyr-bsc"},{"payerId":"pyr-kaiser","providerIdNumber":"KP-991204","payerName":"Kaiser Permanente","effectiveDate":"2023-01-01","recredentialingDate":"2026-11-30","status":"In-Network"},{"recredentialingDate":"","status":"Application In Progress","payerId":"pyr-cigna","providerIdNumber":"PENDING","payerName":"Cigna","effectiveDate":""}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-3', '1639201948', 'Lucas', 'Moreno', 'MS, OTR/L', 'OTR/L', 'lucas.moreno@childsplaytherapy.com', '(925) 555-0199', 'OTR-CA-8831', 'CA', '17839204', 'Attested', 'Submitted', '{"feeScheduleTier":"Tier 1 OT Standard","contractType":"Group Agreement","recredentialingCycleYears":3,"notes":"Child''s Play participating provider agreement.","contractNumber":"CNT-CP-OT-2023","contractEffectiveDate":"2023-07-01"}'::jsonb, '[{"effectiveDate":"2023-08-01","payerId":"pyr-aetna","providerIdNumber":"AET-OT-8831","status":"In-Network","payerName":"Aetna","recredentialingDate":"2026-12-01"},{"recredentialingDate":"","effectiveDate":"","status":"Pending Payer Review","payerName":"Central California Alliance for Health","providerIdNumber":"PENDING","payerId":"pyr-ccah"}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-4', '1093847291', 'Kaitlyn', 'Zimmerman', 'MA, BCBA', 'BCBA', 'kaitlyn.zimmerman@ageslearningsolutions.com', '(801) 555-0178', 'UT-BCBA-1029', 'UT', '20194827', 'Attested', 'Not Required', '{"feeScheduleTier":"Tier 1 Utah Regional","contractNumber":"CNT-AGES-UT-2024","contractType":"Group Agreement","recredentialingCycleYears":3,"contractEffectiveDate":"2024-10-01","notes":"Utah regional Medicaid and commercial expansion contract."}'::jsonb, '[{"payerName":"Cigna","effectiveDate":"2024-11-15","status":"In-Network","payerId":"pyr-cigna","recredentialingDate":"2027-10-15","providerIdNumber":"CG-UT-1029"},{"payerName":"UnitedHealthcare (UHC)","payerId":"pyr-uhc","recredentialingDate":"2027-11-01","providerIdNumber":"UHC-UT-882","status":"In-Network","effectiveDate":"2024-12-01"}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-5', '1582910482', 'Jordan', 'Taylor', 'MS, SLP, BCBA', 'SLP', 'jordan.taylor@proficiotherapy.com', '(925) 555-0182', 'SLP-CA-9931', 'CA', '19482019', 'Attested', 'Approved', '{"notes":"Dual discipline SLP & BCBA agreement.","contractEffectiveDate":"2024-01-15","feeScheduleTier":"Tier 1 Dual Specialty","recredentialingCycleYears":3,"contractNumber":"CNT-DUAL-2024-01","contractType":"Group Agreement"}'::jsonb, '[{"providerIdNumber":"AET-DUAL-9931","effectiveDate":"2024-03-01","recredentialingDate":"2027-02-01","payerId":"pyr-aetna","status":"In-Network","payerName":"Aetna"},{"providerIdNumber":"BSC-9931","payerId":"pyr-bsc","effectiveDate":"2024-03-15","status":"In-Network","recredentialingDate":"2027-02-15","payerName":"Blue Shield of California"}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-6', '1749201849', 'Derrick', 'Sterling', 'MS, OTR/L', 'OTR/L', 'derrick.sterling@childsplaytherapy.com', '(925) 555-0133', 'OTR-CA-7721', 'CA', '18920194', 'Complete', 'Approved', '{"notes":"Contractor agreement requiring annual COI and biannual recredentialing.","contractType":"1099 Contractor Agreement","recredentialingCycleYears":2,"feeScheduleTier":"Tier 2 Hourly Rate","contractNumber":"CNT-CP-1099-7721","contractEffectiveDate":"2023-11-01"}'::jsonb, '[{"payerName":"Aetna","payerId":"pyr-aetna","effectiveDate":"2023-12-15","recredentialingDate":"2026-09-15","status":"In-Network","providerIdNumber":"AET-OT-7721"}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.providers (id, npi, first_name, last_name, credentials, provider_type, email, phone, license_number, license_state, caqh_id, caqh_status, pave_status, contract_info, payer_enrollments, is_demo, owner_email, active)
+VALUES ('prv-954093', '1679023418', 'Marcus', 'Vance', 'MS,  OTR/L', 'BCBA', 'marcus.vance@ageslearning.com', '(510) 555-0144', '|  OT-CA-38291 (Exp: 2028-05-15)', 'CA', '17829401', 'Complete', 'In Progress', '{}'::jsonb, '[{"payerName":"Aetna","status":"In-Network","payerId":"pyr-aetna","recredentialingDate":"2030-11-22","effectiveDate":"2026-09-06","notes":"Application initiated via APP-2026-4951"},{"payerName":"Alameda Alliance","payerId":"pyr-alameda","status":"Application In Progress","notes":"Application initiated via APP-2026-4951"},{"payerName":"Anthem","payerId":"pyr-anthem","status":"Application In Progress","notes":"Application initiated via APP-2026-4951"}]'::jsonb, true, 'admin@example.com', true)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+-- Demo Clinical Staff (7)
+INSERT INTO public.clinical_staff (id, employee_id, provider_id, first_name, last_name, credentials, provider_type, license_number, license_state, npi, caqh_id, pave_status, status, is_demo, owner_email, raw_data)
+VALUES ('cs-prv-1', 'emp-prv-1', 'prv-1', 'Ashley', 'Vanderbilt', 'MS, BCBA, LBA', 'BCBA', 'LBA-CA-9021', 'CA', '1487920193', '18492011', 'Approved', 'Active', true, 'admin@example.com', '{"id":"cs-prv-1","entityIds":["ent-1"],"createdAt":"2026-01-01","providerType":"BCBA","caqhId":"18492011","credentials":"MS, BCBA, LBA","ownerAccountEmail":"admin@example.com","lastName":"Vanderbilt","taxonomy":"103K00000X (Behavior Analyst)","licenseState":"CA","updatedAt":"2026-08-26","licenseNumber":"LBA-CA-9021","locationIds":["loc-3","loc-4"],"isolatedFor":"admin@example.com","isDemo":true,"disciplines":["ABA"],"licenseExpiration":"2027-05-31","npi":"1487920193","specialty":"Pediatric Autism Spectrum & Early Intervention","providerId":"prv-1","fullName":"Ashley Vanderbilt","firstName":"Ashley","primaryLocationId":"loc-3","status":"Active","paveStatus":"Approved","employeeId":"emp-prv-1"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.clinical_staff (id, employee_id, provider_id, first_name, last_name, credentials, provider_type, license_number, license_state, npi, caqh_id, pave_status, status, is_demo, owner_email, raw_data)
+VALUES ('cs-prv-2', 'emp-prv-2', 'prv-2', 'Maya', 'Patel', 'MS, CCC-SLP', 'SLP', 'SLP-CA-4482', 'CA', '1922847102', '19920144', 'Approved', 'Active', true, 'admin@example.com', '{"id":"cs-prv-2","providerType":"SLP","isDemo":true,"primaryLocationId":"loc-1","licenseState":"CA","npi":"1922847102","createdAt":"2026-01-01","entityIds":["ent-2","ent-1"],"licenseExpiration":"2026-10-31","caqhId":"19920144","updatedAt":"2026-08-26","taxonomy":"235Z00000X (Speech-Language Pathologist)","lastName":"Patel","specialty":"Pediatric Articulation, AAC Devices & Language Disorders","fullName":"Maya Patel","firstName":"Maya","credentials":"MS, CCC-SLP","status":"Active","licenseNumber":"SLP-CA-4482","locationIds":["loc-1","loc-3"],"isolatedFor":"admin@example.com","ownerAccountEmail":"admin@example.com","providerId":"prv-2","disciplines":["Speech"],"employeeId":"emp-prv-2","paveStatus":"Approved"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.clinical_staff (id, employee_id, provider_id, first_name, last_name, credentials, provider_type, license_number, license_state, npi, caqh_id, pave_status, status, is_demo, owner_email, raw_data)
+VALUES ('cs-prv-3', 'emp-prv-3', 'prv-3', 'Lucas', 'Moreno', 'MS, OTR/L', 'OTR/L', 'OTR-CA-8831', 'CA', '1639201948', '17839204', 'Submitted', 'Active', true, 'admin@example.com', '{"id":"cs-prv-3","fullName":"Lucas Moreno","primaryLocationId":"loc-2","npi":"1639201948","isDemo":true,"firstName":"Lucas","caqhId":"17839204","licenseExpiration":"2027-09-30","specialty":"Sensory Integration, Fine Motor Coordination & Feeding Therapy","credentials":"MS, OTR/L","entityIds":["ent-3","ent-1"],"licenseState":"CA","createdAt":"2026-01-01","updatedAt":"2026-08-26","status":"Active","providerType":"OTR/L","locationIds":["loc-2","loc-3"],"licenseNumber":"OTR-CA-8831","providerId":"prv-3","taxonomy":"225X00000X (Occupational Therapist)","isolatedFor":"admin@example.com","lastName":"Moreno","ownerAccountEmail":"admin@example.com","employeeId":"emp-prv-3","disciplines":["OT"],"paveStatus":"Submitted"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.clinical_staff (id, employee_id, provider_id, first_name, last_name, credentials, provider_type, license_number, license_state, npi, caqh_id, pave_status, status, is_demo, owner_email, raw_data)
+VALUES ('cs-prv-4', 'emp-prv-4', 'prv-4', 'Kaitlyn', 'Zimmerman', 'MA, BCBA', 'BCBA', 'UT-BCBA-1029', 'UT', '1093847291', '20194827', 'Not Required', 'Active', true, 'admin@example.com', '{"id":"cs-prv-4","disciplines":["ABA"],"providerType":"BCBA","locationIds":["loc-5"],"npi":"1093847291","firstName":"Kaitlyn","caqhId":"20194827","isolatedFor":"admin@example.com","specialty":"School-Based Behavior Interventions & Parent Coaching","licenseState":"UT","fullName":"Kaitlyn Zimmerman","isDemo":true,"ownerAccountEmail":"admin@example.com","credentials":"MA, BCBA","employeeId":"emp-prv-4","paveStatus":"Not Required","primaryLocationId":"loc-5","providerId":"prv-4","status":"Active","lastName":"Zimmerman","taxonomy":"103K00000X (Behavior Analyst)","updatedAt":"2026-08-26","licenseNumber":"UT-BCBA-1029","licenseExpiration":"2027-11-30","createdAt":"2026-01-01","entityIds":["ent-1"]}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.clinical_staff (id, employee_id, provider_id, first_name, last_name, credentials, provider_type, license_number, license_state, npi, caqh_id, pave_status, status, is_demo, owner_email, raw_data)
+VALUES ('cs-prv-5', 'emp-prv-5', 'prv-5', 'Jordan', 'Taylor', 'MS, SLP, BCBA', 'SLP', 'SLP-CA-9931', 'CA', '1582910482', '19482019', 'Approved', 'Active', true, 'admin@example.com', '{"id":"cs-prv-5","createdAt":"2026-01-01","entityIds":["ent-1","ent-2"],"npi":"1582910482","fullName":"Jordan Taylor","isDemo":true,"credentials":"MS, SLP, BCBA","updatedAt":"2026-08-26","disciplines":["Speech","ABA"],"ownerAccountEmail":"admin@example.com","caqhId":"19482019","isolatedFor":"admin@example.com","locationIds":["loc-1","loc-3"],"paveStatus":"Approved","status":"Active","employeeId":"emp-prv-5","primaryLocationId":"loc-1","licenseNumber":"SLP-CA-9931","providerId":"prv-5","specialty":"Dual Certified SLP & BCBA for Non-Verbal Autism","licenseExpiration":"2027-08-31","providerType":"SLP","firstName":"Jordan","taxonomy":"235Z00000X / 103K00000X","lastName":"Taylor","licenseState":"CA"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.clinical_staff (id, employee_id, provider_id, first_name, last_name, credentials, provider_type, license_number, license_state, npi, caqh_id, pave_status, status, is_demo, owner_email, raw_data)
+VALUES ('cs-prv-6', 'emp-prv-6', 'prv-6', 'Derrick', 'Sterling', 'MS, OTR/L', 'OTR/L', 'OTR-CA-7721', 'CA', '1749201849', '18920194', 'Approved', 'Active', true, 'admin@example.com', '{"id":"cs-prv-6","licenseExpiration":"2026-09-15","licenseNumber":"OTR-CA-7721","lastName":"Sterling","taxonomy":"225X00000X (Occupational Therapist)","primaryLocationId":"loc-2","status":"Active","firstName":"Derrick","specialty":"Neurodevelopmental Therapy & Bilateral Coordination","updatedAt":"2026-08-26","paveStatus":"Approved","employeeId":"emp-prv-6","caqhId":"18920194","credentials":"MS, OTR/L","licenseState":"CA","ownerAccountEmail":"admin@example.com","fullName":"Derrick Sterling","providerId":"prv-6","providerType":"OTR/L","entityIds":["ent-3"],"createdAt":"2026-01-01","locationIds":["loc-2"],"isolatedFor":"admin@example.com","npi":"1749201849","disciplines":["OT"],"isDemo":true}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+INSERT INTO public.clinical_staff (id, employee_id, provider_id, first_name, last_name, credentials, provider_type, license_number, license_state, npi, caqh_id, pave_status, status, is_demo, owner_email, raw_data)
+VALUES ('cs-prv-954093', 'emp-prv-954093', 'prv-954093', 'Marcus', 'Vance', 'MS,  OTR/L', 'BCBA', '|  OT-CA-38291 (Exp: 2028-05-15)', 'CA', '1679023418', '17829401', 'In Progress', 'In Credentialing', true, 'admin@example.com', '{"id":"cs-prv-954093","fullName":"Marcus Vance","ownerAccountEmail":"admin@example.com","isDemo":true,"paveStatus":"In Progress","providerType":"BCBA","specialty":"| Specialty: Pediatric Occupational Therapy |  225X00000X","caqhId":"17829401","firstName":"Marcus","employeeId":"emp-prv-954093","providerId":"prv-954093","licenseState":"CA","entityIds":["ent-1"],"createdAt":"2026-09-06T13:22:34.093Z","licenseNumber":"|  OT-CA-38291 (Exp: 2028-05-15)","credentials":"MS,  OTR/L","npi":"1679023418","updatedAt":"2026-09-06T13:22:34.093Z","licenseExpiration":"2028-12-31","status":"In Credentialing","primaryLocationId":"loc-3","disciplines":["ABA"],"isolatedFor":"admin@example.com","locationIds":["loc-3"],"taxonomy":"103K00000X","lastName":"Vance"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, updated_at = NOW();
+
+-- Demo Records (10)
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0001', 'prv-1', 'pyr-aetna', 'ent-1', 'loc-3', NULL, NULL, 'usr-1', 'Initial credentialing', 'ABA', 'Approved', 'IN_PROGRESS', 0, 'Linked', 'Contract Executed', true, 'admin@example.com', '{"id":"APP-2026-0001","auditTrail":[{"id":"aud-1","userName":"Sanjay Tom","notes":"Initial intake created","userId":"usr-1","timestamp":"2026-04-10 09:30","action":"Created Credentialing Record"},{"userName":"Sanjay Tom","previousValue":"Application Preparation","newValue":"Application Submitted","timestamp":"2026-04-15 14:20","userId":"usr-1","id":"aud-2","action":"Stage Transitioned"},{"userName":"Sanjay Tom","action":"Approval Logged","userId":"usr-1","timestamp":"2026-06-20 11:00","newValue":"Approved","id":"aud-3"},{"newValue":"Linked","timestamp":"2026-07-05 16:30","userId":"usr-1","action":"Provider Linked to Billing NPI","id":"aud-4","userName":"Sanjay Tom"}],"discipline":"ABA","submissionDate":"2026-04-15","assignedSpecialistId":"usr-1","validationIssues":[],"linkEffectiveDate":"2026-07-05","providerId":"prv-1","payerId":"pyr-aetna","applicationType":"Initial credentialing","linkingStatus":"Linked","documentsRequestedDate":"2026-04-10","targetTurnaroundDate":"2026-06-15","effectiveDate":"2026-07-01","locationId":"loc-3","intakeDate":"2026-04-10","contractStatus":"Contract Executed","documents":[],"approvalDate":"2026-06-20","checklist":[{"category":"Validation","completedDate":"2026-04-12","isCompleted":true,"isRequired":true,"id":"chk-1","title":"CAQH Profile Attestation Verified"},{"id":"chk-2","isCompleted":true,"category":"Validation","isRequired":true,"completedDate":"2026-04-12","title":"W-9 & Entity Match Checked"},{"isCompleted":true,"category":"Document","isRequired":true,"id":"chk-3","title":"Malpractice COI Uploaded","completedDate":"2026-04-12"},{"category":"Form","id":"chk-4","isCompleted":true,"isRequired":true,"completedDate":"2026-04-14","title":"Availity Roster Form Generated"}],"ownerAccountEmail":"admin@example.com","createdAt":"2026-04-10","isolatedFor":"admin@example.com","isOverdue":false,"followUps":[{"contactPerson":"Availity Portal Status Check","notes":"Clean submission without any RFIs.","id":"fu-1","date":"2026-04-25","nextAction":"Re-check portal for committee decision.","nextFollowUpDate":"2026-05-10","payerResponse":"Application verified in initial committee queue.","method":"Availity","referenceNumber":"REF-AET-9921","isEscalated":false,"specialistName":"Sanjay Tom","specialistId":"usr-1"}],"updatedAt":"2026-07-05","documentsReceivedDate":"2026-04-12","assignedSpecialistName":"Sanjay Tom","isDemo":true,"totalCycleDays":66,"entityId":"ent-1","contractEffectiveDate":"2024-01-01","providerLinkDate":"2026-07-05","daysInCurrentStage":52,"stage":"Approved","revalidationDate":"2029-06-20"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0002', 'prv-2', 'pyr-alameda', 'ent-2', 'loc-1', NULL, NULL, 'usr-4', 'Provider linking', 'Speech', 'Linking Pending', 'IN_PROGRESS', 0, 'Pending Approval', 'Contract Executed', true, 'admin@example.com', '{"id":"APP-2026-0002","payerId":"pyr-alameda","daysInCurrentStage":29,"submissionDate":"2026-05-08","documents":[],"ownerAccountEmail":"admin@example.com","contractStatus":"Contract Executed","assignedSpecialistName":"Elena Rostova","isDemo":true,"approvalDate":"2026-07-28","stage":"Linking Pending","linkingStatus":"Pending Approval","entityId":"ent-2","applicationType":"Provider linking","discipline":"Speech","auditTrail":[{"userName":"Elena Rostova","id":"aud-10","timestamp":"2026-05-01 10:00","action":"Created Record","userId":"usr-4"},{"timestamp":"2026-07-28 14:00","newValue":"Approved","userId":"usr-4","action":"Stage Transitioned","userName":"Elena Rostova","previousValue":"Payer Review","id":"aud-11"},{"id":"aud-12","action":"Stage Transitioned","userId":"usr-4","timestamp":"2026-07-29 09:30","newValue":"Linking Pending","userName":"Elena Rostova","previousValue":"Approved"},{"userName":"Automation Engine","action":"Auto Overdue Detection","userId":"SYSTEM","id":"aud-13","notes":"Scheduled follow-up date 2026-08-15 passed without update. Escalation generated.","timestamp":"2026-08-16 08:00"}],"nextFollowUpDate":"2026-08-15","providerId":"prv-2","validationIssues":[],"assignedSpecialistId":"usr-4","isolatedFor":"admin@example.com","checklist":[{"title":"PAVE Confirmation Attached","id":"chk-10","category":"Validation","isCompleted":true,"isRequired":true},{"isRequired":true,"category":"Form","id":"chk-11","isCompleted":true,"title":"Alameda Alliance Group Linking Roster"},{"isRequired":true,"id":"chk-12","category":"Document","isCompleted":true,"title":"Confirmation of Payer Approval Letter"}],"createdAt":"2026-05-01","lastFollowUpDate":"2026-08-01","followUps":[{"specialistId":"usr-4","referenceNumber":"ALA-LNK-8841","id":"fu-2","payerResponse":"Credentialing approved. Linking request is in provider enrollment queue.","specialistName":"Elena Rostova","method":"Phone","isEscalated":true,"nextAction":"Call provider data operations team for link confirmation.","nextFollowUpDate":"2026-08-15","escalatedTo":"Credentialing Manager & Leadership","notes":"Provider cannot bill Medicaid claims until link is confirmed in system.","contactPerson":"Tanya Gomez","date":"2026-08-01"}],"updatedAt":"2026-08-16","isOverdue":true,"intakeDate":"2026-05-01","locationId":"loc-1","totalCycleDays":114}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0003', 'prv-3', 'pyr-scfhp', 'ent-3', 'loc-2', NULL, NULL, 'usr-1', 'Initial credentialing', 'OT', 'Overdue', 'IN_PROGRESS', 0, 'Pending Approval', 'Contract Executed', true, 'admin@example.com', '{"id":"APP-2026-0003","validationIssues":[{"field":"Lease Agreement","id":"val-lease-sub","description":"Lease file name on record indicates suite mismatch vs SCFHP portal filing.","severity":"Warning","ruleReference":"Section 5.10: Location & Lease Consistency"}],"locationId":"loc-2","intakeDate":"2026-06-15","contractStatus":"Contract Executed","followUps":[{"date":"2026-08-18","payerResponse":"Requesting updated lease documentation showing Suite C and DHCS welcome letter.","nextFollowUpDate":"2026-08-28","method":"Email","specialistName":"Sanjay Tom","referenceNumber":"SCFHP-REQ-4410","nextAction":"Obtain sublease confirmation from Landlord & upload to portal.","contactPerson":"Carlos Mendez","specialistId":"usr-1","isEscalated":false,"id":"fu-3"}],"updatedAt":"2026-08-18","isOverdue":true,"createdAt":"2026-06-15","assignedSpecialistId":"usr-1","nextFollowUpDate":"2026-08-28","checklist":[{"category":"Document","id":"chk-20","isRequired":true,"isCompleted":true,"title":"PAVE Approval Form"},{"isCompleted":false,"notes":"Landlord amendment requested","title":"Lease / Sublease Matching Entity","category":"Document","isRequired":true,"id":"chk-21"},{"category":"Validation","id":"chk-22","isCompleted":true,"isRequired":true,"title":"W-9 Verification"}],"ownerAccountEmail":"admin@example.com","payerId":"pyr-scfhp","assignedSpecialistName":"Sanjay Tom","providerId":"prv-3","entityId":"ent-3","targetTurnaroundDate":"2026-09-05","auditTrail":[{"action":"Created Record","userId":"usr-1","id":"aud-20","timestamp":"2026-06-15","userName":"Sanjay Tom"},{"id":"aud-21","newValue":"Additional Documents Requested","previousValue":"Payer Review","timestamp":"2026-08-18","userId":"usr-1","userName":"Sanjay Tom","action":"Stage Transitioned"}],"discipline":"OT","submissionDate":"2026-06-20","daysInCurrentStage":8,"lastFollowUpDate":"2026-08-18","isolatedFor":"admin@example.com","stage":"Overdue","totalCycleDays":72,"applicationType":"Initial credentialing","documents":[],"linkingStatus":"Pending Approval","isDemo":true}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0004', 'prv-1', 'pyr-anthem', 'ent-1', 'loc-4', NULL, NULL, 'usr-1', 'Location addition', 'ABA', 'Overdue', 'IN_PROGRESS', 0, 'Pending Approval', 'Contract Executed', true, 'admin@example.com', '{"id":"APP-2026-0004","targetTurnaroundDate":"2026-09-19","isolatedFor":"admin@example.com","intakeDate":"2026-07-01","locationId":"loc-4","submissionDate":"2026-07-06","applicationType":"Location addition","payerId":"pyr-anthem","documents":[],"discipline":"ABA","auditTrail":[{"userName":"Sanjay Tom","id":"aud-30","timestamp":"2026-07-01","userId":"usr-1","action":"Created Location Addition Record"}],"contractStatus":"Contract Executed","assignedSpecialistId":"usr-1","providerId":"prv-1","updatedAt":"2026-08-12","followUps":[{"contactPerson":"Anthem Provider Network","isEscalated":false,"specialistName":"Sanjay Tom","nextFollowUpDate":"2026-08-27","referenceNumber":"ANT-LOC-1102","id":"fu-4","nextAction":"Follow up on committee approval next week.","payerResponse":"Location addition for Vacaville in secondary review queue.","method":"Availity","date":"2026-08-12","specialistId":"usr-1"}],"isOverdue":true,"nextFollowUpDate":"2026-08-27","validationIssues":[],"stage":"Overdue","checklist":[{"isRequired":true,"category":"Document","id":"chk-30","title":"Vacaville Certificate of Occupancy / Lease","isCompleted":true},{"id":"chk-31","title":"Anthem Location Addition Form","isCompleted":true,"isRequired":true,"category":"Form"}],"createdAt":"2026-07-01","entityId":"ent-1","ownerAccountEmail":"admin@example.com","daysInCurrentStage":45,"lastFollowUpDate":"2026-08-12","isDemo":true,"totalCycleDays":56,"assignedSpecialistName":"Sanjay Tom","linkingStatus":"Pending Approval"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0005', 'prv-4', 'pyr-utmedicaid', 'ent-1', 'loc-5', NULL, NULL, 'usr-1', 'Enrollment', 'ABA', 'Application Submitted', 'IN_PROGRESS', 0, 'Not Applicable', 'In Negotiation', true, 'admin@example.com', '{"id":"APP-2026-0005","ownerAccountEmail":"admin@example.com","payerId":"pyr-utmedicaid","providerId":"prv-4","discipline":"ABA","auditTrail":[{"timestamp":"2026-08-01","userId":"usr-1","action":"Created Record","id":"aud-40","userName":"Sanjay Tom"}],"isolatedFor":"admin@example.com","targetTurnaroundDate":"2026-10-05","submissionDate":"2026-08-06","linkingStatus":"Not Applicable","assignedSpecialistName":"Sanjay Tom","documents":[],"locationId":"loc-5","intakeDate":"2026-08-01","stage":"Application Submitted","contractStatus":"In Negotiation","assignedSpecialistId":"usr-1","isDemo":true,"entityId":"ent-1","applicationType":"Enrollment","updatedAt":"2026-08-21","followUps":[{"specialistName":"Sanjay Tom","date":"2026-08-06","nextAction":"Check PRISM status for analyst assignment.","specialistId":"usr-1","isEscalated":true,"contactPerson":"PRISM Enrollment Portal","nextFollowUpDate":"2026-08-20","method":"Portal","escalatedTo":"Credentialing Lead","payerResponse":"Submission acknowledged electronically.","referenceNumber":"UT-PRISM-99412","id":"fu-5"}],"lastFollowUpDate":"2026-08-06","isOverdue":true,"checklist":[{"title":"Utah License Copy","category":"Document","isRequired":true,"isCompleted":true,"id":"chk-40"},{"id":"chk-41","isCompleted":true,"category":"Validation","isRequired":true,"title":"Fingerprinting Card Verification"},{"category":"Form","isRequired":true,"id":"chk-42","title":"PRISM Disclosure Form","isCompleted":true}],"createdAt":"2026-08-01","nextFollowUpDate":"2026-08-20","documentsReceivedDate":"2026-08-04","daysInCurrentStage":20,"totalCycleDays":25,"validationIssues":[]}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0006', 'prv-2', 'pyr-bsc', 'ent-2', 'loc-1', NULL, NULL, 'usr-4', 'Recredentialing', 'Speech', 'Recredentialing Due', 'IN_PROGRESS', 0, 'Linked', 'Contract Executed', true, 'admin@example.com', '{"id":"APP-2026-0006","payerId":"pyr-bsc","documents":[],"entityId":"ent-2","revalidationDate":"2026-11-01","isDemo":true,"isolatedFor":"admin@example.com","linkingStatus":"Linked","totalCycleDays":16,"targetTurnaroundDate":"2026-10-10","auditTrail":[{"userId":"usr-4","action":"Auto-created recredentialing record 90 days before revalidation date","id":"aud-50","userName":"Elena Rostova","timestamp":"2026-08-10"}],"discipline":"Speech","validationIssues":[{"field":"CAQH Attestation","ruleReference":"FR-010 & FR-029: Recredentialing CAQH Prerequisite","description":"CAQH re-attestation is required prior to submitting recredentialing packet.","severity":"Error","id":"val-rec-caqh"}],"daysInCurrentStage":16,"stage":"Recredentialing Due","assignedSpecialistName":"Elena Rostova","providerId":"prv-2","contractStatus":"Contract Executed","applicationType":"Recredentialing","assignedSpecialistId":"usr-4","updatedAt":"2026-08-10","followUps":[],"isOverdue":false,"ownerAccountEmail":"admin@example.com","createdAt":"2026-08-10","locationId":"loc-1","intakeDate":"2026-08-10","checklist":[{"title":"Verify CAQH Profile Attestation","notes":"Attestation due on CAQH","id":"chk-50","category":"Validation","isCompleted":false,"isRequired":true},{"id":"chk-51","isCompleted":false,"isRequired":true,"category":"Document","title":"Confirm Renewed SLP License","notes":"License expires 10/31"},{"title":"Download BSC Recred Packet","category":"Form","id":"chk-52","isCompleted":true,"isRequired":true}]}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0007', 'prv-5', 'pyr-catalight', 'ent-1', 'loc-3', NULL, NULL, 'usr-1', 'Provider addition', 'ABA', 'Application Preparation', 'IN_PROGRESS', 0, 'Pending Approval', 'Contract Executed', true, 'admin@example.com', '{"id":"APP-2026-0007","contractStatus":"Contract Executed","discipline":"ABA","auditTrail":[{"timestamp":"2026-08-20","action":"Created Record","userId":"usr-1","userName":"Sanjay Tom","id":"aud-60"}],"providerId":"prv-5","linkingStatus":"Pending Approval","isolatedFor":"admin@example.com","documents":[],"daysInCurrentStage":4,"isDemo":true,"entityId":"ent-1","intakeDate":"2026-08-20","locationId":"loc-3","assignedSpecialistName":"Sanjay Tom","applicationType":"Provider addition","isOverdue":false,"updatedAt":"2026-08-22","followUps":[],"validationIssues":[],"assignedSpecialistId":"usr-1","checklist":[{"id":"chk-60","title":"BCBA BACB Verification","isRequired":true,"category":"Validation","isCompleted":true},{"isRequired":true,"id":"chk-61","isCompleted":true,"category":"Form","title":"Catalight Roster Entry"},{"title":"Entity / DBA Match Check","isCompleted":true,"isRequired":true,"id":"chk-62","category":"Validation"}],"totalCycleDays":6,"createdAt":"2026-08-20","stage":"Application Preparation","documentsReceivedDate":"2026-08-22","ownerAccountEmail":"admin@example.com","payerId":"pyr-catalight"}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0008', 'prv-6', 'pyr-cigna', 'ent-3', 'loc-2', NULL, NULL, 'usr-1', 'Initial credentialing', 'OT', 'Intake', 'IN_PROGRESS', 0, 'Not Applicable', 'In Negotiation', true, 'admin@example.com', '{"id":"APP-2026-0008","locationId":"loc-2","intakeDate":"2026-08-24","documents":[],"linkingStatus":"Not Applicable","applicationType":"Initial credentialing","contractStatus":"In Negotiation","providerId":"prv-6","discipline":"OT","auditTrail":[{"id":"aud-70","timestamp":"2026-08-24","userName":"Sanjay Tom","action":"Created Record","userId":"usr-1"}],"assignedSpecialistName":"Sanjay Tom","isDemo":true,"ownerAccountEmail":"admin@example.com","stage":"Intake","updatedAt":"2026-08-24","followUps":[],"daysInCurrentStage":2,"isOverdue":false,"assignedSpecialistId":"usr-1","checklist":[{"isCompleted":true,"title":"NPI & NPPES Validation","id":"chk-70","category":"Validation","isRequired":true},{"id":"chk-71","title":"License Verification","isRequired":true,"notes":"License expires in Sept 2026!","isCompleted":false,"category":"Validation"},{"isRequired":true,"category":"Form","title":"Cigna Behavioral Health Application","id":"chk-72","isCompleted":false}],"payerId":"pyr-cigna","entityId":"ent-3","isolatedFor":"admin@example.com","validationIssues":[{"severity":"Error","field":"State Professional License","description":"License OTR-CA-7721 expires in less than 30 days (2026-09-15). Renewed license required before submission.","ruleReference":"SLA-007: Zero Submissions with Expired Credentials","id":"val-exp-lic-soon"}],"createdAt":"2026-08-24","totalCycleDays":2}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-0009', 'prv-1788608145700', 'pyr-aetna', 'ent-1', 'loc-1', NULL, NULL, 'acc-admin-clean', 'Initial credentialing', 'ABA', 'Intake', 'IN_PROGRESS', 0, 'Pending Approval', 'Contract Executed', true, 'admin@example.com', '{"id":"APP-2026-0009","isolatedFor":"admin@example.com","paveNotes":"","contractEffectiveDate":"2026-09-05","isDemo":true,"notes":"New clinical staff onboarding for New Clinical Staff with Aetna.","payerId":"pyr-aetna","followUps":[],"updatedAt":"2026-09-05","isOverdue":false,"linkingStatus":"Pending Approval","createdAt":"2026-09-05","totalCycleDays":0,"daysInCurrentStage":0,"dhcsApprovalDate":"","linkEffectiveDate":"2026-09-05","checklist":[{"isRequired":true,"isCompleted":false,"title":"NPI & NPPES Validation","category":"Validation","id":"chk-1788608145720-1"},{"isCompleted":false,"id":"chk-1788608145720-2","title":"State Professional License Verified","isRequired":true,"category":"Document"},{"isCompleted":false,"title":"CAQH Profile Attestation Verified","id":"chk-1788608145720-3","category":"Validation","isRequired":true},{"title":"Entity & DBA Match Confirmation","isRequired":true,"isCompleted":true,"id":"chk-1788608145720-4","category":"Validation"},{"isRequired":true,"category":"Document","id":"chk-1788608145720-5","title":"Malpractice / COI Current","isCompleted":true},{"category":"Document","isRequired":true,"id":"chk-pyr-1788608145720-0","title":"Payer Requirement: State License","isCompleted":false},{"id":"chk-pyr-1788608145720-1","isRequired":true,"isCompleted":false,"category":"Document","title":"Payer Requirement: W-9 Form"},{"id":"chk-pyr-1788608145720-2","category":"Document","isCompleted":false,"title":"Payer Requirement: Malpractice Insurance / COI","isRequired":true},{"category":"Document","id":"chk-pyr-1788608145720-3","title":"Payer Requirement: Curriculum Vitae (CV)","isCompleted":false,"isRequired":true},{"title":"Payer Requirement: Board Certification","isCompleted":false,"isRequired":true,"id":"chk-pyr-1788608145720-4","category":"Document"}],"paveTrackingNumber":"","documents":[],"caqhStatusAtSubmission":"Attested","discipline":"ABA","auditTrail":[{"userId":"acc-admin-clean","action":"Created Credentialing Record","id":"aud-1788608145720","userName":"Administrator","timestamp":"9/5/2026, 5:05:45 PM","notes":"Initiated Initial credentialing application for undefined undefined with Aetna."}],"targetTurnaroundDate":"2026-12-03","providerId":"prv-1788608145700","contractStatus":"Contract Executed","stage":"Intake","ownerAccountEmail":"admin@example.com","entityId":"ent-1","assignedSpecialistName":"Administrator","applicationType":"Initial credentialing","intakeDate":"2026-09-05","locationId":"loc-1","assignedSpecialistId":"acc-admin-clean","validationIssues":[{"id":"val-loc-entity-mismatch","field":"Location Legal Entity","ruleReference":"Entity/DBA Validation - Location Entity Mismatch","description":"Location ''Livermore Clinic'' is assigned to entity ''ent-2'' but application is filed under ''Ages Learning Solutions LLC''.","severity":"Error"},{"id":"val-checklist-incomplete","field":"Payer Requirements Checklist","ruleReference":"FR-009 & Section 4.3: Mandatory Checklist Completion Before Submission","description":"8 mandatory checklist item(s) are incomplete (NPI & NPPES Validation, State Professional License Verified...).","severity":"Error"}]}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+INSERT INTO public.credentialing_records (id, provider_id, payer_id, entity_id, location_id, clinical_staff_id, employee_id, assigned_specialist_id, application_type, discipline, stage, status, cycle_days, linking_status, contract_status, is_demo, owner_email, raw_record)
+VALUES ('APP-2026-4951', 'prv-954093', 'pyr-aetna', 'ent-1', 'loc-3', 'cs-prv-954093', 'emp-prv-954093', 'acc-admin-clean', 'New provider credentialing', 'ABA', 'Linked', 'IN_PROGRESS', 0, 'Linked', 'Not Started', true, 'admin@example.com', '{"id":"APP-2026-4951","contractStatus":"Not Started","createdAt":"2026-09-06T13:22:34.094Z","checklist":[{"isRequired":true,"title":"Intake and baseline verification","completedBy":"Administrator","isCompleted":true,"completedDate":"2026-09-06","category":"Administrative","id":"chk-1"},{"id":"chk-2","isCompleted":true,"completedDate":"2026-09-06","category":"Validation","completedBy":"Administrator","isRequired":true,"title":"CAQH profile attestation and NPI match"},{"isRequired":true,"title":"Payer application packets submitted","id":"chk-3","category":"Portal","completedBy":"Administrator","completedDate":"2026-09-06","isCompleted":true},{"isRequired":true,"completedBy":"Administrator","completedDate":"2026-09-06","isCompleted":true,"title":"Payer committee credentialing approval","category":"Administrative","id":"chk-4"},{"completedDate":"2026-09-06","isCompleted":true,"category":"Administrative","id":"chk-5","completedBy":"Administrator","isRequired":true,"title":"Provider linking to group TIN and location"},{"completedBy":"Administrator","completedDate":"2026-09-06","title":"Effective date confirmation and billing release","isCompleted":true,"category":"Administrative","id":"chk-6","isRequired":true}],"providerId":"prv-954093","documentsCompleteDate":"2026-09-06","daysInCurrentStage":0,"auditTrail":[{"notes":"Directly verified and approved by Administrator Administrator. Reference: ADMIN-APPR-7607","newValue":"Linked","id":"aud-1788700977606","previousValue":"Application Submitted","timestamp":"9/6/2026, 6:52:57 PM","userId":"acc-admin-clean","userName":"Administrator","action":"Admin Verified & Approved Application"},{"timestamp":"2026-09-06T13:22:34.094Z","notes":"Application APP-2026-4951 initiated with 3 payers, linked to Employee emp-prv-954093 and Clinical Staff cs-prv-954093.","id":"aud-1788700954094","userName":"Administrator","action":"Credentialing Application Created","userId":"acc-admin-clean"}],"discipline":"ABA","applicationType":"New provider credentialing","employeeId":"emp-prv-954093","updatedAt":"2026-09-06","followUps":[],"isOverdue":false,"targetTurnaroundDate":"2026-12-03","commentIds":["com-APP-2026-4951-1"],"isolatedFor":"admin@example.com","notes":"Credentialing initiated for Marcus Vance. Associated with 3 payers, 3 document links, and 1 notes.","ownerAccountEmail":"admin@example.com","intakeDate":"2026-09-06","locationId":"loc-3","validationOverridden":{"date":"2026-09-06","reason":"Admin Direct Verification & Approval Sign-off","overriddenBy":"Administrator"},"payerIds":["pyr-aetna","pyr-alameda","pyr-anthem"],"documentLinks":[{"uploadDate":"2026-09-06","name":"California State BCBA License Certificate","url":"https://dca.ca.gov/verify/license/LBA-CA-94821.pdf","type":"State License","id":"doc-APP-2026-4951-1"},{"id":"doc-APP-2026-4951-2","name":"BACB Board Certification Verification (Cert #1-21-48902)","url":"https://bacb.com/verify/certs/1-21-48902.pdf","uploadDate":"2026-09-06","type":"Board Certification"},{"uploadDate":"2026-09-06","url":"https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf","id":"doc-APP-2026-4951-3","type":"Malpractice Insurance","name":"Professional Malpractice Liability Certificate (COI $1M/$3M)"}],"documentsRequestedDate":"2026-09-06","submissionDate":"2026-09-06","assignedSpecialistId":"acc-admin-clean","documentsReceivedDate":"2026-09-06","validationIssues":[],"documentIds":["doc-APP-2026-4951-1","doc-APP-2026-4951-2","doc-APP-2026-4951-3"],"payerId":"pyr-aetna","applicationId":"APP-2026-4951","approvalDate":"2026-09-06","stage":"Linked","comments":[{"applicationId":"APP-2026-4951","authorRole":"System Administrator","id":"com-APP-2026-4951-1","timestamp":"2026-09-06T13:21:13.407Z","dateCreated":"September 6, 2026","authorId":"acc-admin-clean","timeCreated":"9:30 AM","providerId":"prv-954093","authorName":"Administrator","commentText":"Initial application intake initiated. Baseline CAQH credentials verified and NPI match confirmed."}],"clinicalStaffId":"cs-prv-954093","totalCycleDays":0,"paveTrackingNumber":"PAVE-206032","entityId":"ent-1","assignedSpecialistName":"Administrator","isDemo":true,"linkEffectiveDate":"2026-09-06","linkingStatus":"Linked","effectiveDate":"2026-09-06","documents":[{"verifiedBy":"Administrator","uploadDate":"2026-09-06","expirationDate":"2028-10-31","documentUrl":"https://dca.ca.gov/verify/license/LBA-CA-94821.pdf","providerId":"prv-954093","type":"State License","verificationStatus":"Verified","id":"doc-APP-2026-4951-1","name":"California State BCBA License Certificate","fileSize":"1.2 MB","fileName":"California State BCBA License Certificate.pdf","verifiedDate":"2026-09-06"},{"providerId":"prv-954093","fileSize":"1.2 MB","fileName":"BACB Board Certification Verification (Cert #1-21-48902).pdf","type":"Board Certification","uploadDate":"2026-09-06","verifiedBy":"Administrator","verifiedDate":"2026-09-06","name":"BACB Board Certification Verification (Cert #1-21-48902)","verificationStatus":"Verified","expirationDate":"2027-08-31","documentUrl":"https://bacb.com/verify/certs/1-21-48902.pdf","id":"doc-APP-2026-4951-2"},{"providerId":"prv-954093","uploadDate":"2026-09-06","type":"Malpractice Insurance","verifiedBy":"Administrator","verificationStatus":"Verified","verifiedDate":"2026-09-06","name":"Professional Malpractice Liability Certificate (COI $1M/$3M)","fileSize":"1.2 MB","fileName":"Professional Malpractice Liability Certificate (COI $1M/$3M).pdf","expirationDate":"2027-06-30","documentUrl":"https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf","id":"doc-APP-2026-4951-3"}]}'::jsonb)
+ON CONFLICT (id) DO UPDATE SET stage = EXCLUDED.stage, status = EXCLUDED.status, updated_at = NOW();
+
+-- Notifications (6)
+INSERT INTO public.system_notifications (id, type, title, message, severity, record_id, provider_id, is_read)
+VALUES ('notif-1', 'OVERDUE_FOLLOWUP', 'SLA Breach: Overdue Follow-up for Utah Medicaid', 'Application APP-2026-0005 for Kaitlyn Zimmerman (BCBA) has an overdue follow-up since August 20, 2026.', 'error', 'APP-2026-0005', 'prv-4', false)
+ON CONFLICT (id) DO UPDATE SET is_read = EXCLUDED.is_read;
+
+INSERT INTO public.system_notifications (id, type, title, message, severity, record_id, provider_id, is_read)
+VALUES ('notif-1788608145700', 'MISSING_DOCS', 'Provider Added: New Clinical Staff', 'BCBA (ABA) registered in Master Directory.', 'info', NULL, 'prv-1788608145700', false)
+ON CONFLICT (id) DO UPDATE SET is_read = EXCLUDED.is_read;
+
+INSERT INTO public.system_notifications (id, type, title, message, severity, record_id, provider_id, is_read)
+VALUES ('notif-2', 'LINKING_PENDING', 'Provider Approved: Linking Pending with Alameda Alliance', 'Maya Patel (SLP) was approved by Alameda Alliance on 07/28/2026. Provider linking to group is still pending completion.', 'warning', 'APP-2026-0002', 'prv-2', false)
+ON CONFLICT (id) DO UPDATE SET is_read = EXCLUDED.is_read;
+
+INSERT INTO public.system_notifications (id, type, title, message, severity, record_id, provider_id, is_read)
+VALUES ('notif-3', 'CAQH_ATTESTATION', 'CAQH Re-attestation Due: Maya Patel', 'CAQH profile #19920144 requires immediate re-attestation to prevent credentialing interruption.', 'warning', NULL, 'prv-2', false)
+ON CONFLICT (id) DO UPDATE SET is_read = EXCLUDED.is_read;
+
+INSERT INTO public.system_notifications (id, type, title, message, severity, record_id, provider_id, is_read)
+VALUES ('notif-4', 'LICENSE_EXPIRING', 'Urgent License Expiry: Derrick Sterling, OTR/L', 'California license OTR-CA-7721 expires on September 15, 2026 (in 20 days).', 'error', NULL, 'prv-6', false)
+ON CONFLICT (id) DO UPDATE SET is_read = EXCLUDED.is_read;
+
+INSERT INTO public.system_notifications (id, type, title, message, severity, record_id, provider_id, is_read)
+VALUES ('notif-5', 'PAVE_ACTION', 'Additional Documentation Requested by DHCS / SCFHP', 'SCFHP has requested supplemental lease documentation for Lucas Moreno (OT).', 'info', 'APP-2026-0003', 'prv-3', true)
+ON CONFLICT (id) DO UPDATE SET is_read = EXCLUDED.is_read;
+
+SET session_replication_role = 'origin';

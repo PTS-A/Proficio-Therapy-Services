@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { isSuperAdmin } from '../utils/rbac';
 import {
-  AccessLevel,
   AppAccount,
   ApplicationType,
   AuditEntry,
@@ -23,7 +22,6 @@ import {
   ProviderCommentLog,
   SavedFilter,
   SLAItem,
-  StageCategory,
   StageConfig,
   SystemNotification,
   User,
@@ -32,7 +30,6 @@ import {
   ClinicalStaff,
   ApplicationDocument,
   ApplicationComment,
-  CredentialingApplication,
 } from '../types';
 import {
   DEFAULT_STAGE_CONFIGS,
@@ -58,8 +55,18 @@ import {
   fetchCollection, 
   saveDocument, 
   deleteDocument, 
-  saveBatch 
-} from '../lib/firebase';
+  saveBatch,
+  subscribeToCollection,
+  subscribeToSyncStatus,
+  drainMutationQueue,
+} from '../lib/databaseBridge';
+import { initiateGoogleSignIn, checkForPendingOAuth } from '../services/authService';
+import { supabase } from '../lib/supabase';
+import { 
+  HolidayItem, 
+  NotificationTemplate, 
+  SystemSettings 
+} from '../types';
 
 interface FilterState {
   searchQuery: string;
@@ -100,7 +107,16 @@ interface CredentialingContextType {
   currentAccount: AppAccount | null;
   isAdmin: boolean;
   isSuperAdminUser: boolean;
+  isAuthenticatingOAuth?: boolean;
   login: (email: string, password?: string) => { success: boolean; error?: string };
+  loginWithGoogle: (emailOverride?: string, preferredFlow?: 'popup' | 'redirect') => Promise<{
+    success: boolean;
+    error?: string;
+    step?: number;
+    stepName?: string;
+    code?: string;
+    account?: AppAccount;
+  }>;
   logout: (reason?: string) => void;
   changePassword: (newPassword: string) => { success: boolean; error?: string };
   sessionTimeoutMessage: string | null;
@@ -188,7 +204,9 @@ interface CredentialingContextType {
     // Provider Profile Updates to persist
     providerUpdates?: Partial<Provider>;
   }) => CredentialingRecord;
+  addRecord: (data: Parameters<CredentialingContextType['createRecord']>[0]) => CredentialingRecord;
   updateRecord: (id: string, updates: Partial<CredentialingRecord>) => void;
+  deleteRecord: (id: string) => { success: boolean; error?: string };
   advanceRecordStage: (
     recordId: string, 
     newStage: CredentialingStage, 
@@ -215,10 +233,12 @@ interface CredentialingContextType {
   // Payer CRUD
   addPayer: (payerData: Omit<Payer, 'id'>) => Payer;
   updatePayer: (id: string, updates: Partial<Payer>) => void;
+  deletePayer: (id: string) => { success: boolean; error?: string };
 
   // Entity & Location CRUD
   addEntity: (entityData: Omit<LegalEntity, 'id'>) => LegalEntity;
   updateEntity: (id: string, updates: Partial<LegalEntity>) => void;
+  deleteEntity: (id: string) => { success: boolean; error?: string };
   addLocation: (locData: Omit<Location, 'id'>) => Location;
   updateLocation: (id: string, updates: Partial<Location>) => void;
   deleteLocation: (id: string) => { success: boolean; error?: string };
@@ -251,8 +271,10 @@ interface CredentialingContextType {
   // Employee & Clinical Staff operations
   addEmployee: (empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => Employee;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
+  deleteEmployee: (id: string) => void;
   addClinicalStaff: (staffData: Omit<ClinicalStaff, 'id' | 'createdAt' | 'updatedAt'>) => ClinicalStaff;
   updateClinicalStaff: (id: string, updates: Partial<ClinicalStaff>) => void;
+  deleteClinicalStaff: (id: string) => void;
 
   // Comments & Documents operations
   addApplicationComment: (comment: { applicationId: string; providerId?: string; commentText: string }) => ApplicationComment;
@@ -272,10 +294,73 @@ interface CredentialingContextType {
     comments: { commentText: string; authorName: string; dateCreated: string; timeCreated: string; timestamp: string }[];
   }) => Promise<{ success: boolean; applicationId: string; record: CredentialingRecord; error?: string }>;
 
+  // System Configuration & Settings
+  systemSettings: SystemSettings;
+  updateSystemSettings: (updates: Partial<SystemSettings>) => void;
+  holidays: HolidayItem[];
+  updateHolidays: (holidays: HolidayItem[]) => void;
+  emailTemplates: NotificationTemplate[];
+  updateEmailTemplates: (templates: NotificationTemplate[]) => void;
+
   // System Tools
   resetToDefaultData: () => void;
   importBulkData: (importedRecords: CredentialingRecord[], importedProviders?: Provider[], importedPayers?: Payer[], importedLocations?: Location[]) => void;
 }
+
+const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
+  slaSubmissionDays: 5,
+  slaFollowUpMinDays: 7,
+  slaFollowUpMaxDays: 10,
+  caqhReattestationDays: 120,
+  licenseExpAdvanceAlertDays: 60,
+  autoReminderPayerAging: true,
+  autoEscalateOverdueFollowup: true,
+  enableDailySummaryEmail: false,
+  nppesAutoValidation: true,
+};
+
+const DEFAULT_HOLIDAYS: HolidayItem[] = [
+  { id: 'HOL-1', name: "New Year's Day", date: '2026-01-01', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-2', name: 'Martin Luther King Jr. Day', date: '2026-01-19', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-3', name: "Presidents' Day", date: '2026-02-16', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-4', name: 'Memorial Day', date: '2026-05-25', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-5', name: 'Juneteenth National Independence Day', date: '2026-06-19', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-6', name: 'Independence Day', date: '2026-07-04', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-7', name: 'Labor Day', date: '2026-09-07', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-8', name: 'Thanksgiving Day', date: '2026-11-26', affectsSla: true, type: 'Federal' },
+  { id: 'HOL-9', name: 'Day After Thanksgiving', date: '2026-11-27', affectsSla: true, type: 'Corporate' },
+  { id: 'HOL-10', name: 'Christmas Day', date: '2026-12-25', affectsSla: true, type: 'Federal' },
+];
+
+const DEFAULT_TEMPLATES: NotificationTemplate[] = [
+  {
+    id: 'TMPL-01',
+    name: 'License 60-Day Advance Warning',
+    triggerEvent: 'Clinician license expires in ≤ 60 calendar days',
+    subject: 'URGENT: Credentialing License Renewal Notice - {provider_name}',
+    recipientRoles: ['Credentialing Specialist', 'Provider (Clinician)', 'Human Resources (HR)'],
+    bodyTemplate: 'Dear {provider_name},\n\nYour {license_type} license ({license_number}) under state {license_state} is scheduled to expire on {expiration_date}. To prevent clinical credentialing suspension or payer billing hold, please submit renewal documentation immediately to the credentialing team.\n\nThank you,\nAges / Proficio Credentialing Department',
+    isActive: true
+  },
+  {
+    id: 'TMPL-02',
+    name: 'Overdue Follow-up & Aging Escalation',
+    triggerEvent: 'Application pending payer determination ≥ 60 days or follow-up overdue',
+    subject: 'ACTION REQUIRED: Escalated Credentialing Application Aging ({payer_name}) - {provider_name}',
+    recipientRoles: ['Credentialing Manager', 'Leadership / Executive', 'Credentialing Specialist'],
+    bodyTemplate: 'Attention Credentialing Leadership,\n\nApplication {application_id} for {provider_name} with {payer_name} has exceeded SLA benchmarks ({days_in_process} days elapsed). Last logged contact with payer representative was on {last_follow_up_date}.\n\nPlease review escalation notes and initiate supervisor outreach.',
+    isActive: true
+  },
+  {
+    id: 'TMPL-03',
+    name: 'Payer Approval & Effective Date Broadcast',
+    triggerEvent: 'Payer status updated to Approved with Effective Date',
+    subject: 'CREDENTIALING APPROVED: {provider_name} is now in-network with {payer_name}',
+    recipientRoles: ['Billing and Claims', 'HR / Operations', 'Credentialing Specialist', 'Provider (Clinician)'],
+    bodyTemplate: 'Great news! {provider_name} has been formally approved and linked under {entity_name} for {payer_name}.\n\nEffective Date: {effective_date}\nProvider Rendering NPI: {npi}\nBilling Hold: RELEASED (Ready to bill claims)',
+    isActive: true
+  }
+];
 
 const CredentialingContext = createContext<CredentialingContextType | undefined>(undefined);
 
@@ -321,16 +406,38 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number>(20 * 60);
   const lastActivityRef = React.useRef<number>(Date.now());
 
+  // Track if page is actively processing incoming OAuth redirect parameters
+  const [isAuthenticatingOAuth, setIsAuthenticatingOAuth] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      return Boolean(
+        url.searchParams.get('auth_email') ||
+        url.searchParams.get('code') ||
+        url.searchParams.get('access_token') ||
+        window.location.hash.includes('access_token')
+      );
+    }
+    return false;
+  });
+
   // Default page is the login page (currentAccount is null by default on fresh visit/timeout)
   const [currentAccount, setCurrentAccount] = useState<AppAccount | null>(() => {
     const saved = localStorage.getItem('cred_current_account');
     const lastActiveStr = localStorage.getItem('cred_last_activity');
-    if (saved && lastActiveStr) {
+    if (saved) {
       try {
-        const lastActive = parseInt(lastActiveStr, 10);
-        const elapsed = Date.now() - lastActive;
-        if (!isNaN(lastActive) && elapsed < SESSION_TIMEOUT_MS) {
-          return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.email) {
+          if (lastActiveStr) {
+            const lastActive = parseInt(lastActiveStr, 10);
+            const elapsed = Date.now() - lastActive;
+            if (!isNaN(lastActive) && elapsed < SESSION_TIMEOUT_MS) {
+              return parsed;
+            }
+          } else {
+            localStorage.setItem('cred_last_activity', String(Date.now()));
+            return parsed;
+          }
         }
       } catch (e) {
         return null;
@@ -341,23 +448,35 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [providers, setProviders] = useState<Provider[]>(() => {
+    const savedAccount = localStorage.getItem('cred_current_account');
+    let isAdminAccount = false;
+    try {
+      if (savedAccount) {
+        isAdminAccount = JSON.parse(savedAccount)?.email?.toLowerCase() === 'admin@example.com';
+      }
+    } catch {}
+
+    if (isAdminAccount) {
+      const saved = localStorage.getItem('cred_demo_providers');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+      return INITIAL_PROVIDERS;
+    }
+
     const saved = localStorage.getItem('cred_providers');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((p: Provider) => {
-            const initMatch = INITIAL_PROVIDERS.find((ip) => ip.id === p.id);
-            return {
-              ...p,
-              commentLogs: (p.commentLogs && p.commentLogs.length > 0) ? p.commentLogs : (initMatch?.commentLogs || []),
-              documents: (p.documents && p.documents.length > 0) ? p.documents : (initMatch?.documents || []),
-            };
-          });
+        if (Array.isArray(parsed)) {
+          return parsed.filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com');
         }
-      } catch (e) {}
+      } catch {}
     }
-    return INITIAL_PROVIDERS;
+    return [];
   });
 
   const [payers, setPayers] = useState<Payer[]>(() => {
@@ -402,14 +521,35 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [records, setRecords] = useState<CredentialingRecord[]>(() => {
+    const savedAccount = localStorage.getItem('cred_current_account');
+    let isAdminAccount = false;
+    try {
+      if (savedAccount) {
+        isAdminAccount = JSON.parse(savedAccount)?.email?.toLowerCase() === 'admin@example.com';
+      }
+    } catch {}
+
+    if (isAdminAccount) {
+      const saved = localStorage.getItem('cred_demo_records');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+      return INITIAL_CREDENTIALING_RECORDS;
+    }
+
     const saved = localStorage.getItem('cred_records');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {}
+        if (Array.isArray(parsed)) {
+          return parsed.filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com');
+        }
+      } catch {}
     }
-    return INITIAL_CREDENTIALING_RECORDS;
+    return [];
   });
 
   // Dedicated Database Collections (Section 5)
@@ -447,14 +587,28 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [clinicalStaff, setClinicalStaff] = useState<ClinicalStaff[]>(() => {
+    const savedAccount = localStorage.getItem('cred_current_account');
+    let isAdminAccount = false;
+    try {
+      if (savedAccount) {
+        isAdminAccount = JSON.parse(savedAccount)?.email?.toLowerCase() === 'admin@example.com';
+      }
+    } catch {}
+
+    if (isAdminAccount) {
+      return INITIAL_CLINICAL_STAFF;
+    }
+
     const saved = localStorage.getItem('cred_clinical_staff');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com');
+        }
       } catch (e) {}
     }
-    return INITIAL_CLINICAL_STAFF;
+    return [];
   });
 
   const [documentsList, setDocumentsList] = useState<ApplicationDocument[]>(() => {
@@ -462,10 +616,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return INITIAL_APPLICATION_DOCUMENTS;
+    return [];
   });
 
   const [commentsList, setCommentsList] = useState<ApplicationComment[]>(() => {
@@ -473,10 +627,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return INITIAL_APPLICATION_COMMENTS;
+    return [];
   });
 
   const [users] = useState<User[]>(INITIAL_USERS);
@@ -538,12 +692,53 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     currentAccount?.systemRole === 'System Administrator' ||
     currentAccount?.systemRole === 'Credentialing Lead / Manager';
 
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('syncing');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
 
-  // Google Cloud Firestore Synchronization
+  // System Configuration State
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
+    const saved = localStorage.getItem('cred_system_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return DEFAULT_SYSTEM_SETTINGS;
+  });
+
+  const [holidays, setHolidays] = useState<HolidayItem[]>(() => {
+    const saved = localStorage.getItem('cred_system_holidays');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_HOLIDAYS;
+  });
+
+  const [emailTemplates, setEmailTemplates] = useState<NotificationTemplate[]>(() => {
+    const saved = localStorage.getItem('cred_system_templates');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_TEMPLATES;
+  });
+
+  // Subscribe to SyncEngine status updates
+  useEffect(() => {
+    return subscribeToSyncStatus((status) => {
+      setCloudSyncStatus(status);
+    });
+  }, []);
+
+  // Hydration & initial drain from Google Cloud Firestore
   const refreshFromCloud = async () => {
     try {
       setCloudSyncStatus('syncing');
+      await drainMutationQueue();
       const isOnline = await testConnection();
       if (!isOnline) {
         setCloudSyncStatus('offline');
@@ -551,6 +746,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // Fetch all collections in parallel from Google Cloud Firestore
+      const savedAccountStr = localStorage.getItem('cred_current_account');
+      let activeEmail = '';
+      try {
+        if (savedAccountStr) activeEmail = JSON.parse(savedAccountStr)?.email?.toLowerCase() || '';
+      } catch {}
+      const isAdminActive = activeEmail === 'admin@example.com';
+
       const [
         cloudAccounts,
         cloudProviders,
@@ -565,6 +767,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         cloudDocuments,
         cloudComments,
         cloudDemoEmployees,
+        cloudDemoProviders,
+        cloudDemoRecords,
+        cloudDemoClinicalStaff,
+        cloudConfigs,
       ] = await Promise.all([
         fetchCollection<AppAccount>('users').catch(() => []),
         fetchCollection<Provider>('providers').catch(() => []),
@@ -578,7 +784,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         fetchCollection<ClinicalStaff>('clinical_staff').catch(() => []),
         fetchCollection<ApplicationDocument>('documents').catch(() => []),
         fetchCollection<ApplicationComment>('comments').catch(() => []),
-        fetchCollection<Employee>('demo_employees').catch(() => []),
+        isAdminActive ? fetchCollection<Employee>('demo_employees').catch(() => []) : Promise.resolve([]),
+        isAdminActive ? fetchCollection<Provider>('demo_providers').catch(() => []) : Promise.resolve([]),
+        isAdminActive ? fetchCollection<CredentialingRecord>('demo_records').catch(() => []) : Promise.resolve([]),
+        isAdminActive ? fetchCollection<ClinicalStaff>('demo_clinical_staff').catch(() => []) : Promise.resolve([]),
+        fetchCollection<any>('system_config').catch(() => []),
       ]);
 
       // Seed if empty or populate state
@@ -588,23 +798,57 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         setAccounts(INITIAL_ACCOUNTS);
       } else {
         let merged = [...cloudAccounts];
-        let hasNewRole = false;
         INITIAL_ACCOUNTS.forEach((initAcc) => {
           const idx = merged.findIndex((a) => a.email.toLowerCase() === initAcc.email.toLowerCase());
           if (idx === -1) {
             merged.push(initAcc);
             saveDocument('users', initAcc.id, initAcc).catch(console.error);
-            hasNewRole = true;
           }
         });
         setAccounts(merged);
       }
 
-      if (!cloudProviders || cloudProviders.length === 0) {
-        await saveBatch('providers', INITIAL_PROVIDERS);
-        setProviders(INITIAL_PROVIDERS);
+      if (isAdminActive) {
+        // Admin account: load isolated demo collections
+        if (!cloudDemoProviders || cloudDemoProviders.length === 0) {
+          await saveBatch('demo_providers', INITIAL_PROVIDERS);
+          setProviders(INITIAL_PROVIDERS);
+        } else {
+          setProviders(cloudDemoProviders);
+        }
+
+        if (!cloudDemoRecords || cloudDemoRecords.length === 0) {
+          await saveBatch('demo_records', INITIAL_CREDENTIALING_RECORDS);
+          setRecords(INITIAL_CREDENTIALING_RECORDS);
+        } else {
+          setRecords(cloudDemoRecords);
+        }
+
+        if (!cloudDemoClinicalStaff || cloudDemoClinicalStaff.length === 0) {
+          await saveBatch('demo_clinical_staff', INITIAL_CLINICAL_STAFF);
+          setClinicalStaff(INITIAL_CLINICAL_STAFF);
+        } else {
+          setClinicalStaff(cloudDemoClinicalStaff);
+        }
+
+        if (!cloudDemoEmployees || cloudDemoEmployees.length === 0) {
+          await saveBatch('demo_employees', DEMO_EMPLOYEES);
+          setDemoEmployees(DEMO_EMPLOYEES);
+        } else {
+          setDemoEmployees(cloudDemoEmployees);
+        }
       } else {
-        setProviders(cloudProviders);
+        // Normal accounts: Strictly clean production datasets. NEVER seed demo data.
+        const cleanProviders = (cloudProviders || []).filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com');
+        setProviders(cleanProviders);
+
+        const cleanRecords = (cloudRecords || []).filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com');
+        setRecords(cleanRecords);
+
+        const cleanStaff = (cloudClinicalStaff || []).filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com');
+        setClinicalStaff(cleanStaff);
+
+        setDemoEmployees([]);
       }
 
       if (!cloudPayers || cloudPayers.length === 0) {
@@ -628,13 +872,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         setLocations(cloudLocations);
       }
 
-      if (!cloudRecords || cloudRecords.length === 0) {
-        await saveBatch('records', INITIAL_CREDENTIALING_RECORDS);
-        setRecords(INITIAL_CREDENTIALING_RECORDS);
-      } else {
-        setRecords(cloudRecords);
-      }
-
       if (!cloudNotifications || cloudNotifications.length === 0) {
         await saveBatch('notifications', INITIAL_NOTIFICATIONS);
         setNotifications(INITIAL_NOTIFICATIONS);
@@ -653,293 +890,314 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const sanitizedProductionEmployees = (cloudEmployees || []).filter((e) => !isDemoEmployee(e));
       setEmployees(sanitizedProductionEmployees);
 
-      // Isolated Demo Employees collection: Only accessible if active account is admin@example.com
-      const savedAccountStr = localStorage.getItem('cred_current_account');
-      let activeEmail = '';
-      try {
-        if (savedAccountStr) activeEmail = JSON.parse(savedAccountStr)?.email?.toLowerCase() || '';
-      } catch {}
+      setDocumentsList(cloudDocuments || []);
+      setCommentsList(cloudComments || []);
 
-      if (activeEmail === 'admin@example.com') {
-        if (!cloudDemoEmployees || cloudDemoEmployees.length === 0) {
-          await saveBatch('demo_employees', DEMO_EMPLOYEES);
-          setDemoEmployees(DEMO_EMPLOYEES);
+      // System config: settings, holidays, templates
+      if (cloudConfigs && cloudConfigs.length > 0) {
+        const settingsDoc = cloudConfigs.find((c: any) => c.id === 'settings');
+        if (settingsDoc) {
+          const { id, ...rest } = settingsDoc;
+          setSystemSettings(rest as SystemSettings);
         } else {
-          setDemoEmployees(cloudDemoEmployees);
+          saveDocument('system_config', 'settings', { id: 'settings', ...DEFAULT_SYSTEM_SETTINGS }).catch(console.error);
+        }
+
+        const holidaysDoc = cloudConfigs.find((c: any) => c.id === 'holidays');
+        if (holidaysDoc && Array.isArray(holidaysDoc.items)) {
+          setHolidays(holidaysDoc.items);
+        } else {
+          saveDocument('system_config', 'holidays', { id: 'holidays', items: DEFAULT_HOLIDAYS }).catch(console.error);
+        }
+
+        const templatesDoc = cloudConfigs.find((c: any) => c.id === 'templates');
+        if (templatesDoc && Array.isArray(templatesDoc.items)) {
+          setEmailTemplates(templatesDoc.items);
+        } else {
+          saveDocument('system_config', 'templates', { id: 'templates', items: DEFAULT_TEMPLATES }).catch(console.error);
         }
       } else {
-        setDemoEmployees([]);
-      }
-
-      if (!cloudClinicalStaff || cloudClinicalStaff.length === 0) {
-        await saveBatch('clinical_staff', INITIAL_CLINICAL_STAFF);
-        setClinicalStaff(INITIAL_CLINICAL_STAFF);
-      } else {
-        setClinicalStaff(cloudClinicalStaff);
-      }
-
-      if (!cloudDocuments || cloudDocuments.length === 0) {
-        await saveBatch('documents', INITIAL_APPLICATION_DOCUMENTS);
-        setDocumentsList(INITIAL_APPLICATION_DOCUMENTS);
-      } else {
-        setDocumentsList(cloudDocuments);
-      }
-
-      if (!cloudComments || cloudComments.length === 0) {
-        await saveBatch('comments', INITIAL_APPLICATION_COMMENTS);
-        setCommentsList(INITIAL_APPLICATION_COMMENTS);
-      } else {
-        setCommentsList(cloudComments);
+        await Promise.all([
+          saveDocument('system_config', 'settings', { id: 'settings', ...DEFAULT_SYSTEM_SETTINGS }),
+          saveDocument('system_config', 'holidays', { id: 'holidays', items: DEFAULT_HOLIDAYS }),
+          saveDocument('system_config', 'templates', { id: 'templates', items: DEFAULT_TEMPLATES }),
+        ]);
       }
 
       setCloudSyncStatus('synced');
-      initialLoadDoneRef.current = true;
-      dirtyCollectionsRef.current.clear();
-      console.log('[Cloud Database] Hydration complete. 10-minute automated sync active.');
+      console.log('[Cloud Database] Hydration complete. Automatic real-time database synchronization active.');
     } catch (err) {
       console.error('[Cloud Database] Error syncing from Firestore:', err);
       setCloudSyncStatus('offline');
-      initialLoadDoneRef.current = true;
     }
   };
 
-  // State refs to guarantee fresh data inside the 10-minute interval callback
-  const accountsRef = useRef(accounts);
-  accountsRef.current = accounts;
-  const providersRef = useRef(providers);
-  providersRef.current = providers;
-  const payersRef = useRef(payers);
-  payersRef.current = payers;
-  const entitiesRef = useRef(entities);
-  entitiesRef.current = entities;
-  const locationsRef = useRef(locations);
-  locationsRef.current = locations;
-  const recordsRef = useRef(records);
-  recordsRef.current = records;
-  const notificationsRef = useRef(notifications);
-  notificationsRef.current = notifications;
-  const stageConfigsRef = useRef(stageConfigs);
-  stageConfigsRef.current = stageConfigs;
-  const employeesRef = useRef(employees);
-  employeesRef.current = employees;
-  const demoEmployeesRef = useRef(demoEmployees);
-  demoEmployeesRef.current = demoEmployees;
-  const currentAccountRef = useRef(currentAccount);
-  currentAccountRef.current = currentAccount;
-  const clinicalStaffRef = useRef(clinicalStaff);
-  clinicalStaffRef.current = clinicalStaff;
-  const documentsListRef = useRef(documentsList);
-  documentsListRef.current = documentsList;
-  const commentsListRef = useRef(commentsList);
-  commentsListRef.current = commentsList;
-
-  // Track modified collections that need syncing to Google Cloud
-  const dirtyCollectionsRef = useRef<Set<string>>(new Set());
-  const initialLoadDoneRef = useRef<boolean>(false);
-
-  const markDirty = (collection: string) => {
-    if (initialLoadDoneRef.current) {
-      dirtyCollectionsRef.current.add(collection);
-    }
-  };
-
-  // Automated 10-minute Interval Sync
-  const TEN_MINUTES_MS = 10 * 60 * 1000; // 600,000 ms
-
-  const syncChangesToCloud = async () => {
-    if (dirtyCollectionsRef.current.size === 0) {
-      console.log('[Cloud Database Auto-Sync] 10-minute interval: All data is in sync. No local modifications pending.');
-      return;
-    }
-
-    const modified = Array.from(dirtyCollectionsRef.current);
-    console.log(`[Cloud Database Auto-Sync] 10-minute interval reached. Syncing modified collections: ${modified.join(', ')}...`);
-    setCloudSyncStatus('syncing');
-
-    try {
-      const syncTasks: Promise<any>[] = [];
-
-      if (dirtyCollectionsRef.current.has('users')) {
-        syncTasks.push(saveBatch('users', accountsRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('providers')) {
-        syncTasks.push(saveBatch('providers', providersRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('payers')) {
-        syncTasks.push(saveBatch('payers', payersRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('entities')) {
-        syncTasks.push(saveBatch('entities', entitiesRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('locations')) {
-        syncTasks.push(saveBatch('locations', locationsRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('records')) {
-        syncTasks.push(saveBatch('records', recordsRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('notifications')) {
-        syncTasks.push(saveBatch('notifications', notificationsRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('stage_configs')) {
-        syncTasks.push(saveBatch('stage_configs', stageConfigsRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('employees')) {
-        const realEmployeesOnly = employeesRef.current.filter((e) => !isDemoEmployee(e));
-        syncTasks.push(saveBatch('employees', realEmployeesOnly));
-      }
-      if (dirtyCollectionsRef.current.has('demo_employees') && currentAccountRef.current?.email?.toLowerCase() === 'admin@example.com') {
-        syncTasks.push(saveBatch('demo_employees', demoEmployeesRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('clinical_staff')) {
-        syncTasks.push(saveBatch('clinical_staff', clinicalStaffRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('documents')) {
-        syncTasks.push(saveBatch('documents', documentsListRef.current));
-      }
-      if (dirtyCollectionsRef.current.has('comments')) {
-        syncTasks.push(saveBatch('comments', commentsListRef.current));
-      }
-
-      await Promise.all(syncTasks);
-      dirtyCollectionsRef.current.clear();
-      setCloudSyncStatus('synced');
-      console.log('[Cloud Database Auto-Sync] 10-minute sync completed successfully.');
-    } catch (err) {
-      console.error('[Cloud Database Auto-Sync] 10-minute interval sync error:', err);
-      setCloudSyncStatus('error');
-    }
-  };
-
-  // Immediate full sync to cloud
-  const syncNow = async () => {
-    setCloudSyncStatus('syncing');
-    try {
-      await Promise.all([
-        saveBatch('users', accountsRef.current),
-        saveBatch('providers', providersRef.current),
-        saveBatch('payers', payersRef.current),
-        saveBatch('entities', entitiesRef.current),
-        saveBatch('locations', locationsRef.current),
-        saveBatch('records', recordsRef.current),
-        saveBatch('notifications', notificationsRef.current),
-        saveBatch('stage_configs', stageConfigsRef.current),
-        saveBatch('employees', employeesRef.current.filter((e) => !isDemoEmployee(e))),
-        saveBatch('clinical_staff', clinicalStaffRef.current),
-        saveBatch('documents', documentsListRef.current),
-        saveBatch('comments', commentsListRef.current),
-        ...(currentAccountRef.current?.email?.toLowerCase() === 'admin@example.com'
-          ? [saveBatch('demo_employees', demoEmployeesRef.current)]
-          : []),
-      ]);
-      dirtyCollectionsRef.current.clear();
-      setCloudSyncStatus('synced');
-    } catch (err) {
-      console.error('[Cloud Database Manual Sync] Error:', err);
-      setCloudSyncStatus('error');
-      throw err;
-    }
-  };
-
-  // 10-Minute interval timer for automated background syncing
+  // Real-time continuous live subscriptions to Firestore collections
   useEffect(() => {
-    const timer = setInterval(() => {
-      syncChangesToCloud();
-    }, TEN_MINUTES_MS);
+    const unsubs: (() => void)[] = [];
 
-    return () => clearInterval(timer);
-  }, []);
+    unsubs.push(
+      subscribeToCollection<AppAccount>('users', (cloudUsers) => {
+        if (cloudUsers && cloudUsers.length > 0) {
+          setAccounts((prev) => {
+            const map = new Map(prev.map((a) => [a.id, a]));
+            cloudUsers.forEach((u) => map.set(u.id, u));
+            return Array.from(map.values());
+          });
+        }
+      })
+    );
 
-  // Flush any pending changes when tab or window is closing
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (dirtyCollectionsRef.current.size > 0) {
-        syncChangesToCloud();
-      }
+    unsubs.push(
+      subscribeToCollection<Provider>('providers', (cloudProviders) => {
+        const savedAccountStr = localStorage.getItem('cred_current_account');
+        const isAdmin = savedAccountStr?.includes('admin@example.com');
+        if (!isAdmin) {
+          setProviders((cloudProviders || []).filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com'));
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<Provider>('demo_providers', (cloudDemoProviders) => {
+        const savedAccountStr = localStorage.getItem('cred_current_account');
+        const isAdmin = savedAccountStr?.includes('admin@example.com');
+        if (isAdmin && cloudDemoProviders && cloudDemoProviders.length > 0) {
+          setProviders(cloudDemoProviders);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<Payer>('payers', (cloudPayers) => {
+        if (cloudPayers && cloudPayers.length > 0) {
+          setPayers(cloudPayers);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<LegalEntity>('entities', (cloudEntities) => {
+        if (cloudEntities && cloudEntities.length > 0) {
+          setEntities(cloudEntities);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<Location>('locations', (cloudLocations) => {
+        if (cloudLocations && cloudLocations.length > 0) {
+          setLocations(cloudLocations);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<CredentialingRecord>('records', (cloudRecords) => {
+        const savedAccountStr = localStorage.getItem('cred_current_account');
+        const isAdmin = savedAccountStr?.includes('admin@example.com');
+        if (!isAdmin) {
+          setRecords((cloudRecords || []).filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com'));
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<CredentialingRecord>('demo_records', (cloudDemoRecords) => {
+        const savedAccountStr = localStorage.getItem('cred_current_account');
+        const isAdmin = savedAccountStr?.includes('admin@example.com');
+        if (isAdmin && cloudDemoRecords && cloudDemoRecords.length > 0) {
+          setRecords(cloudDemoRecords);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<SystemNotification>('notifications', (cloudNotes) => {
+        if (cloudNotes && cloudNotes.length > 0) {
+          setNotifications(cloudNotes);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<StageConfig>('stage_configs', (cloudStages) => {
+        if (cloudStages && cloudStages.length > 0) {
+          setStageConfigs(cloudStages.sort((a, b) => a.order - b.order));
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<Employee>('employees', (cloudEmployees) => {
+        if (cloudEmployees && cloudEmployees.length > 0) {
+          setEmployees(cloudEmployees.filter((e) => !isDemoEmployee(e)));
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<Employee>('demo_employees', (cloudDemoEmployees) => {
+        const savedAccountStr = localStorage.getItem('cred_current_account');
+        const isAdmin = savedAccountStr?.includes('admin@example.com');
+        if (isAdmin && cloudDemoEmployees && cloudDemoEmployees.length > 0) {
+          setDemoEmployees(cloudDemoEmployees);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<ClinicalStaff>('clinical_staff', (cloudStaff) => {
+        const savedAccountStr = localStorage.getItem('cred_current_account');
+        const isAdmin = savedAccountStr?.includes('admin@example.com');
+        if (!isAdmin) {
+          setClinicalStaff((cloudStaff || []).filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com'));
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<ClinicalStaff>('demo_clinical_staff', (cloudDemoStaff) => {
+        const savedAccountStr = localStorage.getItem('cred_current_account');
+        const isAdmin = savedAccountStr?.includes('admin@example.com');
+        if (isAdmin && cloudDemoStaff && cloudDemoStaff.length > 0) {
+          setClinicalStaff(cloudDemoStaff);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<ApplicationDocument>('documents', (cloudDocs) => {
+        if (cloudDocs && cloudDocs.length > 0) {
+          setDocumentsList(cloudDocs);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<ApplicationComment>('comments', (cloudComments) => {
+        if (cloudComments && cloudComments.length > 0) {
+          setCommentsList(cloudComments);
+        }
+      })
+    );
+
+    unsubs.push(
+      subscribeToCollection<any>('system_config', (configs) => {
+        if (configs && configs.length > 0) {
+          configs.forEach((cfg) => {
+            if (cfg.id === 'settings') {
+              const { id, ...rest } = cfg;
+              setSystemSettings(rest as SystemSettings);
+            } else if (cfg.id === 'holidays' && Array.isArray(cfg.items)) {
+              setHolidays(cfg.items);
+            } else if (cfg.id === 'templates' && Array.isArray(cfg.items)) {
+              setEmailTemplates(cfg.items);
+            }
+          });
+        }
+      })
+    );
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
+
+  // System Configuration setters with immediate database persistence
+  const updateSystemSettings = (updates: Partial<SystemSettings>) => {
+    setSystemSettings((prev) => {
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('cred_system_settings', JSON.stringify(updated));
+      saveDocument('system_config', 'settings', { id: 'settings', ...updated }).catch(console.error);
+      return updated;
+    });
+  };
+
+  const updateHolidays = (newHolidays: HolidayItem[]) => {
+    setHolidays(newHolidays);
+    localStorage.setItem('cred_system_holidays', JSON.stringify(newHolidays));
+    saveDocument('system_config', 'holidays', { id: 'holidays', items: newHolidays }).catch(console.error);
+  };
+
+  const updateEmailTemplates = (newTemplates: NotificationTemplate[]) => {
+    setEmailTemplates(newTemplates);
+    localStorage.setItem('cred_system_templates', JSON.stringify(newTemplates));
+    saveDocument('system_config', 'templates', { id: 'templates', items: newTemplates }).catch(console.error);
+  };
+
+  // Immediate full sync to cloud helper
+  const syncNow = async () => {
+    await drainMutationQueue();
+    await refreshFromCloud();
+  };
 
   useEffect(() => {
     refreshFromCloud();
   }, []);
 
+  // Local state cache in localStorage for fast initial render
   useEffect(() => {
     localStorage.setItem('cred_stage_configs', JSON.stringify(stageConfigs));
-    markDirty('stage_configs');
   }, [stageConfigs]);
 
-  // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('cred_accounts', JSON.stringify(accounts));
-    markDirty('users');
   }, [accounts]);
 
   useEffect(() => {
     if (currentAccount) {
       localStorage.setItem('cred_current_account', JSON.stringify(currentAccount));
-    } else {
-      localStorage.removeItem('cred_current_account');
     }
+    // Do NOT wipe cred_current_account when currentAccount is null during mount/re-renders.
+    // Explicit session clearing happens only in logout() or session timeout expiration.
   }, [currentAccount]);
 
   useEffect(() => {
     localStorage.setItem('cred_providers', JSON.stringify(providers));
-    markDirty('providers');
   }, [providers]);
 
   useEffect(() => {
     localStorage.setItem('cred_payers', JSON.stringify(payers));
-    markDirty('payers');
   }, [payers]);
 
   useEffect(() => {
     localStorage.setItem('cred_entities', JSON.stringify(entities));
-    markDirty('entities');
   }, [entities]);
 
   useEffect(() => {
     localStorage.setItem('cred_locations', JSON.stringify(locations));
-    markDirty('locations');
   }, [locations]);
 
   useEffect(() => {
     localStorage.setItem('cred_records', JSON.stringify(records));
-    markDirty('records');
   }, [records]);
 
   useEffect(() => {
     localStorage.setItem('cred_notifications', JSON.stringify(notifications));
-    markDirty('notifications');
   }, [notifications]);
 
   useEffect(() => {
-    // Only save strictly real non-demo employees to cred_employees
     const realEmployeesOnly = employees.filter((e) => !isDemoEmployee(e));
     localStorage.setItem('cred_employees', JSON.stringify(realEmployeesOnly));
-    markDirty('employees');
   }, [employees]);
 
   useEffect(() => {
     if (currentAccount?.email?.toLowerCase() === 'admin@example.com') {
       localStorage.setItem('cred_demo_employees_admin', JSON.stringify(demoEmployees));
-      markDirty('demo_employees');
     }
   }, [demoEmployees, currentAccount]);
 
   useEffect(() => {
     localStorage.setItem('cred_clinical_staff', JSON.stringify(clinicalStaff));
-    markDirty('clinical_staff');
   }, [clinicalStaff]);
 
   useEffect(() => {
     localStorage.setItem('cred_documents', JSON.stringify(documentsList));
-    markDirty('documents');
   }, [documentsList]);
 
   useEffect(() => {
     localStorage.setItem('cred_comments', JSON.stringify(commentsList));
-    markDirty('comments');
   }, [commentsList]);
 
   // Sync currentUser with currentAccount changes
@@ -983,6 +1241,103 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       setRecords(checkedRecords);
     }
   }, [records]);
+
+  // Synchronize authentication changes across windows, tabs, and OAuth callback popups
+  useEffect(() => {
+    let isMounted = true;
+
+    // Check for pending OAuth redirect tokens or query parameters immediately on mount
+    checkForPendingOAuth().then((res) => {
+      if (!isMounted) return;
+      if (res && res.handled) {
+        if (res.authorized && res.account) {
+          setCurrentAccount(res.account);
+          switchDataForAccount(res.account);
+          localStorage.setItem('cred_current_account', JSON.stringify(res.account));
+          localStorage.setItem('cred_last_activity', String(Date.now()));
+          localStorage.removeItem('cred_timeout_reason');
+          localStorage.removeItem('cred_oauth_denial');
+          setSessionSecondsLeft(20 * 60);
+        } else if (res.denial || res.error) {
+          localStorage.setItem('cred_oauth_denial', JSON.stringify(res.denial || { reason: res.error }));
+        }
+      }
+      setIsAuthenticatingOAuth(false);
+    }).catch(() => {
+      if (isMounted) setIsAuthenticatingOAuth(false);
+    });
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'cred_current_account') {
+        if (e.newValue) {
+          try {
+            const acc = JSON.parse(e.newValue);
+            setCurrentAccount(acc);
+            switchDataForAccount(acc);
+            localStorage.setItem('cred_last_activity', String(Date.now()));
+            setSessionSecondsLeft(20 * 60);
+          } catch {}
+        } else {
+          setCurrentAccount(null);
+        }
+      }
+    };
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'OAUTH_AUTH_SUCCESS' && e.data?.account) {
+        const acc = e.data.account;
+        setCurrentAccount(acc);
+        switchDataForAccount(acc);
+        localStorage.setItem('cred_current_account', JSON.stringify(acc));
+        localStorage.setItem('cred_last_activity', String(Date.now()));
+        setSessionSecondsLeft(20 * 60);
+      }
+    };
+
+    let authChannel: BroadcastChannel | null = null;
+    try {
+      authChannel = new BroadcastChannel('cred_auth_channel');
+      authChannel.onmessage = (e) => {
+        if (e.data?.type === 'OAUTH_AUTH_SUCCESS' && e.data?.account) {
+          const acc = e.data.account;
+          setCurrentAccount(acc);
+          switchDataForAccount(acc);
+          localStorage.setItem('cred_current_account', JSON.stringify(acc));
+          localStorage.setItem('cred_last_activity', String(Date.now()));
+          setSessionSecondsLeft(20 * 60);
+        }
+      };
+    } catch (e) {}
+
+    // Active auth check to catch cross-window or popup completions
+    const authCheckInterval = setInterval(() => {
+      if (!currentAccount) {
+        const saved = localStorage.getItem('cred_current_account');
+        if (saved) {
+          try {
+            const acc = JSON.parse(saved);
+            if (acc && acc.email) {
+              setCurrentAccount(acc);
+              switchDataForAccount(acc);
+              localStorage.setItem('cred_last_activity', String(Date.now()));
+              setSessionSecondsLeft(20 * 60);
+            }
+          } catch {}
+        }
+      }
+    }, 300);
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('message', handleMessage);
+      clearInterval(authCheckInterval);
+      if (authChannel) {
+        try { authChannel.close(); } catch (e) {}
+      }
+    };
+  }, [currentAccount]);
 
   // 20-minute inactivity timer and activity event listeners
   const resetSessionTimer = React.useCallback(() => {
@@ -1044,17 +1399,18 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentAccount, SESSION_TIMEOUT_MS]);
 
   const switchDataForAccount = (_targetAccount: AppAccount) => {
-    const savedProviders = localStorage.getItem('cred_providers');
-    setProviders(savedProviders ? JSON.parse(savedProviders) : INITIAL_PROVIDERS);
+    const isTargetAdmin = _targetAccount.email.toLowerCase() === 'admin@example.com';
 
-    const savedRecords = localStorage.getItem('cred_records');
-    setRecords(savedRecords ? JSON.parse(savedRecords) : INITIAL_CREDENTIALING_RECORDS);
+    if (isTargetAdmin) {
+      const savedDemoProviders = localStorage.getItem('cred_demo_providers');
+      setProviders(savedDemoProviders ? JSON.parse(savedDemoProviders) : INITIAL_PROVIDERS);
 
-    const savedNotifications = localStorage.getItem('cred_notifications');
-    setNotifications(savedNotifications ? JSON.parse(savedNotifications) : INITIAL_NOTIFICATIONS);
+      const savedDemoRecords = localStorage.getItem('cred_demo_records');
+      setRecords(savedDemoRecords ? JSON.parse(savedDemoRecords) : INITIAL_CREDENTIALING_RECORDS);
 
-    // Enforce Demo Employee Data Isolation: Strictly available only to admin@example.com
-    if (_targetAccount.email.toLowerCase() === 'admin@example.com') {
+      const savedDemoStaff = localStorage.getItem('cred_demo_clinical_staff');
+      setClinicalStaff(savedDemoStaff ? JSON.parse(savedDemoStaff) : INITIAL_CLINICAL_STAFF);
+
       const savedDemo = localStorage.getItem('cred_demo_employees_admin');
       if (savedDemo) {
         try {
@@ -1067,7 +1423,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         setDemoEmployees(DEMO_EMPLOYEES);
       }
     } else {
-      // Remove and isolate demo employees completely for all other accounts & new users
+      // Normal accounts and all other accounts get clean production data:
+      const savedProviders = localStorage.getItem('cred_providers');
+      setProviders(savedProviders ? JSON.parse(savedProviders).filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com') : []);
+
+      const savedRecords = localStorage.getItem('cred_records');
+      setRecords(savedRecords ? JSON.parse(savedRecords).filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com') : []);
+
+      const savedClinicalStaff = localStorage.getItem('cred_clinical_staff');
+      setClinicalStaff(savedClinicalStaff ? JSON.parse(savedClinicalStaff).filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com') : []);
+
       setDemoEmployees([]);
       setEmployees((prev) => prev.filter((e) => !isDemoEmployee(e)));
       const saved = localStorage.getItem('cred_employees');
@@ -1080,6 +1445,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         } catch {}
       }
     }
+
+    const savedNotifications = localStorage.getItem('cred_notifications');
+    setNotifications(savedNotifications ? JSON.parse(savedNotifications) : INITIAL_NOTIFICATIONS);
   };
 
   // Auth Operations
@@ -1115,7 +1483,69 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     return { success: true };
   };
 
+  const loginWithGoogle = async (
+    emailOverride?: string,
+    preferredFlow: 'popup' | 'redirect' = 'redirect'
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    step?: number;
+    stepName?: string;
+    code?: string;
+    account?: AppAccount;
+  }> => {
+    try {
+      const res = await initiateGoogleSignIn(emailOverride, preferredFlow);
+      if (!res.success || !res.data || !res.data.authorized || !res.data.account) {
+        return {
+          success: false,
+          error: res.error || res.data?.reason || 'Access Denied: Employee Access Control validation failed.',
+          step: res.data?.step,
+          stepName: res.data?.stepName,
+          code: res.data?.code,
+        };
+      }
+
+      const verifiedAcc: AppAccount = res.data.account;
+      setCurrentAccount(verifiedAcc);
+      switchDataForAccount(verifiedAcc);
+
+      setAccounts((prev) => {
+        const idx = prev.findIndex((a) => a.email.toLowerCase() === verifiedAcc.email.toLowerCase());
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = { ...copy[idx], ...verifiedAcc };
+          return copy;
+        }
+        return [...prev, verifiedAcc];
+      });
+
+      localStorage.setItem('cred_current_account', JSON.stringify(verifiedAcc));
+      localStorage.removeItem('cred_timeout_reason');
+      setSessionTimeoutMessage(null);
+      lastActivityRef.current = Date.now();
+      localStorage.setItem('cred_last_activity', String(Date.now()));
+      setSessionSecondsLeft(20 * 60);
+
+      return {
+        success: true,
+        account: verifiedAcc,
+        step: 10,
+        stepName: 'Application Access',
+        code: 'AUTHORIZED',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: 'Google login error: ' + (err.message || 'Unknown authentication failure'),
+      };
+    }
+  };
+
   const logout = (reason?: string) => {
+    if (supabase) {
+      supabase.auth.signOut().catch(() => {});
+    }
     setCurrentAccount(null);
     setDemoEmployees([]);
     localStorage.removeItem('cred_current_account');
@@ -1416,6 +1846,51 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         return rec;
       })
     );
+  };
+
+  const addRecord = (recordData: Partial<CredentialingRecord>): CredentialingRecord => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const id = recordData.id || `rec-${Date.now()}`;
+    const newRec: CredentialingRecord = {
+      id,
+      providerId: recordData.providerId || providers[0]?.id || 'prv-1',
+      payerId: recordData.payerId || payers[0]?.id || 'pyr-1',
+      entityId: recordData.entityId || entities[0]?.id || 'ent-1',
+      locationId: recordData.locationId || locations[0]?.id || 'loc-1',
+      applicationType: recordData.applicationType || 'Initial credentialing',
+      discipline: recordData.discipline || 'ABA',
+      stage: recordData.stage || 'Intake',
+      assignedSpecialistId: recordData.assignedSpecialistId || currentUser.id,
+      assignedSpecialistName: recordData.assignedSpecialistName || currentUser.name,
+      intakeDate: recordData.intakeDate || todayStr,
+      targetTurnaroundDate: recordData.targetTurnaroundDate || addBusinessDays(todayStr, 60),
+      isOverdue: recordData.isOverdue || false,
+      daysInCurrentStage: recordData.daysInCurrentStage || 0,
+      totalCycleDays: recordData.totalCycleDays || 0,
+      linkingStatus: recordData.linkingStatus || 'Not Applicable',
+      contractStatus: recordData.contractStatus || 'Contract Executed',
+      checklist: recordData.checklist || [],
+      documents: recordData.documents || [],
+      validationIssues: recordData.validationIssues || [],
+      followUps: recordData.followUps || [],
+      auditTrail: recordData.auditTrail || [],
+      notes: recordData.notes || '',
+      createdAt: recordData.createdAt || todayStr,
+      updatedAt: todayStr,
+      ...recordData,
+    };
+    setRecords((prev) => [newRec, ...prev]);
+    saveDocument('records', newRec.id, newRec).catch(console.error);
+    return newRec;
+  };
+
+  const deleteRecord = (id: string): { success: boolean; error?: string } => {
+    setRecords((prev) => prev.filter((r) => r.id !== id));
+    deleteDocument('records', id).catch(console.error);
+    if (selectedRecordId === id) {
+      setSelectedRecordId(null);
+    }
+    return { success: true };
   };
 
   // Stage Progression with Pre-Submission Validation Gating
@@ -2025,6 +2500,19 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
+  const deletePayer = (id: string): { success: boolean; error?: string } => {
+    const inUse = records.some((r) => r.payerId === id);
+    if (inUse) {
+      return {
+        success: false,
+        error: 'Cannot delete payer: active credentialing applications are currently associated with this insurance payer.',
+      };
+    }
+    setPayers((prev) => prev.filter((p) => p.id !== id));
+    deleteDocument('payers', id).catch(console.error);
+    return { success: true };
+  };
+
   // Entity & Location CRUD
   const addEntity = (entityData: Omit<LegalEntity, 'id'>): LegalEntity => {
     const newEntity: LegalEntity = {
@@ -2047,6 +2535,20 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         return e;
       })
     );
+  };
+
+  const deleteEntity = (id: string): { success: boolean; error?: string } => {
+    const inUseInRecords = records.some((r) => r.entityId === id);
+    const inUseInLocations = locations.some((l) => l.entityId === id);
+    if (inUseInRecords || inUseInLocations) {
+      return {
+        success: false,
+        error: 'Cannot delete entity: practice locations or credentialing applications are currently linked to this legal tax entity.',
+      };
+    }
+    setEntities((prev) => prev.filter((e) => e.id !== id));
+    deleteDocument('entities', id).catch(console.error);
+    return { success: true };
   };
 
   const addLocation = (locData: Omit<Location, 'id'>): Location => {
@@ -2700,6 +3202,18 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     saveDocument('clinical_staff', id, updates).catch(console.error);
   };
 
+  const deleteEmployee = (id: string) => {
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
+    setDemoEmployees((prev) => prev.filter((e) => e.id !== id));
+    deleteDocument('employees', id).catch(console.error);
+    deleteDocument('demo_employees', id).catch(console.error);
+  };
+
+  const deleteClinicalStaff = (id: string) => {
+    setClinicalStaff((prev) => prev.filter((s) => s.id !== id));
+    deleteDocument('clinical_staff', id).catch(console.error);
+  };
+
   const addApplicationComment = (comment: {
     applicationId: string;
     providerId?: string;
@@ -3203,9 +3717,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         syncNow,
         accounts,
         currentAccount,
+        isAuthenticatingOAuth,
         isAdmin,
         isSuperAdminUser,
         login,
+        loginWithGoogle,
         logout,
         changePassword,
         sessionTimeoutMessage,
@@ -3280,14 +3796,26 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         clinicalStaff,
         documentsList,
         commentsList,
+        addRecord,
+        deleteRecord,
+        deletePayer,
+        deleteEntity,
         addEmployee,
         updateEmployee,
+        deleteEmployee,
         addClinicalStaff,
         updateClinicalStaff,
+        deleteClinicalStaff,
         addApplicationComment,
         addApplicationDocument,
         deleteApplicationDocument,
         startCredentialingWorkflow,
+        systemSettings,
+        holidays,
+        emailTemplates,
+        updateSystemSettings,
+        updateHolidays,
+        updateEmailTemplates,
       }}
     >
       {children}

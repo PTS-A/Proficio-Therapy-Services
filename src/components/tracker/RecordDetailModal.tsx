@@ -3,34 +3,27 @@ import { useCredentialing } from '../../context/CredentialingContext';
 import { 
   CredentialingStage, 
   DocumentItem, 
-  FollowUpEntry, 
   LinkingStatus 
 } from '../../types';
 import { 
   AlertCircle, 
   AlertTriangle, 
   ArrowRight, 
-  Calendar, 
   Check, 
   CheckCircle2, 
   Clock, 
   DollarSign, 
-  Eye, 
   FileCheck, 
-  FilePlus, 
   FileText, 
   History, 
   Link2, 
-  MessageSquare, 
   Phone, 
-  Plus, 
   Send, 
   ShieldAlert, 
   ShieldCheck, 
   Sparkles, 
   Upload, 
   UserCheck, 
-  Users, 
   X,
   CheckSquare
 } from 'lucide-react';
@@ -63,7 +56,6 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     toggleChecklistItem,
     overrideValidation,
     updateProviderLinking,
-    updateRecord,
     adminVerifyDocument,
     adminVerifyAllDocuments,
     adminCompleteAllChecklist,
@@ -74,7 +66,6 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
   const [isAdminApproveModalOpen, setIsAdminApproveModalOpen] = useState(false);
 
   // Stage advance state
-  const [targetStage, setTargetStage] = useState<CredentialingStage | ''>('');
   const [overrideReason, setOverrideReason] = useState('');
   const [transitionError, setTransitionError] = useState<string | null>(null);
 
@@ -125,7 +116,6 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     if (!res.success) {
       setTransitionError(res.error || 'Failed to advance stage');
     } else {
-      setTargetStage('');
       setOverrideReason('');
     }
   };

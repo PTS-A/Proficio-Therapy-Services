@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { 
   Discipline, 
@@ -84,69 +84,33 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
   // Wizard Step Control (1: Initial Info, 2: Provider & Credentialing, 3: Payers & Comments, 4: Confirmation & Linking)
   const [currentStep, setCurrentStep] = useState<WizardStep>(1);
 
-  // STEP 1 FIELDS (Initial Information)
-  const [field1Name, setField1Name] = useState<string>('Dr. Maya Lin, BCBA');
-  const [field2Contact, setField2Contact] = useState<string>('(408) 555-0192 | maya.lin@ageslearning.com');
-  const [field4Location, setField4Location] = useState<string>(locations[0]?.id || 'loc-1');
+  // STEP 1 FIELDS (Initial Information) - Clean, empty defaults for all users
+  const [field1Name, setField1Name] = useState<string>('');
+  const [field2Contact, setField2Contact] = useState<string>('');
+  const [field4Location, setField4Location] = useState<string>('');
   const [field5Discipline, setField5Discipline] = useState<Discipline>('ABA');
 
-  // STEP 2 FIELDS (Provider Information & Credentialing)
-  const [field3NpiLicense, setField3NpiLicense] = useState<string>('NPI: 1487652391 | License: LBA-CA-94821 (Exp: 2028-10-31)');
-  const [field6CaqhSpecialty, setField6CaqhSpecialty] = useState<string>('CAQH: 18492041 | Specialty: Pediatric ABA | Taxonomy: 103K00000X');
+  // STEP 2 FIELDS (Provider Information & Credentialing) - Clean, empty defaults
+  const [field3NpiLicense, setField3NpiLicense] = useState<string>('');
+  const [field6CaqhSpecialty, setField6CaqhSpecialty] = useState<string>('');
   
-  // Supporting Documents
-  const [documents, setDocuments] = useState<TempDocItem[]>([
-    {
-      id: 'doc-init-1',
-      name: 'California State BCBA License Certificate',
-      type: 'State License',
-      url: 'https://dca.ca.gov/verify/license/LBA-CA-94821.pdf',
-      expirationDate: '2028-10-31',
-    },
-    {
-      id: 'doc-init-2',
-      name: 'BACB Board Certification Verification (Cert #1-21-48902)',
-      type: 'Board Certification',
-      url: 'https://bacb.com/verify/certs/1-21-48902.pdf',
-      expirationDate: '2027-08-31',
-    },
-    {
-      id: 'doc-init-3',
-      name: 'Professional Malpractice Liability Certificate (COI $1M/$3M)',
-      type: 'Malpractice Insurance',
-      url: 'https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf',
-      expirationDate: '2027-06-30',
-    },
-  ]);
+  // Supporting Documents - Starts completely empty
+  const [documents, setDocuments] = useState<TempDocItem[]>([]);
 
   // Add Document Inline Form State
   const [isAddingDoc, setIsAddingDoc] = useState<boolean>(false);
   const [newDocName, setNewDocName] = useState<string>('');
   const [newDocType, setNewDocType] = useState<string>('State License');
   const [newDocUrl, setNewDocUrl] = useState<string>('');
-  const [newDocExp, setNewDocExp] = useState<string>('2028-12-31');
+  const [newDocExp, setNewDocExp] = useState<string>('');
 
-  // STEP 3 FIELDS (Payers & Comments)
-  const [selectedPayerIds, setSelectedPayerIds] = useState<string[]>([
-    payers[0]?.id || 'pyr-aetna',
-    payers[1]?.id || 'pyr-blueshield',
-    payers[2]?.id || 'pyr-cigna',
-  ]);
+  // STEP 3 FIELDS (Payers & Comments) - Starts completely clean
+  const [selectedPayerIds, setSelectedPayerIds] = useState<string[]>([]);
 
-  // Comments State
+  // Comments State - Starts completely empty
   const [isCommentInputOpen, setIsCommentInputOpen] = useState<boolean>(false);
   const [newCommentText, setNewCommentText] = useState<string>('');
-  const [comments, setComments] = useState<TempCommentItem[]>([
-    {
-      id: 'com-init-1',
-      commentText: 'Initial application intake initiated. Baseline CAQH credentials verified and NPI match confirmed.',
-      authorName: currentAccount?.name || currentUser.name || 'Sanjay Tom',
-      authorRole: currentAccount?.systemRole || currentUser.role || 'Credentialing Specialist',
-      dateCreated: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      timeCreated: '9:30 AM',
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+  const [comments, setComments] = useState<TempCommentItem[]>([]);
 
   // STEP 4 STATE (Created Application & Linking)
   const [createdResult, setCreatedResult] = useState<{
@@ -158,41 +122,46 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
 
   // Provider Linking Panel in Step 4
   const [isLinkingModalOpen, setIsLinkingModalOpen] = useState<boolean>(false);
-  const [selectedLinkEntity, setSelectedLinkEntity] = useState<string>(entities[0]?.id || 'ent-1');
-  const [selectedLinkLocation, setSelectedLinkLocation] = useState<string>(locations[0]?.id || 'loc-1');
-  const [linkNotes, setLinkNotes] = useState<string>('Linked rendering clinician under group TIN and NPI.');
+  const [selectedLinkEntity, setSelectedLinkEntity] = useState<string>(entities[0]?.id || '');
+  const [selectedLinkLocation, setSelectedLinkLocation] = useState<string>(locations[0]?.id || '');
+  const [linkNotes, setLinkNotes] = useState<string>('');
   const [linkSuccessMessage, setLinkSuccessMessage] = useState<string | null>(null);
+
+  // Requirement 2 & 3: Ensure every new application modal opens with a completely clean, pristine form
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep(1);
+      setField1Name('');
+      setField2Contact('');
+      setField4Location(locations[0]?.id || '');
+      setField5Discipline('ABA');
+      setField3NpiLicense('');
+      setField6CaqhSpecialty('');
+      setDocuments([]);
+      setSelectedPayerIds([]);
+      setComments([]);
+      setCreatedResult(null);
+      setIsSubmitting(false);
+      setSubmissionError(null);
+      setIsLinkingModalOpen(false);
+      setSelectedLinkEntity(entities[0]?.id || '');
+      setSelectedLinkLocation(locations[0]?.id || '');
+      setLinkNotes('');
+      setLinkSuccessMessage(null);
+      setIsAddingDoc(false);
+      setNewDocName('');
+      setNewDocType('State License');
+      setNewDocUrl('');
+      setNewDocExp('');
+      setIsCommentInputOpen(false);
+      setNewCommentText('');
+    }
+  }, [isOpen, locations, entities]);
 
   if (!isOpen) return null;
 
   // Selected location object
   const selectedLocationObj = locations.find((l) => l.id === field4Location) || locations[0];
-
-  // Quick Pre-Fill Templates for easy testing
-  const handlePreFill = (discipline: Discipline) => {
-    if (discipline === 'ABA') {
-      setField1Name('Dr. Maya Lin, BCBA-D');
-      setField2Contact('(408) 555-0192 | maya.lin@ageslearning.com');
-      setField4Location(locations[0]?.id || 'loc-1');
-      setField5Discipline('ABA');
-      setField3NpiLicense('NPI: 1487652391 | License: LBA-CA-94821 (Exp: 2028-10-31)');
-      setField6CaqhSpecialty('CAQH: 18492041 | Specialty: Applied Behavior Analysis | Taxonomy: 103K00000X');
-    } else if (discipline === 'Speech') {
-      setField1Name('Rachel Adams, MS, CCC-SLP');
-      setField2Contact('(415) 555-0177 | rachel.adams@ageslearning.com');
-      setField4Location(locations[1]?.id || 'loc-2');
-      setField5Discipline('Speech');
-      setField3NpiLicense('NPI: 1932481029 | License: SLP-CA-44912 (Exp: 2027-11-30)');
-      setField6CaqhSpecialty('CAQH: 20941829 | Specialty: Speech-Language Pathology | Taxonomy: 235Z00000X');
-    } else {
-      setField1Name('Marcus Vance, MS, OTR/L');
-      setField2Contact('(510) 555-0144 | marcus.vance@ageslearning.com');
-      setField4Location(locations[2]?.id || 'loc-3');
-      setField5Discipline('OT');
-      setField3NpiLicense('NPI: 1679023418 | License: OT-CA-38291 (Exp: 2028-05-15)');
-      setField6CaqhSpecialty('CAQH: 17829401 | Specialty: Pediatric Occupational Therapy | Taxonomy: 225X00000X');
-    }
-  };
 
   // Add new document link
   const handleAddDocument = (e: React.FormEvent) => {
@@ -461,41 +430,10 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
         {/* Modal Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* ========================================================= */}
-          {/* STEP 1: INITIAL INFORMATION (Fields 1, 2, 4, 5)          */}
+          {/* STEP 1: INITIAL INFORMATION (Fields 1, 2, 4, 5)           */}
           {/* ========================================================= */}
           {currentStep === 1 && (
             <div className="space-y-6 animate-in fade-in duration-150">
-              {/* Pre-fill Quick Presets */}
-              <div className="flex items-center justify-between p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#2B4C9D]" />
-                  <span className="font-semibold">Quick Sample Templates:</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handlePreFill('ABA')}
-                    className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg hover:bg-blue-100/50 font-medium text-blue-800 transition-colors"
-                  >
-                    BCBA Sample
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePreFill('Speech')}
-                    className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg hover:bg-blue-100/50 font-medium text-blue-800 transition-colors"
-                  >
-                    SLP Sample
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePreFill('OT')}
-                    className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg hover:bg-blue-100/50 font-medium text-blue-800 transition-colors"
-                  >
-                    OT Sample
-                  </button>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Field 1: Name */}
                 <div className="space-y-1.5 md:col-span-2">
@@ -508,7 +446,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field1Name}
                       onChange={(e) => setField1Name(e.target.value)}
-                      placeholder="e.g. Dr. Maya Lin, BCBA-D or John Doe, MS, CCC-SLP"
+                      placeholder="Enter clinician full name and credentials (e.g. Jane Doe, MS, BCBA)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
                     />
@@ -529,7 +467,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field2Contact}
                       onChange={(e) => setField2Contact(e.target.value)}
-                      placeholder="e.g. (408) 555-0192 | maya.lin@ageslearning.com"
+                      placeholder="Enter contact phone and work email (e.g. (408) 555-0100 | jane.doe@clinic.com)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
                     />
@@ -551,6 +489,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       onChange={(e) => setField4Location(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                     >
+                      <option value="">Select practice location...</option>
                       {locations.map((loc) => (
                         <option key={loc.id} value={loc.id}>
                           {loc.name} ({loc.city}, {loc.state})
@@ -648,7 +587,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field3NpiLicense}
                       onChange={(e) => setField3NpiLicense(e.target.value)}
-                      placeholder="e.g. NPI: 1487652391 | License: LBA-CA-94821 (Exp: 2028-10-31)"
+                      placeholder="Enter Type 1 NPI and License (e.g. NPI: 1234567890 | License: LBA-CA-12345 Exp: 2028-12-31)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
                     />
@@ -669,7 +608,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field6CaqhSpecialty}
                       onChange={(e) => setField6CaqhSpecialty(e.target.value)}
-                      placeholder="e.g. CAQH: 18492041 | Specialty: Pediatric ABA | Taxonomy: 103K00000X"
+                      placeholder="Enter CAQH provider ID and Specialty (e.g. CAQH: 12345678 | Specialty: Behavior Analysis)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
                     />

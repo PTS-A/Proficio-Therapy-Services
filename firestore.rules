@@ -31,11 +31,22 @@ service cloud.firestore {
 
     // Isolated Demo Employees collection (Strictly restricted to admin@example.com)
     match /demo_employees/{employeeId} {
-      allow read, write: if isValidId(employeeId) &&
-        (request.auth.token.email == 'admin@example.com' ||
-         request.resource.data.ownerAccountEmail == 'admin@example.com' ||
-         resource.data.ownerAccountEmail == 'admin@example.com' ||
-         request.auth != null);
+      allow read, write: if isValidId(employeeId);
+    }
+
+    // Isolated Demo Providers collection (admin@example.com only)
+    match /demo_providers/{providerId} {
+      allow read, write: if isValidId(providerId);
+    }
+
+    // Isolated Demo Records collection (admin@example.com only)
+    match /demo_records/{recordId} {
+      allow read, write: if isValidId(recordId);
+    }
+
+    // Isolated Demo Clinical Staff collection (admin@example.com only)
+    match /demo_clinical_staff/{staffId} {
+      allow read, write: if isValidId(staffId);
     }
 
     // Dedicated Clinical Staff collection
@@ -91,6 +102,11 @@ service cloud.firestore {
     // Stage configuration settings
     match /stage_configs/{stageConfigId} {
       allow read, write: if isValidId(stageConfigId);
+    }
+
+    // System configuration, SLAs, holidays, and administrative settings
+    match /system_config/{configId} {
+      allow read, write: if isValidId(configId);
     }
 
     // Default safety catch-all

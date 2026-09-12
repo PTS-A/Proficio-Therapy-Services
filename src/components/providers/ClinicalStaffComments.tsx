@@ -4,19 +4,11 @@ import { useCredentialing } from '../../context/CredentialingContext';
 import { 
   MessageSquare, 
   Send, 
-  ChevronRight, 
-  User, 
   UserCheck, 
-  Filter, 
   Search, 
   Clock, 
-  CheckCircle2, 
-  AlertCircle, 
   Sparkles, 
-  Tag,
-  ArrowRight,
-  ShieldCheck,
-  Building2
+  ArrowRight
 } from 'lucide-react';
 
 interface ClinicalStaffCommentsProps {
@@ -28,9 +20,7 @@ export const ClinicalStaffComments: React.FC<ClinicalStaffCommentsProps> = ({ pr
     addProviderCommentLog, 
     updateProvider, 
     currentUser, 
-    currentAccount, 
-    users, 
-    providers 
+    currentAccount
   } = useCredentialing();
 
   const [newComment, setNewComment] = useState('');

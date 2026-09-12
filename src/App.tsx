@@ -12,7 +12,6 @@ import { LinkingContractingTracker } from './components/linking/LinkingContracti
 import { ReportsView } from './components/reports/ReportsView';
 import { NotificationDrawer } from './components/notifications/NotificationDrawer';
 import { NewApplicationModal } from './components/modals/NewApplicationModal';
-import { UserManagementView } from './components/admin/UserManagementView';
 import { NewUserView } from './components/admin/NewUserView';
 import { DataImportView } from './components/admin/DataImportView';
 import { SystemConfigView } from './components/admin/SystemConfigView';
@@ -30,7 +29,7 @@ const MainContent: React.FC = () => {
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [isNewAppModalOpen, setIsNewAppModalOpen] = useState<boolean>(false);
 
-  const { setFilters, currentAccount } = useCredentialing();
+  const { setFilters, currentAccount, isAuthenticatingOAuth } = useCredentialing();
 
   // Enforce RBAC navigation constraints: if current activeTab is not allowed, fallback to first authorized tab
   React.useEffect(() => {
@@ -41,6 +40,24 @@ const MainContent: React.FC = () => {
       }
     }
   }, [currentAccount, activeTab]);
+
+  // If redirect authentication is actively validating tokens or session
+  if (isAuthenticatingOAuth) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-lg border border-slate-200 text-center">
+          <div className="w-12 h-12 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center mx-auto mb-4 animate-spin text-[#2B4C9D]">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-1">Verifying Authorization</h3>
+          <p className="text-sm text-slate-500">Validating employee status, organization affiliation, and access permissions...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If user is not logged in, display the clean dedicated Login Page
   if (!currentAccount) {

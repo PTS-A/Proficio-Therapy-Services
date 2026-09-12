@@ -1,0 +1,4106 @@
+{
+  "users": [
+    {
+      "id": "acc-1788700393824",
+      "email": "joel.reji@ageslearningsolutions.com",
+      "accessLevel": "USER",
+      "password": "123456",
+      "permissions": [
+        "Provider intake and document verification",
+        "CAQH, NPI coordination, PAVE, Medicaid enrollment",
+        "Payer applications and follow-ups",
+        "Additional documentation and application corrections",
+        "Approval and effective-date tracking",
+        "Updating credentialing records and monthly reporting",
+        "W-9 and group financial information required by payers",
+        "Manage discipline, payer, entity, and location master data"
+      ],
+      "mustChangePasswordOnFirstLogin": false,
+      "lastLogin": "2026-09-09",
+      "createdAt": "2026-09-06",
+      "department": "Proficio Therapy Credentialing Hub",
+      "assignedEntities": [
+        "ent-1",
+        "ent-2",
+        "ent-3"
+      ],
+      "status": "Active",
+      "isSuperAdmin": false,
+      "systemRole": "Credentialing Specialist",
+      "hasChangedInitialPassword": true,
+      "roleTitle": "Credentialing Specialist",
+      "name": "Joel Mathew Reji",
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ]
+    },
+    {
+      "id": "acc-admin-clean",
+      "name": "Administrator",
+      "password": "admin",
+      "createdAt": "2026-01-01",
+      "status": "Active",
+      "roleTitle": "System Administrator & IT Governance",
+      "isSuperAdmin": true,
+      "email": "admin@example.com",
+      "systemRole": "System Administrator",
+      "hasChangedInitialPassword": true,
+      "mustChangePasswordOnFirstLogin": false,
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ],
+      "department": "Executive IT & Compliance Governance",
+      "accessLevel": "ADMINISTRATOR",
+      "permissions": [
+        "Manage users, roles, and permissions",
+        "Configure workflow stages, SLAs, notification templates, payer requirements",
+        "Manage integrations (email, Power BI dataset)",
+        "View system-wide stored user passwords (Super Admin Exclusive)"
+      ],
+      "lastLogin": "2026-09-09",
+      "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+      "id": "acc-admin-leadership",
+      "lastLogin": "2026-08-26",
+      "isSuperAdmin": false,
+      "password": "proficio",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "permissions": [
+        "Strategic decisions, contracting decisions, and rate negotiations",
+        "Payer network expansion and entity / location approvals",
+        "Resource allocation",
+        "Reviewing credentialing KPIs and escalations"
+      ],
+      "accessLevel": "ADMINISTRATOR",
+      "email": "leadership@proficiotherapy.com",
+      "mustChangePasswordOnFirstLogin": true,
+      "name": "Katherine Holmes",
+      "roleTitle": "Director of Strategic Contracting & Growth",
+      "status": "Active",
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ],
+      "systemRole": "Leadership / Management",
+      "createdAt": "2026-01-01",
+      "hasChangedInitialPassword": false,
+      "department": "Executive Leadership & Strategy"
+    },
+    {
+      "id": "acc-admin-namitha",
+      "isSuperAdmin": false,
+      "systemRole": "Credentialing Lead / Manager",
+      "createdAt": "2026-01-10",
+      "department": "Centralized Credentialing Hub",
+      "email": "manager@proficiotherapy.com",
+      "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80",
+      "roleTitle": "Credentialing Operations Manager",
+      "name": "Namitha Narayanan",
+      "status": "Active",
+      "mustChangePasswordOnFirstLogin": true,
+      "hasChangedInitialPassword": false,
+      "password": "proficioadmin",
+      "lastLogin": "2026-08-26",
+      "accessLevel": "ADMINISTRATOR",
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ],
+      "permissions": [
+        "Work allocation and quality control",
+        "Escalations and payer issue resolution",
+        "KPI monitoring, process improvement, and team training",
+        "Management reporting and audit oversight"
+      ]
+    },
+    {
+      "id": "acc-superadmin-corp",
+      "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
+      "roleTitle": "Chief Information & Security Officer",
+      "systemRole": "System Administrator",
+      "permissions": [
+        "Manage users, roles, and permissions",
+        "Configure workflow stages, SLAs, notification templates, payer requirements",
+        "Manage integrations (email, Power BI dataset)",
+        "View system-wide stored user passwords (Super Admin Exclusive)"
+      ],
+      "accessLevel": "ADMINISTRATOR",
+      "department": "Information Security & Administration",
+      "createdAt": "2026-01-01",
+      "lastLogin": "2026-08-26",
+      "status": "Active",
+      "isSuperAdmin": true,
+      "mustChangePasswordOnFirstLogin": false,
+      "email": "superadmin@proficiotherapy.com",
+      "password": "superadmin123",
+      "hasChangedInitialPassword": true,
+      "name": "Super Administrator",
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ]
+    },
+    {
+      "id": "acc-user-billing",
+      "status": "Active",
+      "email": "billing@proficiotherapy.com",
+      "systemRole": "Billing and Claims",
+      "lastLogin": "2026-08-23",
+      "department": "Revenue Cycle & Billing Operations",
+      "name": "David Patel",
+      "isSuperAdmin": false,
+      "mustChangePasswordOnFirstLogin": true,
+      "permissions": [
+        "Payer contract financial coordination",
+        "Coordinate with credentialling team regarding denials."
+      ],
+      "accessLevel": "USER",
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ],
+      "roleTitle": "Revenue Cycle & Claims Linkage Analyst",
+      "avatar": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80",
+      "hasChangedInitialPassword": false,
+      "createdAt": "2026-02-05",
+      "password": "user123"
+    },
+    {
+      "id": "acc-user-clinical",
+      "assignedDisciplines": [
+        "OT",
+        "ABA"
+      ],
+      "name": "Sarah Jenkins, MS, OTR/L",
+      "isSuperAdmin": false,
+      "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
+      "roleTitle": "Clinical Quality & Peer Review Supervisor",
+      "mustChangePasswordOnFirstLogin": true,
+      "createdAt": "2026-02-01",
+      "password": "user123",
+      "hasChangedInitialPassword": false,
+      "status": "Active",
+      "email": "clinical@proficiotherapy.com",
+      "lastLogin": "2026-08-22",
+      "department": "Clinical Supervision & Quality",
+      "systemRole": "Clinical Team",
+      "permissions": [
+        "Clinical documentation and verification support",
+        "License, board certification, and reference support"
+      ],
+      "accessLevel": "USER"
+    },
+    {
+      "id": "acc-user-hr",
+      "department": "Human Resources & Staffing Operations",
+      "lastLogin": "2026-08-21",
+      "systemRole": "HR/Operations",
+      "password": "user123",
+      "mustChangePasswordOnFirstLogin": true,
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ],
+      "status": "Active",
+      "isSuperAdmin": false,
+      "roleTitle": "People & Clinical Staffing Operations Lead",
+      "email": "hroperations@proficiotherapy.com",
+      "permissions": [
+        "Provider onboarding information (start date, location, group assignment)",
+        "Coordination with credentialing on new-hire timelines"
+      ],
+      "accessLevel": "USER",
+      "hasChangedInitialPassword": false,
+      "createdAt": "2026-01-25",
+      "name": "Marcus Vance",
+      "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+      "id": "acc-user-provider",
+      "name": "Dr. Rachel Green, MS, CCC-SLP",
+      "createdAt": "2026-01-20",
+      "permissions": [
+        "Providing accurate information and completing required forms",
+        "Maintaining CAQH profile",
+        "Providing licenses / certifications / requested documents",
+        "Responding to credentialing requests"
+      ],
+      "accessLevel": "USER",
+      "avatar": "https://images.unsplash.com/photo-1594824813511-20986faef49e?w=150&auto=format&fit=crop&q=80",
+      "roleTitle": "Licensed Speech-Language Pathologist (Rendering Clinician)",
+      "email": "provider@proficiotherapy.com",
+      "mustChangePasswordOnFirstLogin": true,
+      "password": "user123",
+      "status": "Active",
+      "systemRole": "Provider",
+      "lastLogin": "2026-08-20",
+      "assignedDisciplines": [
+        "Speech"
+      ],
+      "isSuperAdmin": false,
+      "hasChangedInitialPassword": false,
+      "department": "Clinical Therapy Services"
+    },
+    {
+      "id": "acc-user-sanjay",
+      "createdAt": "2026-01-15",
+      "email": "specialist@proficiotherapy.com",
+      "status": "Active",
+      "hasChangedInitialPassword": false,
+      "roleTitle": "Senior Credentialing Specialist",
+      "password": "user123",
+      "accessLevel": "USER",
+      "mustChangePasswordOnFirstLogin": true,
+      "systemRole": "Credentialing Specialist",
+      "permissions": [
+        "Provider intake and document verification",
+        "CAQH, NPI coordination, PAVE, Medicaid enrollment",
+        "Payer applications and follow-ups",
+        "Additional documentation and application corrections",
+        "Approval and effective-date tracking",
+        "Updating credentialing records and monthly reporting"
+      ],
+      "assignedDisciplines": [
+        "ABA",
+        "Speech",
+        "OT"
+      ],
+      "department": "Proficio Therapy Credentialing Hub",
+      "lastLogin": "2026-08-25",
+      "isSuperAdmin": false,
+      "name": "Sanjay Tom",
+      "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"
+    }
+  ],
+  "payers": [
+    {
+      "id": "pyr-aetna",
+      "followUpCadenceDays": 7,
+      "submissionMethod": "Availity",
+      "type": "Commercial",
+      "portalUrl": "https://www.availity.com",
+      "contacts": [
+        {
+          "role": "Network Manager",
+          "name": "James Martinez",
+          "email": "martinezj@aetna.com",
+          "phone": "(800) 624-0756",
+          "id": "c-1"
+        }
+      ],
+      "active": true,
+      "statesServed": [
+        "CA",
+        "UT",
+        "Nationwide"
+      ],
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "Curriculum Vitae (CV)",
+        "Board Certification"
+      ],
+      "averageTatDays": 60,
+      "name": "Aetna",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Taxonomy",
+        "Practice Location"
+      ]
+    },
+    {
+      "id": "pyr-alameda",
+      "name": "Alameda Alliance",
+      "portalUrl": "https://www.alamedaalliance.org",
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "PAVE Proof of Enrollment",
+        "DHCS Welcome Letter"
+      ],
+      "contacts": [
+        {
+          "role": "Provider Enrollment Lead",
+          "email": "tgomez@alamedaalliance.org",
+          "phone": "(510) 747-4500",
+          "name": "Tanya Gomez",
+          "id": "c-7"
+        }
+      ],
+      "followUpCadenceDays": 7,
+      "statesServed": [
+        "CA (Alameda County)"
+      ],
+      "active": true,
+      "averageTatDays": 90,
+      "type": "Regional / Medicaid",
+      "requiredFields": [
+        "NPI",
+        "PAVE Enrollment #",
+        "CAQH ID",
+        "Service Address"
+      ],
+      "submissionMethod": "Online Portal"
+    },
+    {
+      "id": "pyr-anthem",
+      "followUpCadenceDays": 10,
+      "submissionMethod": "Availity",
+      "name": "Anthem",
+      "statesServed": [
+        "CA",
+        "Nationwide"
+      ],
+      "averageTatDays": 75,
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "CV",
+        "Attestation Form"
+      ],
+      "active": true,
+      "contacts": [
+        {
+          "phone": "(888) 254-2721",
+          "id": "c-2",
+          "name": "Lisa Ray",
+          "role": "Credentialing Lead",
+          "email": "lisa.ray@anthem.com"
+        }
+      ],
+      "type": "Commercial",
+      "portalUrl": "https://www.availity.com",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Effective Date",
+        "Group Tax ID"
+      ]
+    },
+    {
+      "id": "pyr-ash",
+      "active": true,
+      "contacts": [
+        {
+          "role": "Credentialing Manager",
+          "phone": "(800) 972-4226",
+          "id": "c-18",
+          "name": "Brian Kelly",
+          "email": "brian.kelly@ashn.com"
+        }
+      ],
+      "followUpCadenceDays": 7,
+      "type": "Network",
+      "averageTatDays": 45,
+      "statesServed": [
+        "CA",
+        "UT",
+        "Nationwide"
+      ],
+      "portalUrl": "https://www.ashlink.com",
+      "name": "ASH (American Specialty Health)",
+      "submissionMethod": "Online Portal",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Specialty"
+      ],
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "ASH Practitioner App"
+      ]
+    },
+    {
+      "id": "pyr-bsc",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "DBA",
+        "Service Location"
+      ],
+      "active": true,
+      "name": "Blue Shield of California",
+      "contacts": [
+        {
+          "role": "Provider Relations Rep",
+          "email": "robert.kim@blueshieldca.com",
+          "name": "Robert Kim",
+          "id": "c-3",
+          "phone": "(800) 258-3091"
+        }
+      ],
+      "portalUrl": "https://www.blueshieldca.com/provider",
+      "averageTatDays": 60,
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "CAQH Release",
+        "Roster Sheet"
+      ],
+      "statesServed": [
+        "CA"
+      ],
+      "followUpCadenceDays": 7,
+      "submissionMethod": "Online Portal",
+      "type": "Commercial"
+    },
+    {
+      "id": "pyr-catalight",
+      "requiredFields": [
+        "BACB Certification #",
+        "NPI",
+        "CAQH ID",
+        "Service Area Zip Codes"
+      ],
+      "name": "Catalight (Easterseals / Behavioral Health)",
+      "statesServed": [
+        "CA",
+        "Nationwide"
+      ],
+      "submissionMethod": "Online Portal",
+      "followUpCadenceDays": 5,
+      "averageTatDays": 30,
+      "active": true,
+      "requiredDocuments": [
+        "BCBA Board Cert",
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "Catalight Roster Form"
+      ],
+      "type": "Network",
+      "contacts": [
+        {
+          "role": "Network Relations Lead",
+          "email": "rachel.green@catalight.org",
+          "phone": "(800) 843-3725",
+          "name": "Rachel Green",
+          "id": "c-20"
+        }
+      ],
+      "portalUrl": "https://www.catalight.org/providers"
+    },
+    {
+      "id": "pyr-cchp",
+      "averageTatDays": 60,
+      "statesServed": [
+        "CA (San Francisco / San Mateo)"
+      ],
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "CCHP Provider Packet"
+      ],
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Bilingual Competency Details"
+      ],
+      "type": "Regional / Medicaid",
+      "active": true,
+      "contacts": [
+        {
+          "phone": "(415) 834-2100",
+          "email": "wling@cchphealthplan.com",
+          "name": "Wai Ling",
+          "role": "Contracting Manager",
+          "id": "c-8"
+        }
+      ],
+      "followUpCadenceDays": 10,
+      "portalUrl": "https://www.cchphealthplan.com",
+      "submissionMethod": "Email",
+      "name": "CCHP (Chinese Community Health Plan)"
+    },
+    {
+      "id": "pyr-ccs",
+      "averageTatDays": 90,
+      "name": "CCS (California Children's Services)",
+      "active": true,
+      "followUpCadenceDays": 14,
+      "statesServed": [
+        "CA"
+      ],
+      "requiredFields": [
+        "NPI",
+        "Pediatric Experience Hours",
+        "CCS Facility Number"
+      ],
+      "submissionMethod": "Mail",
+      "type": "State program",
+      "portalUrl": "https://www.dhcs.ca.gov/services/ccs",
+      "requiredDocuments": [
+        "California License",
+        "Pediatric Clinical References (3)",
+        "Hospital Privileges / Clinic Affiliation",
+        "Case Logs",
+        "CV",
+        "Board Certification"
+      ],
+      "contacts": [
+        {
+          "phone": "(916) 552-9105",
+          "id": "c-17",
+          "name": "Dr. Rebecca Stern",
+          "email": "rebecca.stern@dhcs.ca.gov",
+          "role": "CCS Panel Coordinator"
+        }
+      ]
+    },
+    {
+      "id": "pyr-cigna",
+      "type": "Commercial",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Tax ID"
+      ],
+      "statesServed": [
+        "CA",
+        "UT",
+        "Nationwide"
+      ],
+      "active": true,
+      "portalUrl": "https://cignaforhcp.cigna.com",
+      "averageTatDays": 60,
+      "submissionMethod": "Online Portal",
+      "followUpCadenceDays": 7,
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "Board Certification"
+      ],
+      "name": "Cigna",
+      "contacts": [
+        {
+          "email": "amber.davis@cigna.com",
+          "name": "Amber Davis",
+          "phone": "(800) 882-4462",
+          "role": "Credentialing Analyst",
+          "id": "c-4"
+        }
+      ]
+    },
+    {
+      "id": "pyr-hill",
+      "averageTatDays": 60,
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "Hill Physicians IPA Application"
+      ],
+      "portalUrl": "https://www.hillphysicians.com/providers",
+      "contacts": [
+        {
+          "id": "c-19",
+          "phone": "(800) 445-5647",
+          "name": "Megan Foster",
+          "email": "megan.foster@hpmg.com",
+          "role": "Allied Health Network Rep"
+        }
+      ],
+      "type": "Network",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Supervising Physician (if applicable)"
+      ],
+      "followUpCadenceDays": 7,
+      "statesServed": [
+        "CA (Bay Area, Sacramento)"
+      ],
+      "active": true,
+      "name": "Hill Physicians",
+      "submissionMethod": "Online Portal"
+    },
+    {
+      "id": "pyr-hpsm",
+      "statesServed": [
+        "CA (San Mateo County)"
+      ],
+      "name": "HPSM (Health Plan of San Mateo)",
+      "submissionMethod": "Online Portal",
+      "active": true,
+      "followUpCadenceDays": 7,
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Medi-Cal Status"
+      ],
+      "type": "Regional / Medicaid",
+      "portalUrl": "https://www.hpsm.org",
+      "contacts": [
+        {
+          "phone": "(650) 616-2106",
+          "id": "c-10",
+          "email": "jennifer.wong@hpsm.org",
+          "role": "Provider Network Liaison",
+          "name": "Jennifer Wong"
+        }
+      ],
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "PAVE Enrollment Verification"
+      ],
+      "averageTatDays": 60
+    },
+    {
+      "id": "pyr-molina",
+      "type": "Medicaid / Commercial",
+      "portalUrl": "https://provider.molinahealthcare.com",
+      "averageTatDays": 90,
+      "requiredFields": [
+        "NPI",
+        "PAVE Application ID",
+        "CAQH ID",
+        "Group Tax ID"
+      ],
+      "contacts": [
+        {
+          "id": "c-12",
+          "phone": "(888) 562-5442",
+          "email": "patricia.ramos@molinahealthcare.com",
+          "role": "Medicaid Credentialing Rep",
+          "name": "Patricia Ramos"
+        }
+      ],
+      "followUpCadenceDays": 7,
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "PAVE Verification",
+        "Molina Roster"
+      ],
+      "submissionMethod": "Online Portal",
+      "name": "Molina",
+      "statesServed": [
+        "CA",
+        "UT",
+        "Nationwide"
+      ],
+      "active": true
+    },
+    {
+      "id": "pyr-php",
+      "averageTatDays": 45,
+      "name": "PHP (Physicians Health Plan)",
+      "statesServed": [
+        "CA",
+        "Regional"
+      ],
+      "active": true,
+      "requiredFields": [
+        "NPI",
+        "CAQH ID"
+      ],
+      "followUpCadenceDays": 10,
+      "type": "Regional",
+      "submissionMethod": "Email",
+      "portalUrl": "https://www.phpmichigan.com",
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "CV"
+      ],
+      "contacts": [
+        {
+          "email": "kbrown@php.org",
+          "name": "Kevin Brown",
+          "phone": "(800) 832-9186",
+          "id": "c-11",
+          "role": "Provider Services"
+        }
+      ]
+    },
+    {
+      "id": "pyr-preferred",
+      "active": true,
+      "averageTatDays": 30,
+      "followUpCadenceDays": 7,
+      "requiredFields": [
+        "NPI",
+        "Therapy Disciplines"
+      ],
+      "statesServed": [
+        "CA",
+        "UT"
+      ],
+      "type": "Network",
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI"
+      ],
+      "contacts": [
+        {
+          "role": "Network Coordinator",
+          "name": "Amanda Hall",
+          "email": "ahall@preferredtherapy.com",
+          "phone": "(800) 664-5240",
+          "id": "c-14"
+        }
+      ],
+      "submissionMethod": "Email",
+      "name": "Preferred Therapy",
+      "portalUrl": "https://www.preferredtherapy.com"
+    },
+    {
+      "id": "pyr-regenceut",
+      "contacts": [
+        {
+          "id": "c-16",
+          "phone": "(800) 253-0838",
+          "role": "Commercial Network Specialist",
+          "name": "Emily Clark",
+          "email": "emily.clark@regence.com"
+        }
+      ],
+      "type": "Commercial",
+      "requiredDocuments": [
+        "Utah State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "CAQH Profile Attestation"
+      ],
+      "submissionMethod": "Availity",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Group Tax ID"
+      ],
+      "active": true,
+      "name": "Regence Utah",
+      "followUpCadenceDays": 7,
+      "statesServed": [
+        "UT"
+      ],
+      "averageTatDays": 45,
+      "portalUrl": "https://www.regence.com/provider"
+    },
+    {
+      "id": "pyr-scfhp",
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "PAVE Approval",
+        "Board Cert"
+      ],
+      "contacts": [
+        {
+          "id": "c-9",
+          "name": "Carlos Mendez",
+          "phone": "(408) 874-1788",
+          "email": "cmendez@scfhp.com",
+          "role": "Credentialing Coordinator"
+        }
+      ],
+      "name": "SCFHP (Santa Clara Family Health Plan)",
+      "portalUrl": "https://www.scfhp.com",
+      "submissionMethod": "Online Portal",
+      "type": "Regional / Medicaid",
+      "statesServed": [
+        "CA (Santa Clara County)"
+      ],
+      "active": true,
+      "requiredFields": [
+        "NPI",
+        "PAVE Approval Number",
+        "Group NPI"
+      ],
+      "followUpCadenceDays": 7,
+      "averageTatDays": 75
+    },
+    {
+      "id": "pyr-triwest",
+      "averageTatDays": 90,
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "Military Cultural Competence Cert",
+        "CV"
+      ],
+      "portalUrl": "https://www.triwest.com/provider",
+      "followUpCadenceDays": 10,
+      "name": "TriWest",
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Federal Exclusion Check Proof"
+      ],
+      "active": true,
+      "statesServed": [
+        "CA",
+        "UT",
+        "West Region"
+      ],
+      "type": "Government",
+      "contacts": [
+        {
+          "role": "VA Network Specialist",
+          "phone": "(877) 226-8349",
+          "id": "c-13",
+          "email": "tmiller@triwest.com",
+          "name": "Capt. Thomas Miller"
+        }
+      ],
+      "submissionMethod": "Online Portal"
+    },
+    {
+      "id": "pyr-uhc",
+      "contacts": [
+        {
+          "role": "Network Manager",
+          "email": "m_scott@uhc.com",
+          "phone": "(877) 842-3210",
+          "name": "Michael Scott",
+          "id": "c-5"
+        }
+      ],
+      "name": "UnitedHealthcare (UHC)",
+      "followUpCadenceDays": 10,
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "Optum Behavioral Roster"
+      ],
+      "submissionMethod": "Online Portal",
+      "active": true,
+      "type": "Commercial",
+      "portalUrl": "https://www.uhcprovider.com",
+      "averageTatDays": 65,
+      "requiredFields": [
+        "NPI",
+        "CAQH ID",
+        "Group Taxonomy"
+      ],
+      "statesServed": [
+        "CA",
+        "UT",
+        "Nationwide"
+      ]
+    },
+    {
+      "id": "pyr-utmedicaid",
+      "averageTatDays": 60,
+      "requiredDocuments": [
+        "Utah State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "PRISM Provider Agreement",
+        "Fingerprinting Card"
+      ],
+      "portalUrl": "https://medicaid.utah.gov/provider-portal",
+      "followUpCadenceDays": 7,
+      "name": "Utah Medicaid",
+      "requiredFields": [
+        "NPI",
+        "PRISM System ID",
+        "Utah Taxonomy 103K00000X"
+      ],
+      "active": true,
+      "statesServed": [
+        "UT"
+      ],
+      "type": "Medicaid",
+      "contacts": [
+        {
+          "id": "c-15",
+          "role": "Utah PRISM Enrollment Specialist",
+          "phone": "(801) 538-6155",
+          "name": "Bradley Young",
+          "email": "byoung@utah.gov"
+        }
+      ],
+      "submissionMethod": "Online Portal"
+    },
+    {
+      "id": "pyr-vhp",
+      "portalUrl": "https://www.valleyhealthplan.org/providers",
+      "requiredFields": [
+        "NPI",
+        "Local Service Address",
+        "Medi-Cal PIN / NPI"
+      ],
+      "contacts": [
+        {
+          "id": "c-6",
+          "phone": "(408) 885-3560",
+          "name": "Maria Santos",
+          "email": "maria.santos@vhp.sccgov.org",
+          "role": "Credentialing Specialist"
+        }
+      ],
+      "type": "Regional",
+      "active": true,
+      "followUpCadenceDays": 7,
+      "averageTatDays": 45,
+      "submissionMethod": "Email",
+      "name": "VHP (Valley Health Plan)",
+      "statesServed": [
+        "CA (Santa Clara County)"
+      ],
+      "requiredDocuments": [
+        "State License",
+        "W-9 Form",
+        "Malpractice Insurance / COI",
+        "VHP Enrollment App",
+        "Lease Agreement"
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "ent-1",
+      "ownershipDetails": "100% Owned by AGES Healthcare Group Inc.",
+      "dba": "AGES Learning Solutions",
+      "workersCompPolicy": "WC-48201-CA",
+      "generalLiabilityPolicy": "GL-982341-C",
+      "legalName": "Ages Learning Solutions LLC",
+      "address": "2105 S Bascom Ave, Suite 150, San Jose, CA 95124",
+      "generalLiabilityExpiry": "2027-02-01",
+      "email": "credentialing@ageslearningsolutions.com",
+      "w9Date": "2026-01-10",
+      "workersCompExpiry": "2027-03-15",
+      "ein": "47-2891234",
+      "phone": "(408) 555-0192",
+      "w9OnFile": true,
+      "primaryContact": "Namitha Narayanan",
+      "active": true
+    },
+    {
+      "id": "ent-2",
+      "w9Date": "2026-01-15",
+      "primaryContact": "Elena Rostova",
+      "ownershipDetails": "Physician & Clinician Owned Professional Corp",
+      "active": true,
+      "w9OnFile": true,
+      "ein": "82-4198271",
+      "workersCompExpiry": "2027-04-30",
+      "address": "1220 Airway Blvd, Suite 200, Livermore, CA 94551",
+      "phone": "(925) 555-0144",
+      "workersCompPolicy": "WC-19283-CA",
+      "dba": "Proficio Speech Therapy",
+      "generalLiabilityExpiry": "2027-04-30",
+      "email": "admin@proficiotherapy.com",
+      "generalLiabilityPolicy": "GL-771829-P",
+      "legalName": "Proficio Speech Therapy Group INC"
+    },
+    {
+      "id": "ent-3",
+      "dba": "Child's Play Therapy",
+      "w9OnFile": true,
+      "w9Date": "2025-12-20",
+      "address": "8440 Brentwood Blvd, Suite C, Brentwood, CA 94513",
+      "primaryContact": "Sarah Jenkins",
+      "workersCompExpiry": "2026-11-30",
+      "active": true,
+      "workersCompPolicy": "WC-88412-CA",
+      "ownershipDetails": "Clinical Services Partnership",
+      "generalLiabilityPolicy": "GL-334190-CP",
+      "legalName": "Child's Play Therapy Services PC",
+      "generalLiabilityExpiry": "2026-11-30",
+      "email": "info@childsplaytherapyservices.com",
+      "phone": "(925) 555-0188",
+      "ein": "94-3321876"
+    }
+  ],
+  "locations": [
+    {
+      "id": "loc-1",
+      "paveStatus": "Approved",
+      "dba": "Proficio Speech Therapy",
+      "leaseAgreementStatus": "Active",
+      "serviceRadiusMiles": 25,
+      "state": "CA",
+      "effectiveDate": "2022-04-01",
+      "insuranceCoverageValid": true,
+      "active": true,
+      "payerApplicability": [
+        "All"
+      ],
+      "phone": "(925) 447-2000",
+      "address": "1220 Airway Blvd, Suite 200",
+      "countiesServed": [
+        "Alameda",
+        "Contra Costa"
+      ],
+      "entityId": "ent-2",
+      "name": "Livermore Clinic",
+      "leaseExpiryDate": "2028-06-30",
+      "locationApprovalStatus": "Approved",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "In-School",
+        "Telehealth"
+      ],
+      "zip": "94551",
+      "locationType": "Physical Clinic",
+      "city": "Livermore"
+    },
+    {
+      "id": "loc-2",
+      "name": "Brentwood Center",
+      "serviceRadiusMiles": 30,
+      "effectiveDate": "2023-01-15",
+      "zip": "94513",
+      "leaseAgreementStatus": "Active",
+      "city": "Brentwood",
+      "insuranceCoverageValid": true,
+      "phone": "(925) 634-1120",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "Telehealth"
+      ],
+      "leaseExpiryDate": "2027-12-31",
+      "locationType": "Physical Clinic",
+      "state": "CA",
+      "entityId": "ent-3",
+      "countiesServed": [
+        "Contra Costa",
+        "San Joaquin"
+      ],
+      "active": true,
+      "address": "8440 Brentwood Blvd, Suite C",
+      "dba": "Child's Play Therapy",
+      "paveStatus": "Approved",
+      "payerApplicability": [
+        "All"
+      ],
+      "locationApprovalStatus": "Approved"
+    },
+    {
+      "id": "loc-3",
+      "leaseExpiryDate": "2029-08-31",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "In-School",
+        "Telehealth"
+      ],
+      "state": "CA",
+      "paveStatus": "Approved",
+      "locationApprovalStatus": "Approved",
+      "address": "2105 S Bascom Ave, Suite 150",
+      "locationType": "Physical Clinic",
+      "serviceRadiusMiles": 35,
+      "effectiveDate": "2021-08-01",
+      "zip": "95124",
+      "leaseAgreementStatus": "Active",
+      "dba": "AGES Learning Solutions",
+      "insuranceCoverageValid": true,
+      "name": "San Jose Headquarters & Clinical Center",
+      "phone": "(408) 559-8800",
+      "countiesServed": [
+        "Santa Clara",
+        "San Mateo",
+        "Santa Cruz"
+      ],
+      "active": true,
+      "city": "San Jose",
+      "entityId": "ent-1",
+      "payerApplicability": [
+        "All"
+      ]
+    },
+    {
+      "id": "loc-4",
+      "address": "750 Mason St, Suite 102",
+      "phone": "(707) 449-3300",
+      "locationApprovalStatus": "Approved",
+      "effectiveDate": "2024-03-01",
+      "payerApplicability": [
+        "All"
+      ],
+      "zip": "95687",
+      "countiesServed": [
+        "Solano",
+        "Yolo",
+        "Napa"
+      ],
+      "leaseAgreementStatus": "Active",
+      "paveStatus": "Approved",
+      "dba": "AGES Learning Solutions",
+      "insuranceCoverageValid": true,
+      "serviceRadiusMiles": 30,
+      "active": true,
+      "city": "Vacaville",
+      "entityId": "ent-1",
+      "leaseExpiryDate": "2027-09-30",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "Telehealth"
+      ],
+      "locationType": "Satellite",
+      "name": "Vacaville Satellite Clinic",
+      "state": "CA"
+    },
+    {
+      "id": "loc-5",
+      "countiesServed": [
+        "Salt Lake",
+        "Utah County",
+        "Davis"
+      ],
+      "paveStatus": "Not Required",
+      "leaseAgreementStatus": "Active",
+      "serviceRadiusMiles": 40,
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "Telehealth"
+      ],
+      "address": "10984 S Jordan Gateway, Suite 400",
+      "insuranceCoverageValid": true,
+      "entityId": "ent-1",
+      "locationType": "Physical Clinic",
+      "effectiveDate": "2024-10-01",
+      "dba": "AGES Learning Solutions Utah",
+      "active": true,
+      "state": "UT",
+      "leaseExpiryDate": "2028-11-30",
+      "city": "South Jordan",
+      "locationApprovalStatus": "Approved",
+      "zip": "84095",
+      "phone": "(801) 876-5400",
+      "name": "South Jordan Center",
+      "payerApplicability": [
+        "All"
+      ]
+    },
+    {
+      "id": "loc-inhome-bayarea",
+      "notes": "Home-based therapy delivery network across the greater San Francisco Bay Area and Silicon Valley.",
+      "serviceRadiusMiles": 60,
+      "phone": "(408) 559-8850",
+      "insuranceCoverageValid": true,
+      "city": "San Jose",
+      "active": true,
+      "zip": "95124",
+      "effectiveDate": "2021-01-01",
+      "leaseExpiryDate": "",
+      "name": "Northern California In-Home & Community Delivery",
+      "leaseAgreementStatus": "Not Applicable",
+      "serviceTypes": [
+        "In-Home",
+        "Telehealth"
+      ],
+      "locationApprovalStatus": "Approved",
+      "locationType": "In-Home / Mobile",
+      "dba": "AGES In-Home Services",
+      "paveStatus": "Approved",
+      "countiesServed": [
+        "Santa Clara",
+        "San Mateo",
+        "Alameda",
+        "Contra Costa",
+        "San Francisco"
+      ],
+      "entityId": "ent-1",
+      "payerApplicability": [
+        "All"
+      ],
+      "address": "Mobile & Community Service Delivery Network",
+      "state": "CA"
+    },
+    {
+      "id": "loc-inhome-eastbay",
+      "countiesServed": [
+        "Alameda",
+        "Contra Costa",
+        "San Joaquin"
+      ],
+      "insuranceCoverageValid": true,
+      "notes": "In-home speech and pediatric therapy delivery network for East Bay and Central Valley families.",
+      "paveStatus": "Approved",
+      "locationType": "In-Home / Mobile",
+      "phone": "(925) 447-2050",
+      "dba": "Proficio In-Home Speech & Therapy Services",
+      "serviceRadiusMiles": 45,
+      "serviceTypes": [
+        "In-Home",
+        "Telehealth"
+      ],
+      "locationApprovalStatus": "Approved",
+      "leaseAgreementStatus": "Not Applicable",
+      "state": "CA",
+      "name": "East Bay & Tri-Valley In-Home Therapy Network",
+      "entityId": "ent-2",
+      "zip": "94551",
+      "effectiveDate": "2022-06-01",
+      "payerApplicability": [
+        "All"
+      ],
+      "city": "Livermore",
+      "active": true,
+      "address": "Mobile & In-Home Practice Coverage (Tri-Valley Region)",
+      "leaseExpiryDate": ""
+    }
+  ],
+  "stage_configs": [
+    {
+      "id": "stg-01",
+      "isActive": true,
+      "name": "Intake",
+      "category": "Pre-Submission",
+      "slaTurnaroundTargetDays": 1,
+      "description": "Initial intake of provider credentialing request, roster assignment, and initial requirements verification.",
+      "badgeColor": "slate",
+      "isMandatory": true,
+      "order": 1
+    },
+    {
+      "id": "stg-02",
+      "description": "Awaiting critical clinician documents (W-9, COI, state licenses, degree diplomas, CV, DEA).",
+      "order": 2,
+      "isMandatory": true,
+      "name": "Documents Pending",
+      "isActive": true,
+      "badgeColor": "blue",
+      "category": "Pre-Submission",
+      "slaTurnaroundTargetDays": 3
+    },
+    {
+      "id": "stg-03",
+      "isActive": true,
+      "category": "Pre-Submission",
+      "name": "Documents Complete",
+      "badgeColor": "teal",
+      "description": "All required provider documentation gathered, verified against checklist, and validated for completeness.",
+      "isMandatory": true,
+      "slaTurnaroundTargetDays": 1,
+      "order": 3
+    },
+    {
+      "id": "stg-04",
+      "category": "Pre-Submission",
+      "badgeColor": "indigo",
+      "slaTurnaroundTargetDays": 2,
+      "name": "CAQH Pending",
+      "isActive": true,
+      "description": "Awaiting CAQH ProView attestation, profile updates, credential releases, or payer access authorization.",
+      "order": 4
+    },
+    {
+      "id": "stg-05",
+      "category": "Pre-Submission",
+      "name": "PAVE Pending",
+      "order": 5,
+      "isActive": true,
+      "badgeColor": "purple",
+      "description": "California Medicaid / Medi-Cal PAVE portal clinician enrollment and facility rendering site submission pending.",
+      "slaTurnaroundTargetDays": 3
+    },
+    {
+      "id": "stg-06",
+      "order": 6,
+      "badgeColor": "amber",
+      "slaTurnaroundTargetDays": 2,
+      "description": "Drafting payer-specific forms, assembling packet, and conducting Section 5.10 Legal Entity & DBA pre-submission checks.",
+      "isMandatory": true,
+      "name": "Application Preparation",
+      "isActive": true,
+      "category": "Pre-Submission"
+    },
+    {
+      "id": "stg-07",
+      "slaTurnaroundTargetDays": 0,
+      "name": "Application Submitted",
+      "isMandatory": true,
+      "description": "Application formally transmitted to payer (portal, email, or physical mail) with confirmation tracking ID.",
+      "badgeColor": "sky",
+      "category": "In-Review",
+      "isActive": true,
+      "order": 7
+    },
+    {
+      "id": "stg-08",
+      "category": "In-Review",
+      "order": 8,
+      "badgeColor": "sky",
+      "isActive": true,
+      "slaTurnaroundTargetDays": 60,
+      "isMandatory": true,
+      "name": "Payer Review",
+      "description": "Application under active evaluation by payer credentialing committee; tracked on automated 7–10 day follow-up cadence."
+    },
+    {
+      "id": "stg-09",
+      "category": "In-Review",
+      "order": 9,
+      "slaTurnaroundTargetDays": 2,
+      "description": "Payer issued formal Request for Information (RFI) or requested supplemental practice evidence.",
+      "isActive": true,
+      "name": "Additional Documents Requested",
+      "badgeColor": "amber"
+    },
+    {
+      "id": "stg-10",
+      "description": "Payer returned application due to demographic, taxonomy, address, or legal entity discrepancy.",
+      "badgeColor": "amber",
+      "slaTurnaroundTargetDays": 2,
+      "category": "In-Review",
+      "name": "Correction Required",
+      "order": 10,
+      "isActive": true
+    },
+    {
+      "id": "stg-11",
+      "badgeColor": "indigo",
+      "name": "Resubmitted",
+      "slaTurnaroundTargetDays": 1,
+      "description": "Corrected application packet and requested supplemental files resubmitted back to payer review team.",
+      "isActive": true,
+      "order": 11,
+      "category": "In-Review"
+    },
+    {
+      "id": "stg-12",
+      "badgeColor": "emerald",
+      "order": 12,
+      "isMandatory": true,
+      "isActive": true,
+      "description": "Payer credentialing committee issued formal approval letter with initial credentialing credentialing decision.",
+      "category": "Approval & Linking",
+      "slaTurnaroundTargetDays": 1,
+      "name": "Approved"
+    },
+    {
+      "id": "stg-13",
+      "slaTurnaroundTargetDays": 5,
+      "description": "Approved provider is queued for facility/group NPI linking under correct Legal Entity & DBA (FR-014).",
+      "isMandatory": true,
+      "isActive": true,
+      "name": "Linking Pending",
+      "category": "Approval & Linking",
+      "order": 13,
+      "badgeColor": "purple"
+    },
+    {
+      "id": "stg-14",
+      "description": "Provider successfully linked to group contract, practice location, and billing tax ID (TIN).",
+      "isMandatory": true,
+      "name": "Linked",
+      "slaTurnaroundTargetDays": 2,
+      "badgeColor": "teal",
+      "category": "Approval & Linking",
+      "isActive": true,
+      "order": 14
+    },
+    {
+      "id": "stg-15",
+      "slaTurnaroundTargetDays": 0,
+      "order": 15,
+      "badgeColor": "emerald",
+      "category": "Completed / Closed",
+      "description": "Effective date confirmed in payer portal; billing hold released and claims authorized for reimbursement.",
+      "isMandatory": true,
+      "isActive": true,
+      "name": "Effective"
+    },
+    {
+      "id": "stg-16",
+      "slaTurnaroundTargetDays": 0,
+      "badgeColor": "slate",
+      "name": "Closed / Not Contracted",
+      "order": 16,
+      "description": "Application closed, withdrawn, or payer panel is closed for this specialty or geographic service area.",
+      "category": "Completed / Closed",
+      "isActive": true
+    },
+    {
+      "id": "stg-17",
+      "order": 17,
+      "isActive": true,
+      "slaTurnaroundTargetDays": 30,
+      "category": "Maintenance / Alert",
+      "isSystemAssigned": true,
+      "description": "Payer re-credentialing cycle approaching (every 2-3 years) requiring re-attestation and updated records.",
+      "badgeColor": "pink",
+      "name": "Recredentialing Due"
+    },
+    {
+      "id": "stg-18",
+      "badgeColor": "rose",
+      "name": "Overdue",
+      "order": 18,
+      "category": "Maintenance / Alert",
+      "isActive": true,
+      "description": "Payer follow-up or credentialing milestone exceeded scheduled date without documented contact (system-assigned).",
+      "isSystemAssigned": true,
+      "slaTurnaroundTargetDays": 0
+    }
+  ],
+  "system_config": [
+    {
+      "id": "holidays",
+      "items": [
+        {
+          "type": "Federal",
+          "name": "New Year's Day",
+          "date": "2026-01-01",
+          "affectsSla": true,
+          "id": "HOL-1"
+        },
+        {
+          "id": "HOL-2",
+          "type": "Federal",
+          "name": "Martin Luther King Jr. Day",
+          "date": "2026-01-19",
+          "affectsSla": true
+        },
+        {
+          "id": "HOL-3",
+          "affectsSla": true,
+          "type": "Federal",
+          "name": "Presidents' Day",
+          "date": "2026-02-16"
+        },
+        {
+          "id": "HOL-4",
+          "affectsSla": true,
+          "type": "Federal",
+          "name": "Memorial Day",
+          "date": "2026-05-25"
+        },
+        {
+          "name": "Juneteenth National Independence Day",
+          "date": "2026-06-19",
+          "type": "Federal",
+          "affectsSla": true,
+          "id": "HOL-5"
+        },
+        {
+          "id": "HOL-6",
+          "affectsSla": true,
+          "name": "Independence Day",
+          "date": "2026-07-04",
+          "type": "Federal"
+        },
+        {
+          "type": "Federal",
+          "affectsSla": true,
+          "name": "Labor Day",
+          "date": "2026-09-07",
+          "id": "HOL-7"
+        },
+        {
+          "id": "HOL-8",
+          "type": "Federal",
+          "affectsSla": true,
+          "date": "2026-11-26",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2026-11-27",
+          "name": "Day After Thanksgiving",
+          "type": "Corporate",
+          "affectsSla": true,
+          "id": "HOL-9"
+        },
+        {
+          "affectsSla": true,
+          "type": "Federal",
+          "id": "HOL-10",
+          "name": "Christmas Day",
+          "date": "2026-12-25"
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "slaFollowUpMaxDays": 10,
+      "autoReminderPayerAging": true,
+      "enableDailySummaryEmail": false,
+      "autoEscalateOverdueFollowup": true,
+      "slaFollowUpMinDays": 7,
+      "caqhReattestationDays": 120,
+      "nppesAutoValidation": true,
+      "slaSubmissionDays": 5,
+      "licenseExpAdvanceAlertDays": 60
+    },
+    {
+      "id": "templates",
+      "items": [
+        {
+          "isActive": true,
+          "recipientRoles": [
+            "Credentialing Specialist",
+            "Provider (Clinician)",
+            "Human Resources (HR)"
+          ],
+          "name": "License 60-Day Advance Warning",
+          "bodyTemplate": "Dear {provider_name},\n\nYour {license_type} license ({license_number}) under state {license_state} is scheduled to expire on {expiration_date}. To prevent clinical credentialing suspension or payer billing hold, please submit renewal documentation immediately to the credentialing team.\n\nThank you,\nAges / Proficio Credentialing Department",
+          "id": "TMPL-01",
+          "subject": "URGENT: Credentialing License Renewal Notice - {provider_name}",
+          "triggerEvent": "Clinician license expires in ≤ 60 calendar days"
+        },
+        {
+          "triggerEvent": "Application pending payer determination ≥ 60 days or follow-up overdue",
+          "isActive": true,
+          "name": "Overdue Follow-up & Aging Escalation",
+          "id": "TMPL-02",
+          "recipientRoles": [
+            "Credentialing Manager",
+            "Leadership / Executive",
+            "Credentialing Specialist"
+          ],
+          "bodyTemplate": "Attention Credentialing Leadership,\n\nApplication {application_id} for {provider_name} with {payer_name} has exceeded SLA benchmarks ({days_in_process} days elapsed). Last logged contact with payer representative was on {last_follow_up_date}.\n\nPlease review escalation notes and initiate supervisor outreach.",
+          "subject": "ACTION REQUIRED: Escalated Credentialing Application Aging ({payer_name}) - {provider_name}"
+        },
+        {
+          "name": "Payer Approval & Effective Date Broadcast",
+          "subject": "CREDENTIALING APPROVED: {provider_name} is now in-network with {payer_name}",
+          "isActive": true,
+          "recipientRoles": [
+            "Billing and Claims",
+            "HR / Operations",
+            "Credentialing Specialist",
+            "Provider (Clinician)"
+          ],
+          "bodyTemplate": "Great news! {provider_name} has been formally approved and linked under {entity_name} for {payer_name}.\n\nEffective Date: {effective_date}\nProvider Rendering NPI: {npi}\nBilling Hold: RELEASED (Ready to bill claims)",
+          "id": "TMPL-03",
+          "triggerEvent": "Payer status updated to Approved with Effective Date"
+        }
+      ]
+    }
+  ],
+  "demo_employees": [
+    {
+      "id": "emp-prv-1",
+      "notes": "Direct clinical staff employed at AGES Learning Solutions. Linked to provider prv-1.",
+      "employmentStatus": "Full-Time",
+      "phone": "(408) 555-0129",
+      "migratedAt": "2026-09-07T14:13:54.286Z",
+      "department": "Clinical Services",
+      "createdAt": "2026-01-01",
+      "fullName": "Ashley Vanderbilt",
+      "updatedAt": "2026-08-26",
+      "entityId": "ent-1",
+      "email": "ashley.vanderbilt@ageslearningsolutions.com",
+      "isDemo": true,
+      "startDate": "2023-02-15",
+      "roleTitle": "BCBA (ABA)",
+      "firstName": "Ashley",
+      "lastName": "Vanderbilt",
+      "ownerAccountEmail": "admin@example.com",
+      "officeLocationId": "loc-3"
+    },
+    {
+      "id": "emp-prv-2",
+      "isDemo": true,
+      "phone": "(925) 555-0163",
+      "notes": "Direct clinical staff employed at Proficio Speech Therapy. Linked to provider prv-2.",
+      "createdAt": "2026-01-01",
+      "officeLocationId": "loc-1",
+      "entityId": "ent-2",
+      "updatedAt": "2026-08-26",
+      "fullName": "Maya Patel",
+      "roleTitle": "SLP (Speech)",
+      "email": "maya.patel@proficiotherapy.com",
+      "startDate": "2022-09-01",
+      "firstName": "Maya",
+      "lastName": "Patel",
+      "migratedAt": "2026-09-07T14:13:55.247Z",
+      "department": "Clinical Services",
+      "employmentStatus": "Full-Time",
+      "ownerAccountEmail": "admin@example.com"
+    },
+    {
+      "id": "emp-prv-3",
+      "email": "lucas.moreno@childsplaytherapy.com",
+      "firstName": "Lucas",
+      "fullName": "Lucas Moreno",
+      "entityId": "ent-3",
+      "notes": "Direct clinical staff employed at Child's Play Therapy. Linked to provider prv-3.",
+      "isDemo": true,
+      "phone": "(925) 555-0199",
+      "officeLocationId": "loc-2",
+      "employmentStatus": "Full-Time",
+      "createdAt": "2026-01-01",
+      "ownerAccountEmail": "admin@example.com",
+      "lastName": "Moreno",
+      "migratedAt": "2026-09-07T14:13:55.824Z",
+      "department": "Clinical Services",
+      "updatedAt": "2026-08-26",
+      "roleTitle": "OTR/L (OT)",
+      "startDate": "2023-06-10"
+    },
+    {
+      "id": "emp-prv-4",
+      "phone": "(801) 555-0178",
+      "entityId": "ent-1",
+      "notes": "Direct clinical staff employed at AGES Learning Solutions Utah. Linked to provider prv-4.",
+      "fullName": "Kaitlyn Zimmerman",
+      "createdAt": "2026-01-01",
+      "isDemo": true,
+      "employmentStatus": "Full-Time",
+      "email": "kaitlyn.zimmerman@ageslearningsolutions.com",
+      "roleTitle": "BCBA (ABA)",
+      "startDate": "2024-10-01",
+      "updatedAt": "2026-08-26",
+      "firstName": "Kaitlyn",
+      "ownerAccountEmail": "admin@example.com",
+      "officeLocationId": "loc-5",
+      "department": "Clinical Services",
+      "lastName": "Zimmerman",
+      "migratedAt": "2026-09-07T14:13:56.411Z"
+    },
+    {
+      "id": "emp-prv-5",
+      "department": "Clinical Services",
+      "migratedAt": "2026-09-07T14:13:57.045Z",
+      "lastName": "Taylor",
+      "email": "jordan.taylor@proficiotherapy.com",
+      "createdAt": "2026-01-01",
+      "updatedAt": "2026-08-26",
+      "officeLocationId": "loc-1",
+      "startDate": "2024-01-15",
+      "notes": "Direct clinical staff employed at Proficio Speech & AGES Joint Clinic. Linked to provider prv-5.",
+      "roleTitle": "SLP (Speech, ABA)",
+      "phone": "(925) 555-0182",
+      "firstName": "Jordan",
+      "employmentStatus": "Full-Time",
+      "ownerAccountEmail": "admin@example.com",
+      "fullName": "Jordan Taylor",
+      "isDemo": true,
+      "entityId": "ent-2"
+    },
+    {
+      "id": "emp-prv-6",
+      "createdAt": "2026-01-01",
+      "entityId": "ent-3",
+      "isDemo": true,
+      "fullName": "Derrick Sterling",
+      "phone": "(925) 555-0133",
+      "notes": "Direct clinical staff employed at Child's Play Therapy. Linked to provider prv-6.",
+      "roleTitle": "OTR/L (OT)",
+      "department": "Clinical Services",
+      "officeLocationId": "loc-2",
+      "startDate": "2023-11-01",
+      "migratedAt": "2026-09-07T14:13:57.578Z",
+      "email": "derrick.sterling@childsplaytherapy.com",
+      "updatedAt": "2026-08-26",
+      "employmentStatus": "Part-Time",
+      "firstName": "Derrick",
+      "ownerAccountEmail": "admin@example.com",
+      "lastName": "Sterling"
+    },
+    {
+      "id": "emp-prv-954093",
+      "migratedAt": "2026-09-07T14:13:58.113Z",
+      "department": "Clinical Services",
+      "createdAt": "2026-09-06T13:22:34.093Z",
+      "email": "marcus.vance@ageslearning.com",
+      "lastName": "Vance",
+      "updatedAt": "2026-09-06T13:22:34.093Z",
+      "officeLocationId": "loc-3",
+      "ownerAccountEmail": "admin@example.com",
+      "notes": "Clinical staff member. Created via credentialing workflow for Application APP-2026-4951.",
+      "phone": "(510) 555-0144",
+      "roleTitle": "BCBA (ABA)",
+      "startDate": "2026-09-06",
+      "firstName": "Marcus",
+      "fullName": "Marcus Vance",
+      "employmentStatus": "Full-Time",
+      "entityId": "ent-1",
+      "isDemo": true
+    },
+    {
+      "id": "emp-usr-1",
+      "createdAt": "2026-01-15",
+      "isDemo": true,
+      "employmentStatus": "Full-Time",
+      "department": "Centralized Credentialing Hub",
+      "roleTitle": "Senior Credentialing Specialist",
+      "startDate": "2026-01-15",
+      "migratedAt": "2026-09-07T14:13:58.703Z",
+      "updatedAt": "2026-08-26",
+      "lastName": "Tom",
+      "entityId": "ent-1",
+      "fullName": "Sanjay Tom",
+      "email": "specialist@proficiotherapy.com",
+      "firstName": "Sanjay",
+      "notes": "Handles initial intakes, CAQH attestation, PAVE tracking, and payer submissions.",
+      "officeLocationId": "loc-1",
+      "phone": "(408) 555-0101",
+      "ownerAccountEmail": "admin@example.com"
+    },
+    {
+      "id": "emp-usr-2",
+      "migratedAt": "2026-09-07T14:13:59.256Z",
+      "firstName": "Namitha",
+      "department": "Centralized Credentialing Hub",
+      "employmentStatus": "Full-Time",
+      "ownerAccountEmail": "admin@example.com",
+      "entityId": "ent-1",
+      "fullName": "Namitha Narayanan",
+      "lastName": "Narayanan",
+      "isDemo": true,
+      "createdAt": "2026-01-10",
+      "notes": "Oversees credentialing workflow quality control, payer escalations, and team KPIs.",
+      "phone": "(408) 555-0102",
+      "officeLocationId": "loc-1",
+      "updatedAt": "2026-08-26",
+      "roleTitle": "Credentialing Operations Manager",
+      "startDate": "2026-01-10",
+      "email": "manager@proficiotherapy.com"
+    },
+    {
+      "id": "emp-usr-6",
+      "officeLocationId": "loc-1",
+      "entityId": "ent-1",
+      "firstName": "David",
+      "fullName": "David Chen",
+      "roleTitle": "Operations & Facilities Coordinator",
+      "isDemo": true,
+      "startDate": "2025-11-01",
+      "lastName": "Chen",
+      "ownerAccountEmail": "admin@example.com",
+      "employmentStatus": "Full-Time",
+      "updatedAt": "2026-08-26",
+      "email": "david.chen@ageslearningsolutions.com",
+      "createdAt": "2025-11-01",
+      "department": "Operations & Practice Management",
+      "migratedAt": "2026-09-07T14:13:59.817Z",
+      "notes": "Coordinates clinic leases, facility licensing, and utility attestations.",
+      "phone": "(408) 555-0106"
+    }
+  ],
+  "demo_providers": [
+    {
+      "id": "prv-1",
+      "disciplines": [
+        "ABA"
+      ],
+      "locationIds": [
+        "loc-3",
+        "loc-4"
+      ],
+      "npiVerified": true,
+      "licenseState": "CA",
+      "ownerAccountEmail": "admin@example.com",
+      "renderingProviderInfo": "Renders ABA clinical supervisory services & direct assessments. Type 1 Rendering NPI under Group Type 2 NPI 1982736450.",
+      "isolatedFor": "admin@example.com",
+      "payerEnrollments": [
+        {
+          "status": "In-Network",
+          "payerName": "Aetna",
+          "recredentialingDate": "2026-10-01",
+          "effectiveDate": "2023-04-01",
+          "payerId": "pyr-aetna",
+          "providerIdNumber": "AET-PRV-9810"
+        },
+        {
+          "payerName": "Cigna",
+          "payerId": "pyr-cigna",
+          "status": "In-Network",
+          "recredentialingDate": "2026-11-15",
+          "providerIdNumber": "CG-882109",
+          "effectiveDate": "2023-05-15"
+        },
+        {
+          "payerId": "pyr-uhc",
+          "providerIdNumber": "UHC-019283",
+          "status": "In-Network",
+          "payerName": "UnitedHealthcare (UHC)",
+          "effectiveDate": "2023-06-01",
+          "recredentialingDate": "2026-12-01"
+        },
+        {
+          "providerIdNumber": "AA-44019",
+          "status": "In-Network",
+          "effectiveDate": "2023-07-01",
+          "payerId": "pyr-alameda",
+          "recredentialingDate": "2026-10-15",
+          "payerName": "Alameda Alliance"
+        }
+      ],
+      "phone": "(408) 555-0129",
+      "taxonomy": "103K00000X (Behavior Analyst)",
+      "lastName": "Vanderbilt",
+      "contractStatus": "W-2 Full-Time",
+      "employmentStatus": "Full-Time",
+      "licenseExpiration": "2027-05-31",
+      "active": true,
+      "dba": "AGES Learning Solutions",
+      "contractInfo": {
+        "contractEffectiveDate": "2024-01-01",
+        "feeScheduleTier": "Tier 1 Specialty ABA",
+        "notes": "Group participating agreement with commercial & Medicaid managed care riders.",
+        "contractType": "Group Agreement",
+        "contractNumber": "CNT-AGES-AET-2024",
+        "recredentialingCycleYears": 3
+      },
+      "additionalLocationIds": [
+        "loc-4"
+      ],
+      "npiVerificationDate": "2026-01-10",
+      "notes": "Senior BCBA leading Early Intervention cases.",
+      "nextAttestationDate": "2026-10-12",
+      "createdAt": "2023-02-10",
+      "entityIds": [
+        "ent-1"
+      ],
+      "caqhId": "18492011",
+      "startDate": "2023-02-15",
+      "nppesRecordMatch": true,
+      "firstName": "Ashley",
+      "specialty": "Pediatric Autism Spectrum & Early Intervention",
+      "recredentialingDate": "2026-11-15",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "In-School",
+        "Telehealth"
+      ],
+      "providerType": "BCBA",
+      "documents": [
+        {
+          "id": "doc-101",
+          "verificationStatus": "Verified",
+          "uploadDate": "2026-01-10",
+          "verifiedBy": "Sanjay Tom",
+          "name": "California BCBA License",
+          "fileName": "vanderbilt_ca_license.pdf",
+          "fileSize": "1.4 MB",
+          "expirationDate": "2027-05-31",
+          "type": "State License",
+          "verifiedDate": "2026-01-11"
+        },
+        {
+          "verificationStatus": "Verified",
+          "type": "Malpractice Insurance / COI",
+          "verifiedDate": "2026-01-11",
+          "expirationDate": "2027-02-15",
+          "verifiedBy": "Sanjay Tom",
+          "uploadDate": "2026-01-10",
+          "fileSize": "820 KB",
+          "fileName": "vanderbilt_malpractice_coi_2026.pdf",
+          "name": "Professional Liability Insurance Certificate",
+          "id": "doc-102"
+        },
+        {
+          "id": "doc-103",
+          "expirationDate": "2027-08-30",
+          "name": "BACB Board Certification",
+          "fileSize": "650 KB",
+          "fileName": "bacb_cert_vanderbilt.pdf",
+          "uploadDate": "2026-01-10",
+          "type": "Board Certification",
+          "verificationStatus": "Verified"
+        }
+      ],
+      "primaryEntityId": "ent-1",
+      "locationEffectiveDate": "2023-02-15",
+      "lastAttestationDate": "2026-06-12",
+      "npi": "1487920193",
+      "groupAffiliation": "AGES Learning Solutions Clinical Group",
+      "caqhStatus": "Attested",
+      "credentials": "MS, BCBA, LBA",
+      "altPhone": "(408) 555-0130",
+      "isDemo": true,
+      "medicaidId": "MED-CA-9921",
+      "effectiveDate": "2023-03-01",
+      "contactAddress": "2105 S Bascom Ave, Suite 150, San Jose, CA 95124",
+      "paveStatus": "Approved",
+      "updatedAt": "2026-08-15",
+      "primaryLocationId": "loc-3",
+      "licenseNumber": "LBA-CA-9021",
+      "email": "ashley.vanderbilt@ageslearningsolutions.com"
+    },
+    {
+      "id": "prv-1788608145700",
+      "nextAttestationDate": "",
+      "groupAffiliation": "Ages Learning Solutions LLC",
+      "startDate": "2026-09-05",
+      "updatedAt": "2026-09-05",
+      "employmentStatus": "Full-Time",
+      "locationEffectiveDate": "2026-09-05",
+      "entityIds": [
+        "ent-1"
+      ],
+      "createdAt": "2026-09-05",
+      "licenseExpiration": "2028-09-04",
+      "primaryLocationId": "loc-1",
+      "licenseState": "CA",
+      "altPhone": "",
+      "payerEnrollments": [
+        {
+          "payerId": "pyr-aetna",
+          "applicationType": "Initial credentialing",
+          "id": "enr-1788608120490-1",
+          "recredentialingDueDate": "2029-06-29",
+          "status": "In Progress",
+          "payerName": "Aetna",
+          "notes": "Group participating agreement intake.",
+          "enrollmentStatus": "In Progress",
+          "effectiveDate": "2026-09-05",
+          "providerIdNumber": ""
+        }
+      ],
+      "contractStatus": "W-2 Full-Time",
+      "renderingProviderInfo": "Type 1 Rendering Clinician billed under group Type 2 NPI.",
+      "npi": "9856533665",
+      "effectiveDate": "2026-09-05",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "Telehealth"
+      ],
+      "providerType": "BCBA",
+      "caqhStatus": "Attested",
+      "lastName": "Clinical Staff",
+      "taxonomy": "103K00000X (Behavior Analyst)",
+      "licenseNumber": "CA-BCBA-10791",
+      "phone": "(408) 555-0100",
+      "disciplines": [
+        "ABA"
+      ],
+      "ownerAccountEmail": "admin@example.com",
+      "primaryEntityId": "ent-1",
+      "lastAttestationDate": "2026-09-05",
+      "caqhId": "39273555",
+      "npiVerified": true,
+      "locationIds": [
+        "loc-1"
+      ],
+      "dba": "AGES Learning Solutions",
+      "isolatedFor": "admin@example.com",
+      "recredentialingDate": "",
+      "email": "new.clinical staff@ageslearning.com",
+      "medicaidId": "",
+      "documents": [],
+      "contractInfo": {
+        "notes": "",
+        "recredentialingCycleYears": 3,
+        "contractType": "Group Agreement",
+        "contractNumber": "GRP-80458",
+        "contractEffectiveDate": "2026-09-05",
+        "feeScheduleTier": "Tier 1 Standard"
+      },
+      "specialty": "Pediatric Applied Behavior Analysis",
+      "isDemo": true,
+      "firstName": "New",
+      "contactAddress": "",
+      "credentials": "MS, BCBA, LBA",
+      "paveStatus": "Approved"
+    },
+    {
+      "id": "prv-2",
+      "employmentStatus": "Full-Time",
+      "contactAddress": "1220 Airway Blvd, Suite 200, Livermore, CA 94551",
+      "primaryLocationId": "loc-1",
+      "additionalLocationIds": [
+        "loc-3"
+      ],
+      "payerEnrollments": [
+        {
+          "recredentialingDate": "2026-10-31",
+          "payerName": "Blue Shield of California",
+          "effectiveDate": "2022-11-01",
+          "status": "In-Network",
+          "providerIdNumber": "BSC-SP-4482",
+          "payerId": "pyr-bsc"
+        },
+        {
+          "payerId": "pyr-kaiser",
+          "providerIdNumber": "KP-991204",
+          "payerName": "Kaiser Permanente",
+          "effectiveDate": "2023-01-01",
+          "recredentialingDate": "2026-11-30",
+          "status": "In-Network"
+        },
+        {
+          "recredentialingDate": "",
+          "status": "Application In Progress",
+          "payerId": "pyr-cigna",
+          "providerIdNumber": "PENDING",
+          "payerName": "Cigna",
+          "effectiveDate": ""
+        }
+      ],
+      "entityIds": [
+        "ent-2",
+        "ent-1"
+      ],
+      "dba": "Proficio Speech Therapy",
+      "createdAt": "2022-08-20",
+      "paveStatus": "Approved",
+      "startDate": "2022-09-01",
+      "medicaidId": "MED-CA-4482",
+      "contractInfo": {
+        "contractNumber": "CNT-PROF-SLP-2023",
+        "feeScheduleTier": "Tier 1 Speech Pathology",
+        "notes": "Participating provider under Proficio master payer agreements.",
+        "recredentialingCycleYears": 3,
+        "contractType": "Group Agreement",
+        "contractEffectiveDate": "2022-10-01"
+      },
+      "caqhId": "19920144",
+      "lastName": "Patel",
+      "credentials": "MS, CCC-SLP",
+      "taxonomy": "235Z00000X (Speech-Language Pathologist)",
+      "lastAttestationDate": "2026-04-10",
+      "renderingProviderInfo": "Provides Speech Therapy in clinic and schools. Supervised rendering billing under Proficio Group NPI 1849201948.",
+      "primaryEntityId": "ent-2",
+      "email": "maya.patel@proficiotherapy.com",
+      "caqhStatus": "Re-attestation Due",
+      "licenseState": "CA",
+      "recredentialingDate": "2026-10-31",
+      "active": true,
+      "groupAffiliation": "Proficio Speech Therapy Group",
+      "nextAttestationDate": "2026-08-10",
+      "npiVerificationDate": "2026-02-01",
+      "licenseExpiration": "2026-10-31",
+      "phone": "(925) 555-0163",
+      "updatedAt": "2026-08-20",
+      "nppesRecordMatch": true,
+      "altPhone": "(925) 555-0164",
+      "specialty": "Pediatric Articulation, AAC Devices & Language Disorders",
+      "licenseNumber": "SLP-CA-4482",
+      "firstName": "Maya",
+      "effectiveDate": "2022-10-15",
+      "contractStatus": "W-2 Full-Time",
+      "documents": [
+        {
+          "name": "CA Speech-Language Pathology License",
+          "verificationStatus": "Verified",
+          "type": "State License",
+          "id": "doc-201",
+          "fileName": "patel_slp_license.pdf",
+          "fileSize": "1.1 MB",
+          "uploadDate": "2025-10-15",
+          "expirationDate": "2026-10-31"
+        },
+        {
+          "type": "Board Certification",
+          "id": "doc-202",
+          "name": "ASHA Certificate of Clinical Competence (CCC-SLP)",
+          "verificationStatus": "Verified",
+          "expirationDate": "2026-12-31",
+          "fileName": "asha_ccc_patel.pdf",
+          "fileSize": "740 KB",
+          "uploadDate": "2025-10-15"
+        }
+      ],
+      "npi": "1922847102",
+      "ownerAccountEmail": "admin@example.com",
+      "locationEffectiveDate": "2022-09-01",
+      "disciplines": [
+        "Speech"
+      ],
+      "notes": "License renewal reminder pending for October 2026.",
+      "isolatedFor": "admin@example.com",
+      "isDemo": true,
+      "providerType": "SLP",
+      "npiVerified": true,
+      "serviceTypes": [
+        "In-Clinic",
+        "In-School",
+        "Telehealth"
+      ],
+      "locationIds": [
+        "loc-1",
+        "loc-3"
+      ]
+    },
+    {
+      "id": "prv-3",
+      "nextAttestationDate": "2026-11-01",
+      "primaryEntityId": "ent-3",
+      "employmentStatus": "Full-Time",
+      "caqhStatus": "Attested",
+      "contractStatus": "W-2 Full-Time",
+      "notes": "PAVE Medicaid enrollment currently in review by DHCS.",
+      "payerEnrollments": [
+        {
+          "effectiveDate": "2023-08-01",
+          "payerId": "pyr-aetna",
+          "providerIdNumber": "AET-OT-8831",
+          "status": "In-Network",
+          "payerName": "Aetna",
+          "recredentialingDate": "2026-12-01"
+        },
+        {
+          "recredentialingDate": "",
+          "effectiveDate": "",
+          "status": "Pending Payer Review",
+          "payerName": "Central California Alliance for Health",
+          "providerIdNumber": "PENDING",
+          "payerId": "pyr-ccah"
+        }
+      ],
+      "documents": [
+        {
+          "verificationStatus": "Verified",
+          "fileSize": "1.2 MB",
+          "fileName": "moreno_ot_license.pdf",
+          "uploadDate": "2026-01-15",
+          "name": "California Occupational Therapy License",
+          "type": "State License",
+          "expirationDate": "2027-09-30",
+          "id": "doc-301"
+        },
+        {
+          "verificationStatus": "Verified",
+          "expirationDate": "2027-03-31",
+          "uploadDate": "2026-01-15",
+          "fileName": "nbcot_moreno.pdf",
+          "fileSize": "512 KB",
+          "id": "doc-302",
+          "type": "Board Certification",
+          "name": "NBCOT Certification"
+        }
+      ],
+      "licenseExpiration": "2027-09-30",
+      "renderingProviderInfo": "Direct OT Clinical Services & Feeding Assessments.",
+      "npiVerificationDate": "2026-01-15",
+      "firstName": "Lucas",
+      "providerType": "OTR/L",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "Telehealth"
+      ],
+      "altPhone": "(925) 555-0200",
+      "specialty": "Sensory Integration, Fine Motor Coordination & Feeding Therapy",
+      "updatedAt": "2026-08-18",
+      "credentials": "MS, OTR/L",
+      "licenseNumber": "OTR-CA-8831",
+      "caqhId": "17839204",
+      "medicaidId": "PENDING",
+      "phone": "(925) 555-0199",
+      "dba": "Child's Play Therapy",
+      "paveStatus": "Submitted",
+      "effectiveDate": "2023-07-15",
+      "additionalLocationIds": [
+        "loc-3"
+      ],
+      "ownerAccountEmail": "admin@example.com",
+      "active": true,
+      "email": "lucas.moreno@childsplaytherapy.com",
+      "groupAffiliation": "Child's Play Therapy Services Group",
+      "primaryLocationId": "loc-2",
+      "locationEffectiveDate": "2023-06-10",
+      "npi": "1639201948",
+      "licenseState": "CA",
+      "lastName": "Moreno",
+      "taxonomy": "225X00000X (Occupational Therapist)",
+      "nppesRecordMatch": true,
+      "contactAddress": "8440 Brentwood Blvd, Suite F, Brentwood, CA 94513",
+      "lastAttestationDate": "2026-07-01",
+      "startDate": "2023-06-10",
+      "entityIds": [
+        "ent-3",
+        "ent-1"
+      ],
+      "createdAt": "2023-06-01",
+      "recredentialingDate": "2027-04-01",
+      "isolatedFor": "admin@example.com",
+      "npiVerified": true,
+      "locationIds": [
+        "loc-2",
+        "loc-3"
+      ],
+      "isDemo": true,
+      "contractInfo": {
+        "feeScheduleTier": "Tier 1 OT Standard",
+        "contractType": "Group Agreement",
+        "recredentialingCycleYears": 3,
+        "notes": "Child's Play participating provider agreement.",
+        "contractNumber": "CNT-CP-OT-2023",
+        "contractEffectiveDate": "2023-07-01"
+      },
+      "disciplines": [
+        "OT"
+      ]
+    },
+    {
+      "id": "prv-4",
+      "isDemo": true,
+      "additionalLocationIds": [],
+      "caqhStatus": "Attested",
+      "licenseExpiration": "2027-11-30",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "Telehealth"
+      ],
+      "providerType": "BCBA",
+      "nextAttestationDate": "2026-09-18",
+      "startDate": "2024-10-01",
+      "contactAddress": "10984 S Jordan Gateway, Suite 400, South Jordan, UT 84095",
+      "renderingProviderInfo": "Utah Regional Clinical Director & Rendering BCBA Supervisor.",
+      "groupAffiliation": "AGES Learning Solutions Utah",
+      "createdAt": "2024-09-25",
+      "entityIds": [
+        "ent-1"
+      ],
+      "taxonomy": "103K00000X (Behavior Analyst)",
+      "lastName": "Zimmerman",
+      "nppesRecordMatch": true,
+      "ownerAccountEmail": "admin@example.com",
+      "dba": "AGES Learning Solutions Utah",
+      "paveStatus": "Not Required",
+      "credentials": "MA, BCBA",
+      "npiVerificationDate": "2026-01-20",
+      "medicaidId": "UT-MED-8819",
+      "email": "kaitlyn.zimmerman@ageslearningsolutions.com",
+      "active": true,
+      "lastAttestationDate": "2026-05-18",
+      "primaryLocationId": "loc-5",
+      "npi": "1093847291",
+      "contractStatus": "W-2 Full-Time",
+      "licenseState": "UT",
+      "recredentialingDate": "2027-10-01",
+      "phone": "(801) 555-0178",
+      "documents": [],
+      "effectiveDate": "2024-11-01",
+      "specialty": "School-Based Behavior Interventions & Parent Coaching",
+      "primaryEntityId": "ent-1",
+      "caqhId": "20194827",
+      "licenseNumber": "UT-BCBA-1029",
+      "firstName": "Kaitlyn",
+      "updatedAt": "2026-08-01",
+      "disciplines": [
+        "ABA"
+      ],
+      "isolatedFor": "admin@example.com",
+      "npiVerified": true,
+      "employmentStatus": "Full-Time",
+      "locationIds": [
+        "loc-5"
+      ],
+      "notes": "Utah regional clinical director.",
+      "locationEffectiveDate": "2024-10-01",
+      "contractInfo": {
+        "feeScheduleTier": "Tier 1 Utah Regional",
+        "contractNumber": "CNT-AGES-UT-2024",
+        "contractType": "Group Agreement",
+        "recredentialingCycleYears": 3,
+        "contractEffectiveDate": "2024-10-01",
+        "notes": "Utah regional Medicaid and commercial expansion contract."
+      },
+      "payerEnrollments": [
+        {
+          "payerName": "Cigna",
+          "effectiveDate": "2024-11-15",
+          "status": "In-Network",
+          "payerId": "pyr-cigna",
+          "recredentialingDate": "2027-10-15",
+          "providerIdNumber": "CG-UT-1029"
+        },
+        {
+          "payerName": "UnitedHealthcare (UHC)",
+          "payerId": "pyr-uhc",
+          "recredentialingDate": "2027-11-01",
+          "providerIdNumber": "UHC-UT-882",
+          "status": "In-Network",
+          "effectiveDate": "2024-12-01"
+        }
+      ]
+    },
+    {
+      "id": "prv-5",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home",
+        "In-School",
+        "Telehealth"
+      ],
+      "providerType": "SLP",
+      "isolatedFor": "admin@example.com",
+      "caqhStatus": "Attested",
+      "dba": "Proficio Speech & AGES Joint Clinic",
+      "lastName": "Taylor",
+      "locationIds": [
+        "loc-1",
+        "loc-3"
+      ],
+      "createdAt": "2024-01-10",
+      "licenseExpiration": "2027-08-31",
+      "taxonomy": "235Z00000X / 103K00000X",
+      "npiVerified": true,
+      "nextAttestationDate": "2026-11-20",
+      "entityIds": [
+        "ent-1",
+        "ent-2"
+      ],
+      "updatedAt": "2026-08-10",
+      "renderingProviderInfo": "Dual discipline provider for integrated AAC and behavioral communication therapy.",
+      "licenseState": "CA",
+      "disciplines": [
+        "Speech",
+        "ABA"
+      ],
+      "startDate": "2024-01-15",
+      "credentials": "MS, SLP, BCBA",
+      "locationEffectiveDate": "2024-01-15",
+      "effectiveDate": "2024-02-15",
+      "primaryLocationId": "loc-1",
+      "contactAddress": "1220 Airway Blvd, Suite 200, Livermore, CA 94551",
+      "phone": "(925) 555-0182",
+      "licenseNumber": "SLP-CA-9931",
+      "npiVerificationDate": "2026-01-12",
+      "paveStatus": "Approved",
+      "isDemo": true,
+      "contractInfo": {
+        "notes": "Dual discipline SLP & BCBA agreement.",
+        "contractEffectiveDate": "2024-01-15",
+        "feeScheduleTier": "Tier 1 Dual Specialty",
+        "recredentialingCycleYears": 3,
+        "contractNumber": "CNT-DUAL-2024-01",
+        "contractType": "Group Agreement"
+      },
+      "groupAffiliation": "Proficio Speech & AGES Joint Clinic",
+      "lastAttestationDate": "2026-07-20",
+      "employmentStatus": "Full-Time",
+      "active": true,
+      "primaryEntityId": "ent-2",
+      "additionalLocationIds": [
+        "loc-3"
+      ],
+      "medicaidId": "MED-CA-9931",
+      "ownerAccountEmail": "admin@example.com",
+      "firstName": "Jordan",
+      "specialty": "Dual Certified SLP & BCBA for Non-Verbal Autism",
+      "recredentialingDate": "2027-01-15",
+      "contractStatus": "W-2 Full-Time",
+      "payerEnrollments": [
+        {
+          "providerIdNumber": "AET-DUAL-9931",
+          "effectiveDate": "2024-03-01",
+          "recredentialingDate": "2027-02-01",
+          "payerId": "pyr-aetna",
+          "status": "In-Network",
+          "payerName": "Aetna"
+        },
+        {
+          "providerIdNumber": "BSC-9931",
+          "payerId": "pyr-bsc",
+          "effectiveDate": "2024-03-15",
+          "status": "In-Network",
+          "recredentialingDate": "2027-02-15",
+          "payerName": "Blue Shield of California"
+        }
+      ],
+      "email": "jordan.taylor@proficiotherapy.com",
+      "npi": "1582910482",
+      "nppesRecordMatch": true,
+      "documents": [],
+      "caqhId": "19482019"
+    },
+    {
+      "id": "prv-6",
+      "payerEnrollments": [
+        {
+          "payerName": "Aetna",
+          "payerId": "pyr-aetna",
+          "effectiveDate": "2023-12-15",
+          "recredentialingDate": "2026-09-15",
+          "status": "In-Network",
+          "providerIdNumber": "AET-OT-7721"
+        }
+      ],
+      "additionalLocationIds": [],
+      "nextAttestationDate": "2026-09-10",
+      "startDate": "2023-11-01",
+      "employmentStatus": "Part-Time",
+      "npiVerificationDate": "2026-01-05",
+      "disciplines": [
+        "OT"
+      ],
+      "isolatedFor": "admin@example.com",
+      "email": "derrick.sterling@childsplaytherapy.com",
+      "entityIds": [
+        "ent-3"
+      ],
+      "createdAt": "2023-10-25",
+      "npiVerified": true,
+      "licenseExpiration": "2026-09-15",
+      "locationIds": [
+        "loc-2"
+      ],
+      "licenseState": "CA",
+      "dba": "Child's Play Therapy",
+      "primaryEntityId": "ent-3",
+      "active": true,
+      "renderingProviderInfo": "Part-time contractor providing sensory OT and fine motor therapy.",
+      "ownerAccountEmail": "admin@example.com",
+      "caqhId": "18920194",
+      "contractInfo": {
+        "notes": "Contractor agreement requiring annual COI and biannual recredentialing.",
+        "contractType": "1099 Contractor Agreement",
+        "recredentialingCycleYears": 2,
+        "feeScheduleTier": "Tier 2 Hourly Rate",
+        "contractNumber": "CNT-CP-1099-7721",
+        "contractEffectiveDate": "2023-11-01"
+      },
+      "contactAddress": "8440 Brentwood Blvd, Suite F, Brentwood, CA 94513",
+      "primaryLocationId": "loc-2",
+      "licenseNumber": "OTR-CA-7721",
+      "effectiveDate": "2023-12-01",
+      "credentials": "MS, OTR/L",
+      "taxonomy": "225X00000X (Occupational Therapist)",
+      "lastName": "Sterling",
+      "nppesRecordMatch": true,
+      "notes": "Urgent: License expiration coming in September 2026.",
+      "updatedAt": "2026-08-22",
+      "contractStatus": "1099 Contractor",
+      "groupAffiliation": "Child's Play Therapy Services PC",
+      "paveStatus": "Approved",
+      "serviceTypes": [
+        "In-Clinic",
+        "In-Home"
+      ],
+      "providerType": "OTR/L",
+      "medicaidId": "MED-CA-7721",
+      "npi": "1749201849",
+      "documents": [],
+      "specialty": "Neurodevelopmental Therapy & Bilateral Coordination",
+      "firstName": "Derrick",
+      "lastAttestationDate": "2026-05-10",
+      "isDemo": true,
+      "phone": "(925) 555-0133",
+      "caqhStatus": "Complete",
+      "locationEffectiveDate": "2023-11-01",
+      "recredentialingDate": "2026-09-15"
+    },
+    {
+      "id": "prv-954093",
+      "email": "marcus.vance@ageslearning.com",
+      "paveStatus": "In Progress",
+      "disciplines": [
+        "ABA"
+      ],
+      "isolatedFor": "admin@example.com",
+      "licenseExpiration": "2028-12-31",
+      "locationIds": [
+        "loc-3"
+      ],
+      "npiVerified": true,
+      "employmentStatus": "Full-Time",
+      "providerType": "BCBA",
+      "nppesRecordMatch": true,
+      "entityIds": [
+        "ent-1"
+      ],
+      "primaryLocationId": "loc-3",
+      "createdAt": "2026-09-06T13:22:34.093Z",
+      "updatedAt": "2026-09-06",
+      "credentials": "MS,  OTR/L",
+      "licenseState": "CA",
+      "payerEnrollments": [
+        {
+          "payerName": "Aetna",
+          "status": "In-Network",
+          "payerId": "pyr-aetna",
+          "recredentialingDate": "2030-11-22",
+          "effectiveDate": "2026-09-06",
+          "notes": "Application initiated via APP-2026-4951"
+        },
+        {
+          "payerName": "Alameda Alliance",
+          "payerId": "pyr-alameda",
+          "status": "Application In Progress",
+          "notes": "Application initiated via APP-2026-4951"
+        },
+        {
+          "payerName": "Anthem",
+          "payerId": "pyr-anthem",
+          "status": "Application In Progress",
+          "notes": "Application initiated via APP-2026-4951"
+        }
+      ],
+      "startDate": "2026-09-06",
+      "contractStatus": "W-2 Full-Time",
+      "firstName": "Marcus",
+      "caqhStatus": "Complete",
+      "lastName": "Vance",
+      "taxonomy": "103K00000X",
+      "caqhId": "17829401",
+      "specialty": "| Specialty: Pediatric Occupational Therapy |  225X00000X",
+      "ownerAccountEmail": "admin@example.com",
+      "currentStatus": "In Credentialing",
+      "primaryEntityId": "ent-1",
+      "phone": "(510) 555-0144",
+      "documents": [
+        {
+          "expirationDate": "2028-10-31",
+          "type": "State License",
+          "documentUrl": "https://dca.ca.gov/verify/license/LBA-CA-94821.pdf",
+          "id": "doc-APP-2026-4951-1",
+          "name": "California State BCBA License Certificate",
+          "verificationStatus": "Verified",
+          "providerId": "prv-954093",
+          "fileSize": "1.2 MB",
+          "fileName": "California State BCBA License Certificate.pdf",
+          "uploadDate": "2026-09-06"
+        },
+        {
+          "documentUrl": "https://bacb.com/verify/certs/1-21-48902.pdf",
+          "verificationStatus": "Verified",
+          "type": "Board Certification",
+          "id": "doc-APP-2026-4951-2",
+          "fileSize": "1.2 MB",
+          "fileName": "BACB Board Certification Verification (Cert #1-21-48902).pdf",
+          "uploadDate": "2026-09-06",
+          "expirationDate": "2027-08-31",
+          "providerId": "prv-954093",
+          "name": "BACB Board Certification Verification (Cert #1-21-48902)"
+        },
+        {
+          "expirationDate": "2027-06-30",
+          "name": "Professional Malpractice Liability Certificate (COI $1M/$3M)",
+          "uploadDate": "2026-09-06",
+          "fileSize": "1.2 MB",
+          "fileName": "Professional Malpractice Liability Certificate (COI $1M/$3M).pdf",
+          "providerId": "prv-954093",
+          "id": "doc-APP-2026-4951-3",
+          "type": "Malpractice Insurance",
+          "verificationStatus": "Verified",
+          "documentUrl": "https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf"
+        }
+      ],
+      "npi": "1679023418",
+      "licenseNumber": "|  OT-CA-38291 (Exp: 2028-05-15)",
+      "isDemo": true,
+      "active": true
+    }
+  ],
+  "demo_clinical_staff": [
+    {
+      "id": "cs-prv-1",
+      "entityIds": [
+        "ent-1"
+      ],
+      "createdAt": "2026-01-01",
+      "providerType": "BCBA",
+      "caqhId": "18492011",
+      "credentials": "MS, BCBA, LBA",
+      "ownerAccountEmail": "admin@example.com",
+      "lastName": "Vanderbilt",
+      "taxonomy": "103K00000X (Behavior Analyst)",
+      "licenseState": "CA",
+      "updatedAt": "2026-08-26",
+      "licenseNumber": "LBA-CA-9021",
+      "locationIds": [
+        "loc-3",
+        "loc-4"
+      ],
+      "isolatedFor": "admin@example.com",
+      "isDemo": true,
+      "disciplines": [
+        "ABA"
+      ],
+      "licenseExpiration": "2027-05-31",
+      "npi": "1487920193",
+      "specialty": "Pediatric Autism Spectrum & Early Intervention",
+      "providerId": "prv-1",
+      "fullName": "Ashley Vanderbilt",
+      "firstName": "Ashley",
+      "primaryLocationId": "loc-3",
+      "status": "Active",
+      "paveStatus": "Approved",
+      "employeeId": "emp-prv-1"
+    },
+    {
+      "id": "cs-prv-2",
+      "providerType": "SLP",
+      "isDemo": true,
+      "primaryLocationId": "loc-1",
+      "licenseState": "CA",
+      "npi": "1922847102",
+      "createdAt": "2026-01-01",
+      "entityIds": [
+        "ent-2",
+        "ent-1"
+      ],
+      "licenseExpiration": "2026-10-31",
+      "caqhId": "19920144",
+      "updatedAt": "2026-08-26",
+      "taxonomy": "235Z00000X (Speech-Language Pathologist)",
+      "lastName": "Patel",
+      "specialty": "Pediatric Articulation, AAC Devices & Language Disorders",
+      "fullName": "Maya Patel",
+      "firstName": "Maya",
+      "credentials": "MS, CCC-SLP",
+      "status": "Active",
+      "licenseNumber": "SLP-CA-4482",
+      "locationIds": [
+        "loc-1",
+        "loc-3"
+      ],
+      "isolatedFor": "admin@example.com",
+      "ownerAccountEmail": "admin@example.com",
+      "providerId": "prv-2",
+      "disciplines": [
+        "Speech"
+      ],
+      "employeeId": "emp-prv-2",
+      "paveStatus": "Approved"
+    },
+    {
+      "id": "cs-prv-3",
+      "fullName": "Lucas Moreno",
+      "primaryLocationId": "loc-2",
+      "npi": "1639201948",
+      "isDemo": true,
+      "firstName": "Lucas",
+      "caqhId": "17839204",
+      "licenseExpiration": "2027-09-30",
+      "specialty": "Sensory Integration, Fine Motor Coordination & Feeding Therapy",
+      "credentials": "MS, OTR/L",
+      "entityIds": [
+        "ent-3",
+        "ent-1"
+      ],
+      "licenseState": "CA",
+      "createdAt": "2026-01-01",
+      "updatedAt": "2026-08-26",
+      "status": "Active",
+      "providerType": "OTR/L",
+      "locationIds": [
+        "loc-2",
+        "loc-3"
+      ],
+      "licenseNumber": "OTR-CA-8831",
+      "providerId": "prv-3",
+      "taxonomy": "225X00000X (Occupational Therapist)",
+      "isolatedFor": "admin@example.com",
+      "lastName": "Moreno",
+      "ownerAccountEmail": "admin@example.com",
+      "employeeId": "emp-prv-3",
+      "disciplines": [
+        "OT"
+      ],
+      "paveStatus": "Submitted"
+    },
+    {
+      "id": "cs-prv-4",
+      "disciplines": [
+        "ABA"
+      ],
+      "providerType": "BCBA",
+      "locationIds": [
+        "loc-5"
+      ],
+      "npi": "1093847291",
+      "firstName": "Kaitlyn",
+      "caqhId": "20194827",
+      "isolatedFor": "admin@example.com",
+      "specialty": "School-Based Behavior Interventions & Parent Coaching",
+      "licenseState": "UT",
+      "fullName": "Kaitlyn Zimmerman",
+      "isDemo": true,
+      "ownerAccountEmail": "admin@example.com",
+      "credentials": "MA, BCBA",
+      "employeeId": "emp-prv-4",
+      "paveStatus": "Not Required",
+      "primaryLocationId": "loc-5",
+      "providerId": "prv-4",
+      "status": "Active",
+      "lastName": "Zimmerman",
+      "taxonomy": "103K00000X (Behavior Analyst)",
+      "updatedAt": "2026-08-26",
+      "licenseNumber": "UT-BCBA-1029",
+      "licenseExpiration": "2027-11-30",
+      "createdAt": "2026-01-01",
+      "entityIds": [
+        "ent-1"
+      ]
+    },
+    {
+      "id": "cs-prv-5",
+      "createdAt": "2026-01-01",
+      "entityIds": [
+        "ent-1",
+        "ent-2"
+      ],
+      "npi": "1582910482",
+      "fullName": "Jordan Taylor",
+      "isDemo": true,
+      "credentials": "MS, SLP, BCBA",
+      "updatedAt": "2026-08-26",
+      "disciplines": [
+        "Speech",
+        "ABA"
+      ],
+      "ownerAccountEmail": "admin@example.com",
+      "caqhId": "19482019",
+      "isolatedFor": "admin@example.com",
+      "locationIds": [
+        "loc-1",
+        "loc-3"
+      ],
+      "paveStatus": "Approved",
+      "status": "Active",
+      "employeeId": "emp-prv-5",
+      "primaryLocationId": "loc-1",
+      "licenseNumber": "SLP-CA-9931",
+      "providerId": "prv-5",
+      "specialty": "Dual Certified SLP & BCBA for Non-Verbal Autism",
+      "licenseExpiration": "2027-08-31",
+      "providerType": "SLP",
+      "firstName": "Jordan",
+      "taxonomy": "235Z00000X / 103K00000X",
+      "lastName": "Taylor",
+      "licenseState": "CA"
+    },
+    {
+      "id": "cs-prv-6",
+      "licenseExpiration": "2026-09-15",
+      "licenseNumber": "OTR-CA-7721",
+      "lastName": "Sterling",
+      "taxonomy": "225X00000X (Occupational Therapist)",
+      "primaryLocationId": "loc-2",
+      "status": "Active",
+      "firstName": "Derrick",
+      "specialty": "Neurodevelopmental Therapy & Bilateral Coordination",
+      "updatedAt": "2026-08-26",
+      "paveStatus": "Approved",
+      "employeeId": "emp-prv-6",
+      "caqhId": "18920194",
+      "credentials": "MS, OTR/L",
+      "licenseState": "CA",
+      "ownerAccountEmail": "admin@example.com",
+      "fullName": "Derrick Sterling",
+      "providerId": "prv-6",
+      "providerType": "OTR/L",
+      "entityIds": [
+        "ent-3"
+      ],
+      "createdAt": "2026-01-01",
+      "locationIds": [
+        "loc-2"
+      ],
+      "isolatedFor": "admin@example.com",
+      "npi": "1749201849",
+      "disciplines": [
+        "OT"
+      ],
+      "isDemo": true
+    },
+    {
+      "id": "cs-prv-954093",
+      "fullName": "Marcus Vance",
+      "ownerAccountEmail": "admin@example.com",
+      "isDemo": true,
+      "paveStatus": "In Progress",
+      "providerType": "BCBA",
+      "specialty": "| Specialty: Pediatric Occupational Therapy |  225X00000X",
+      "caqhId": "17829401",
+      "firstName": "Marcus",
+      "employeeId": "emp-prv-954093",
+      "providerId": "prv-954093",
+      "licenseState": "CA",
+      "entityIds": [
+        "ent-1"
+      ],
+      "createdAt": "2026-09-06T13:22:34.093Z",
+      "licenseNumber": "|  OT-CA-38291 (Exp: 2028-05-15)",
+      "credentials": "MS,  OTR/L",
+      "npi": "1679023418",
+      "updatedAt": "2026-09-06T13:22:34.093Z",
+      "licenseExpiration": "2028-12-31",
+      "status": "In Credentialing",
+      "primaryLocationId": "loc-3",
+      "disciplines": [
+        "ABA"
+      ],
+      "isolatedFor": "admin@example.com",
+      "locationIds": [
+        "loc-3"
+      ],
+      "taxonomy": "103K00000X",
+      "lastName": "Vance"
+    }
+  ],
+  "demo_records": [
+    {
+      "id": "APP-2026-0001",
+      "auditTrail": [
+        {
+          "id": "aud-1",
+          "userName": "Sanjay Tom",
+          "notes": "Initial intake created",
+          "userId": "usr-1",
+          "timestamp": "2026-04-10 09:30",
+          "action": "Created Credentialing Record"
+        },
+        {
+          "userName": "Sanjay Tom",
+          "previousValue": "Application Preparation",
+          "newValue": "Application Submitted",
+          "timestamp": "2026-04-15 14:20",
+          "userId": "usr-1",
+          "id": "aud-2",
+          "action": "Stage Transitioned"
+        },
+        {
+          "userName": "Sanjay Tom",
+          "action": "Approval Logged",
+          "userId": "usr-1",
+          "timestamp": "2026-06-20 11:00",
+          "newValue": "Approved",
+          "id": "aud-3"
+        },
+        {
+          "newValue": "Linked",
+          "timestamp": "2026-07-05 16:30",
+          "userId": "usr-1",
+          "action": "Provider Linked to Billing NPI",
+          "id": "aud-4",
+          "userName": "Sanjay Tom"
+        }
+      ],
+      "discipline": "ABA",
+      "submissionDate": "2026-04-15",
+      "assignedSpecialistId": "usr-1",
+      "validationIssues": [],
+      "linkEffectiveDate": "2026-07-05",
+      "providerId": "prv-1",
+      "payerId": "pyr-aetna",
+      "applicationType": "Initial credentialing",
+      "linkingStatus": "Linked",
+      "documentsRequestedDate": "2026-04-10",
+      "targetTurnaroundDate": "2026-06-15",
+      "effectiveDate": "2026-07-01",
+      "locationId": "loc-3",
+      "intakeDate": "2026-04-10",
+      "contractStatus": "Contract Executed",
+      "documents": [],
+      "approvalDate": "2026-06-20",
+      "checklist": [
+        {
+          "category": "Validation",
+          "completedDate": "2026-04-12",
+          "isCompleted": true,
+          "isRequired": true,
+          "id": "chk-1",
+          "title": "CAQH Profile Attestation Verified"
+        },
+        {
+          "id": "chk-2",
+          "isCompleted": true,
+          "category": "Validation",
+          "isRequired": true,
+          "completedDate": "2026-04-12",
+          "title": "W-9 & Entity Match Checked"
+        },
+        {
+          "isCompleted": true,
+          "category": "Document",
+          "isRequired": true,
+          "id": "chk-3",
+          "title": "Malpractice COI Uploaded",
+          "completedDate": "2026-04-12"
+        },
+        {
+          "category": "Form",
+          "id": "chk-4",
+          "isCompleted": true,
+          "isRequired": true,
+          "completedDate": "2026-04-14",
+          "title": "Availity Roster Form Generated"
+        }
+      ],
+      "ownerAccountEmail": "admin@example.com",
+      "createdAt": "2026-04-10",
+      "isolatedFor": "admin@example.com",
+      "isOverdue": false,
+      "followUps": [
+        {
+          "contactPerson": "Availity Portal Status Check",
+          "notes": "Clean submission without any RFIs.",
+          "id": "fu-1",
+          "date": "2026-04-25",
+          "nextAction": "Re-check portal for committee decision.",
+          "nextFollowUpDate": "2026-05-10",
+          "payerResponse": "Application verified in initial committee queue.",
+          "method": "Availity",
+          "referenceNumber": "REF-AET-9921",
+          "isEscalated": false,
+          "specialistName": "Sanjay Tom",
+          "specialistId": "usr-1"
+        }
+      ],
+      "updatedAt": "2026-07-05",
+      "documentsReceivedDate": "2026-04-12",
+      "assignedSpecialistName": "Sanjay Tom",
+      "isDemo": true,
+      "totalCycleDays": 66,
+      "entityId": "ent-1",
+      "contractEffectiveDate": "2024-01-01",
+      "providerLinkDate": "2026-07-05",
+      "daysInCurrentStage": 52,
+      "stage": "Approved",
+      "revalidationDate": "2029-06-20"
+    },
+    {
+      "id": "APP-2026-0002",
+      "payerId": "pyr-alameda",
+      "daysInCurrentStage": 29,
+      "submissionDate": "2026-05-08",
+      "documents": [],
+      "ownerAccountEmail": "admin@example.com",
+      "contractStatus": "Contract Executed",
+      "assignedSpecialistName": "Elena Rostova",
+      "isDemo": true,
+      "approvalDate": "2026-07-28",
+      "stage": "Linking Pending",
+      "linkingStatus": "Pending Approval",
+      "entityId": "ent-2",
+      "applicationType": "Provider linking",
+      "discipline": "Speech",
+      "auditTrail": [
+        {
+          "userName": "Elena Rostova",
+          "id": "aud-10",
+          "timestamp": "2026-05-01 10:00",
+          "action": "Created Record",
+          "userId": "usr-4"
+        },
+        {
+          "timestamp": "2026-07-28 14:00",
+          "newValue": "Approved",
+          "userId": "usr-4",
+          "action": "Stage Transitioned",
+          "userName": "Elena Rostova",
+          "previousValue": "Payer Review",
+          "id": "aud-11"
+        },
+        {
+          "id": "aud-12",
+          "action": "Stage Transitioned",
+          "userId": "usr-4",
+          "timestamp": "2026-07-29 09:30",
+          "newValue": "Linking Pending",
+          "userName": "Elena Rostova",
+          "previousValue": "Approved"
+        },
+        {
+          "userName": "Automation Engine",
+          "action": "Auto Overdue Detection",
+          "userId": "SYSTEM",
+          "id": "aud-13",
+          "notes": "Scheduled follow-up date 2026-08-15 passed without update. Escalation generated.",
+          "timestamp": "2026-08-16 08:00"
+        }
+      ],
+      "nextFollowUpDate": "2026-08-15",
+      "providerId": "prv-2",
+      "validationIssues": [],
+      "assignedSpecialistId": "usr-4",
+      "isolatedFor": "admin@example.com",
+      "checklist": [
+        {
+          "title": "PAVE Confirmation Attached",
+          "id": "chk-10",
+          "category": "Validation",
+          "isCompleted": true,
+          "isRequired": true
+        },
+        {
+          "isRequired": true,
+          "category": "Form",
+          "id": "chk-11",
+          "isCompleted": true,
+          "title": "Alameda Alliance Group Linking Roster"
+        },
+        {
+          "isRequired": true,
+          "id": "chk-12",
+          "category": "Document",
+          "isCompleted": true,
+          "title": "Confirmation of Payer Approval Letter"
+        }
+      ],
+      "createdAt": "2026-05-01",
+      "lastFollowUpDate": "2026-08-01",
+      "followUps": [
+        {
+          "specialistId": "usr-4",
+          "referenceNumber": "ALA-LNK-8841",
+          "id": "fu-2",
+          "payerResponse": "Credentialing approved. Linking request is in provider enrollment queue.",
+          "specialistName": "Elena Rostova",
+          "method": "Phone",
+          "isEscalated": true,
+          "nextAction": "Call provider data operations team for link confirmation.",
+          "nextFollowUpDate": "2026-08-15",
+          "escalatedTo": "Credentialing Manager & Leadership",
+          "notes": "Provider cannot bill Medicaid claims until link is confirmed in system.",
+          "contactPerson": "Tanya Gomez",
+          "date": "2026-08-01"
+        }
+      ],
+      "updatedAt": "2026-08-16",
+      "isOverdue": true,
+      "intakeDate": "2026-05-01",
+      "locationId": "loc-1",
+      "totalCycleDays": 114
+    },
+    {
+      "id": "APP-2026-0003",
+      "validationIssues": [
+        {
+          "field": "Lease Agreement",
+          "id": "val-lease-sub",
+          "description": "Lease file name on record indicates suite mismatch vs SCFHP portal filing.",
+          "severity": "Warning",
+          "ruleReference": "Section 5.10: Location & Lease Consistency"
+        }
+      ],
+      "locationId": "loc-2",
+      "intakeDate": "2026-06-15",
+      "contractStatus": "Contract Executed",
+      "followUps": [
+        {
+          "date": "2026-08-18",
+          "payerResponse": "Requesting updated lease documentation showing Suite C and DHCS welcome letter.",
+          "nextFollowUpDate": "2026-08-28",
+          "method": "Email",
+          "specialistName": "Sanjay Tom",
+          "referenceNumber": "SCFHP-REQ-4410",
+          "nextAction": "Obtain sublease confirmation from Landlord & upload to portal.",
+          "contactPerson": "Carlos Mendez",
+          "specialistId": "usr-1",
+          "isEscalated": false,
+          "id": "fu-3"
+        }
+      ],
+      "updatedAt": "2026-08-18",
+      "isOverdue": true,
+      "createdAt": "2026-06-15",
+      "assignedSpecialistId": "usr-1",
+      "nextFollowUpDate": "2026-08-28",
+      "checklist": [
+        {
+          "category": "Document",
+          "id": "chk-20",
+          "isRequired": true,
+          "isCompleted": true,
+          "title": "PAVE Approval Form"
+        },
+        {
+          "isCompleted": false,
+          "notes": "Landlord amendment requested",
+          "title": "Lease / Sublease Matching Entity",
+          "category": "Document",
+          "isRequired": true,
+          "id": "chk-21"
+        },
+        {
+          "category": "Validation",
+          "id": "chk-22",
+          "isCompleted": true,
+          "isRequired": true,
+          "title": "W-9 Verification"
+        }
+      ],
+      "ownerAccountEmail": "admin@example.com",
+      "payerId": "pyr-scfhp",
+      "assignedSpecialistName": "Sanjay Tom",
+      "providerId": "prv-3",
+      "entityId": "ent-3",
+      "targetTurnaroundDate": "2026-09-05",
+      "auditTrail": [
+        {
+          "action": "Created Record",
+          "userId": "usr-1",
+          "id": "aud-20",
+          "timestamp": "2026-06-15",
+          "userName": "Sanjay Tom"
+        },
+        {
+          "id": "aud-21",
+          "newValue": "Additional Documents Requested",
+          "previousValue": "Payer Review",
+          "timestamp": "2026-08-18",
+          "userId": "usr-1",
+          "userName": "Sanjay Tom",
+          "action": "Stage Transitioned"
+        }
+      ],
+      "discipline": "OT",
+      "submissionDate": "2026-06-20",
+      "daysInCurrentStage": 8,
+      "lastFollowUpDate": "2026-08-18",
+      "isolatedFor": "admin@example.com",
+      "stage": "Overdue",
+      "totalCycleDays": 72,
+      "applicationType": "Initial credentialing",
+      "documents": [],
+      "linkingStatus": "Pending Approval",
+      "isDemo": true
+    },
+    {
+      "id": "APP-2026-0004",
+      "targetTurnaroundDate": "2026-09-19",
+      "isolatedFor": "admin@example.com",
+      "intakeDate": "2026-07-01",
+      "locationId": "loc-4",
+      "submissionDate": "2026-07-06",
+      "applicationType": "Location addition",
+      "payerId": "pyr-anthem",
+      "documents": [],
+      "discipline": "ABA",
+      "auditTrail": [
+        {
+          "userName": "Sanjay Tom",
+          "id": "aud-30",
+          "timestamp": "2026-07-01",
+          "userId": "usr-1",
+          "action": "Created Location Addition Record"
+        }
+      ],
+      "contractStatus": "Contract Executed",
+      "assignedSpecialistId": "usr-1",
+      "providerId": "prv-1",
+      "updatedAt": "2026-08-12",
+      "followUps": [
+        {
+          "contactPerson": "Anthem Provider Network",
+          "isEscalated": false,
+          "specialistName": "Sanjay Tom",
+          "nextFollowUpDate": "2026-08-27",
+          "referenceNumber": "ANT-LOC-1102",
+          "id": "fu-4",
+          "nextAction": "Follow up on committee approval next week.",
+          "payerResponse": "Location addition for Vacaville in secondary review queue.",
+          "method": "Availity",
+          "date": "2026-08-12",
+          "specialistId": "usr-1"
+        }
+      ],
+      "isOverdue": true,
+      "nextFollowUpDate": "2026-08-27",
+      "validationIssues": [],
+      "stage": "Overdue",
+      "checklist": [
+        {
+          "isRequired": true,
+          "category": "Document",
+          "id": "chk-30",
+          "title": "Vacaville Certificate of Occupancy / Lease",
+          "isCompleted": true
+        },
+        {
+          "id": "chk-31",
+          "title": "Anthem Location Addition Form",
+          "isCompleted": true,
+          "isRequired": true,
+          "category": "Form"
+        }
+      ],
+      "createdAt": "2026-07-01",
+      "entityId": "ent-1",
+      "ownerAccountEmail": "admin@example.com",
+      "daysInCurrentStage": 45,
+      "lastFollowUpDate": "2026-08-12",
+      "isDemo": true,
+      "totalCycleDays": 56,
+      "assignedSpecialistName": "Sanjay Tom",
+      "linkingStatus": "Pending Approval"
+    },
+    {
+      "id": "APP-2026-0005",
+      "ownerAccountEmail": "admin@example.com",
+      "payerId": "pyr-utmedicaid",
+      "providerId": "prv-4",
+      "discipline": "ABA",
+      "auditTrail": [
+        {
+          "timestamp": "2026-08-01",
+          "userId": "usr-1",
+          "action": "Created Record",
+          "id": "aud-40",
+          "userName": "Sanjay Tom"
+        }
+      ],
+      "isolatedFor": "admin@example.com",
+      "targetTurnaroundDate": "2026-10-05",
+      "submissionDate": "2026-08-06",
+      "linkingStatus": "Not Applicable",
+      "assignedSpecialistName": "Sanjay Tom",
+      "documents": [],
+      "locationId": "loc-5",
+      "intakeDate": "2026-08-01",
+      "stage": "Application Submitted",
+      "contractStatus": "In Negotiation",
+      "assignedSpecialistId": "usr-1",
+      "isDemo": true,
+      "entityId": "ent-1",
+      "applicationType": "Enrollment",
+      "updatedAt": "2026-08-21",
+      "followUps": [
+        {
+          "specialistName": "Sanjay Tom",
+          "date": "2026-08-06",
+          "nextAction": "Check PRISM status for analyst assignment.",
+          "specialistId": "usr-1",
+          "isEscalated": true,
+          "contactPerson": "PRISM Enrollment Portal",
+          "nextFollowUpDate": "2026-08-20",
+          "method": "Portal",
+          "escalatedTo": "Credentialing Lead",
+          "payerResponse": "Submission acknowledged electronically.",
+          "referenceNumber": "UT-PRISM-99412",
+          "id": "fu-5"
+        }
+      ],
+      "lastFollowUpDate": "2026-08-06",
+      "isOverdue": true,
+      "checklist": [
+        {
+          "title": "Utah License Copy",
+          "category": "Document",
+          "isRequired": true,
+          "isCompleted": true,
+          "id": "chk-40"
+        },
+        {
+          "id": "chk-41",
+          "isCompleted": true,
+          "category": "Validation",
+          "isRequired": true,
+          "title": "Fingerprinting Card Verification"
+        },
+        {
+          "category": "Form",
+          "isRequired": true,
+          "id": "chk-42",
+          "title": "PRISM Disclosure Form",
+          "isCompleted": true
+        }
+      ],
+      "createdAt": "2026-08-01",
+      "nextFollowUpDate": "2026-08-20",
+      "documentsReceivedDate": "2026-08-04",
+      "daysInCurrentStage": 20,
+      "totalCycleDays": 25,
+      "validationIssues": []
+    },
+    {
+      "id": "APP-2026-0006",
+      "payerId": "pyr-bsc",
+      "documents": [],
+      "entityId": "ent-2",
+      "revalidationDate": "2026-11-01",
+      "isDemo": true,
+      "isolatedFor": "admin@example.com",
+      "linkingStatus": "Linked",
+      "totalCycleDays": 16,
+      "targetTurnaroundDate": "2026-10-10",
+      "auditTrail": [
+        {
+          "userId": "usr-4",
+          "action": "Auto-created recredentialing record 90 days before revalidation date",
+          "id": "aud-50",
+          "userName": "Elena Rostova",
+          "timestamp": "2026-08-10"
+        }
+      ],
+      "discipline": "Speech",
+      "validationIssues": [
+        {
+          "field": "CAQH Attestation",
+          "ruleReference": "FR-010 & FR-029: Recredentialing CAQH Prerequisite",
+          "description": "CAQH re-attestation is required prior to submitting recredentialing packet.",
+          "severity": "Error",
+          "id": "val-rec-caqh"
+        }
+      ],
+      "daysInCurrentStage": 16,
+      "stage": "Recredentialing Due",
+      "assignedSpecialistName": "Elena Rostova",
+      "providerId": "prv-2",
+      "contractStatus": "Contract Executed",
+      "applicationType": "Recredentialing",
+      "assignedSpecialistId": "usr-4",
+      "updatedAt": "2026-08-10",
+      "followUps": [],
+      "isOverdue": false,
+      "ownerAccountEmail": "admin@example.com",
+      "createdAt": "2026-08-10",
+      "locationId": "loc-1",
+      "intakeDate": "2026-08-10",
+      "checklist": [
+        {
+          "title": "Verify CAQH Profile Attestation",
+          "notes": "Attestation due on CAQH",
+          "id": "chk-50",
+          "category": "Validation",
+          "isCompleted": false,
+          "isRequired": true
+        },
+        {
+          "id": "chk-51",
+          "isCompleted": false,
+          "isRequired": true,
+          "category": "Document",
+          "title": "Confirm Renewed SLP License",
+          "notes": "License expires 10/31"
+        },
+        {
+          "title": "Download BSC Recred Packet",
+          "category": "Form",
+          "id": "chk-52",
+          "isCompleted": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "id": "APP-2026-0007",
+      "contractStatus": "Contract Executed",
+      "discipline": "ABA",
+      "auditTrail": [
+        {
+          "timestamp": "2026-08-20",
+          "action": "Created Record",
+          "userId": "usr-1",
+          "userName": "Sanjay Tom",
+          "id": "aud-60"
+        }
+      ],
+      "providerId": "prv-5",
+      "linkingStatus": "Pending Approval",
+      "isolatedFor": "admin@example.com",
+      "documents": [],
+      "daysInCurrentStage": 4,
+      "isDemo": true,
+      "entityId": "ent-1",
+      "intakeDate": "2026-08-20",
+      "locationId": "loc-3",
+      "assignedSpecialistName": "Sanjay Tom",
+      "applicationType": "Provider addition",
+      "isOverdue": false,
+      "updatedAt": "2026-08-22",
+      "followUps": [],
+      "validationIssues": [],
+      "assignedSpecialistId": "usr-1",
+      "checklist": [
+        {
+          "id": "chk-60",
+          "title": "BCBA BACB Verification",
+          "isRequired": true,
+          "category": "Validation",
+          "isCompleted": true
+        },
+        {
+          "isRequired": true,
+          "id": "chk-61",
+          "isCompleted": true,
+          "category": "Form",
+          "title": "Catalight Roster Entry"
+        },
+        {
+          "title": "Entity / DBA Match Check",
+          "isCompleted": true,
+          "isRequired": true,
+          "id": "chk-62",
+          "category": "Validation"
+        }
+      ],
+      "totalCycleDays": 6,
+      "createdAt": "2026-08-20",
+      "stage": "Application Preparation",
+      "documentsReceivedDate": "2026-08-22",
+      "ownerAccountEmail": "admin@example.com",
+      "payerId": "pyr-catalight"
+    },
+    {
+      "id": "APP-2026-0008",
+      "locationId": "loc-2",
+      "intakeDate": "2026-08-24",
+      "documents": [],
+      "linkingStatus": "Not Applicable",
+      "applicationType": "Initial credentialing",
+      "contractStatus": "In Negotiation",
+      "providerId": "prv-6",
+      "discipline": "OT",
+      "auditTrail": [
+        {
+          "id": "aud-70",
+          "timestamp": "2026-08-24",
+          "userName": "Sanjay Tom",
+          "action": "Created Record",
+          "userId": "usr-1"
+        }
+      ],
+      "assignedSpecialistName": "Sanjay Tom",
+      "isDemo": true,
+      "ownerAccountEmail": "admin@example.com",
+      "stage": "Intake",
+      "updatedAt": "2026-08-24",
+      "followUps": [],
+      "daysInCurrentStage": 2,
+      "isOverdue": false,
+      "assignedSpecialistId": "usr-1",
+      "checklist": [
+        {
+          "isCompleted": true,
+          "title": "NPI & NPPES Validation",
+          "id": "chk-70",
+          "category": "Validation",
+          "isRequired": true
+        },
+        {
+          "id": "chk-71",
+          "title": "License Verification",
+          "isRequired": true,
+          "notes": "License expires in Sept 2026!",
+          "isCompleted": false,
+          "category": "Validation"
+        },
+        {
+          "isRequired": true,
+          "category": "Form",
+          "title": "Cigna Behavioral Health Application",
+          "id": "chk-72",
+          "isCompleted": false
+        }
+      ],
+      "payerId": "pyr-cigna",
+      "entityId": "ent-3",
+      "isolatedFor": "admin@example.com",
+      "validationIssues": [
+        {
+          "severity": "Error",
+          "field": "State Professional License",
+          "description": "License OTR-CA-7721 expires in less than 30 days (2026-09-15). Renewed license required before submission.",
+          "ruleReference": "SLA-007: Zero Submissions with Expired Credentials",
+          "id": "val-exp-lic-soon"
+        }
+      ],
+      "createdAt": "2026-08-24",
+      "totalCycleDays": 2
+    },
+    {
+      "id": "APP-2026-0009",
+      "isolatedFor": "admin@example.com",
+      "paveNotes": "",
+      "contractEffectiveDate": "2026-09-05",
+      "isDemo": true,
+      "notes": "New clinical staff onboarding for New Clinical Staff with Aetna.",
+      "payerId": "pyr-aetna",
+      "followUps": [],
+      "updatedAt": "2026-09-05",
+      "isOverdue": false,
+      "linkingStatus": "Pending Approval",
+      "createdAt": "2026-09-05",
+      "totalCycleDays": 0,
+      "daysInCurrentStage": 0,
+      "dhcsApprovalDate": "",
+      "linkEffectiveDate": "2026-09-05",
+      "checklist": [
+        {
+          "isRequired": true,
+          "isCompleted": false,
+          "title": "NPI & NPPES Validation",
+          "category": "Validation",
+          "id": "chk-1788608145720-1"
+        },
+        {
+          "isCompleted": false,
+          "id": "chk-1788608145720-2",
+          "title": "State Professional License Verified",
+          "isRequired": true,
+          "category": "Document"
+        },
+        {
+          "isCompleted": false,
+          "title": "CAQH Profile Attestation Verified",
+          "id": "chk-1788608145720-3",
+          "category": "Validation",
+          "isRequired": true
+        },
+        {
+          "title": "Entity & DBA Match Confirmation",
+          "isRequired": true,
+          "isCompleted": true,
+          "id": "chk-1788608145720-4",
+          "category": "Validation"
+        },
+        {
+          "isRequired": true,
+          "category": "Document",
+          "id": "chk-1788608145720-5",
+          "title": "Malpractice / COI Current",
+          "isCompleted": true
+        },
+        {
+          "category": "Document",
+          "isRequired": true,
+          "id": "chk-pyr-1788608145720-0",
+          "title": "Payer Requirement: State License",
+          "isCompleted": false
+        },
+        {
+          "id": "chk-pyr-1788608145720-1",
+          "isRequired": true,
+          "isCompleted": false,
+          "category": "Document",
+          "title": "Payer Requirement: W-9 Form"
+        },
+        {
+          "id": "chk-pyr-1788608145720-2",
+          "category": "Document",
+          "isCompleted": false,
+          "title": "Payer Requirement: Malpractice Insurance / COI",
+          "isRequired": true
+        },
+        {
+          "category": "Document",
+          "id": "chk-pyr-1788608145720-3",
+          "title": "Payer Requirement: Curriculum Vitae (CV)",
+          "isCompleted": false,
+          "isRequired": true
+        },
+        {
+          "title": "Payer Requirement: Board Certification",
+          "isCompleted": false,
+          "isRequired": true,
+          "id": "chk-pyr-1788608145720-4",
+          "category": "Document"
+        }
+      ],
+      "paveTrackingNumber": "",
+      "documents": [],
+      "caqhStatusAtSubmission": "Attested",
+      "discipline": "ABA",
+      "auditTrail": [
+        {
+          "userId": "acc-admin-clean",
+          "action": "Created Credentialing Record",
+          "id": "aud-1788608145720",
+          "userName": "Administrator",
+          "timestamp": "9/5/2026, 5:05:45 PM",
+          "notes": "Initiated Initial credentialing application for undefined undefined with Aetna."
+        }
+      ],
+      "targetTurnaroundDate": "2026-12-03",
+      "providerId": "prv-1788608145700",
+      "contractStatus": "Contract Executed",
+      "stage": "Intake",
+      "ownerAccountEmail": "admin@example.com",
+      "entityId": "ent-1",
+      "assignedSpecialistName": "Administrator",
+      "applicationType": "Initial credentialing",
+      "intakeDate": "2026-09-05",
+      "locationId": "loc-1",
+      "assignedSpecialistId": "acc-admin-clean",
+      "validationIssues": [
+        {
+          "id": "val-loc-entity-mismatch",
+          "field": "Location Legal Entity",
+          "ruleReference": "Entity/DBA Validation - Location Entity Mismatch",
+          "description": "Location 'Livermore Clinic' is assigned to entity 'ent-2' but application is filed under 'Ages Learning Solutions LLC'.",
+          "severity": "Error"
+        },
+        {
+          "id": "val-checklist-incomplete",
+          "field": "Payer Requirements Checklist",
+          "ruleReference": "FR-009 & Section 4.3: Mandatory Checklist Completion Before Submission",
+          "description": "8 mandatory checklist item(s) are incomplete (NPI & NPPES Validation, State Professional License Verified...).",
+          "severity": "Error"
+        }
+      ]
+    },
+    {
+      "id": "APP-2026-4951",
+      "contractStatus": "Not Started",
+      "createdAt": "2026-09-06T13:22:34.094Z",
+      "checklist": [
+        {
+          "isRequired": true,
+          "title": "Intake and baseline verification",
+          "completedBy": "Administrator",
+          "isCompleted": true,
+          "completedDate": "2026-09-06",
+          "category": "Administrative",
+          "id": "chk-1"
+        },
+        {
+          "id": "chk-2",
+          "isCompleted": true,
+          "completedDate": "2026-09-06",
+          "category": "Validation",
+          "completedBy": "Administrator",
+          "isRequired": true,
+          "title": "CAQH profile attestation and NPI match"
+        },
+        {
+          "isRequired": true,
+          "title": "Payer application packets submitted",
+          "id": "chk-3",
+          "category": "Portal",
+          "completedBy": "Administrator",
+          "completedDate": "2026-09-06",
+          "isCompleted": true
+        },
+        {
+          "isRequired": true,
+          "completedBy": "Administrator",
+          "completedDate": "2026-09-06",
+          "isCompleted": true,
+          "title": "Payer committee credentialing approval",
+          "category": "Administrative",
+          "id": "chk-4"
+        },
+        {
+          "completedDate": "2026-09-06",
+          "isCompleted": true,
+          "category": "Administrative",
+          "id": "chk-5",
+          "completedBy": "Administrator",
+          "isRequired": true,
+          "title": "Provider linking to group TIN and location"
+        },
+        {
+          "completedBy": "Administrator",
+          "completedDate": "2026-09-06",
+          "title": "Effective date confirmation and billing release",
+          "isCompleted": true,
+          "category": "Administrative",
+          "id": "chk-6",
+          "isRequired": true
+        }
+      ],
+      "providerId": "prv-954093",
+      "documentsCompleteDate": "2026-09-06",
+      "daysInCurrentStage": 0,
+      "auditTrail": [
+        {
+          "notes": "Directly verified and approved by Administrator Administrator. Reference: ADMIN-APPR-7607",
+          "newValue": "Linked",
+          "id": "aud-1788700977606",
+          "previousValue": "Application Submitted",
+          "timestamp": "9/6/2026, 6:52:57 PM",
+          "userId": "acc-admin-clean",
+          "userName": "Administrator",
+          "action": "Admin Verified & Approved Application"
+        },
+        {
+          "timestamp": "2026-09-06T13:22:34.094Z",
+          "notes": "Application APP-2026-4951 initiated with 3 payers, linked to Employee emp-prv-954093 and Clinical Staff cs-prv-954093.",
+          "id": "aud-1788700954094",
+          "userName": "Administrator",
+          "action": "Credentialing Application Created",
+          "userId": "acc-admin-clean"
+        }
+      ],
+      "discipline": "ABA",
+      "applicationType": "New provider credentialing",
+      "employeeId": "emp-prv-954093",
+      "updatedAt": "2026-09-06",
+      "followUps": [],
+      "isOverdue": false,
+      "targetTurnaroundDate": "2026-12-03",
+      "commentIds": [
+        "com-APP-2026-4951-1"
+      ],
+      "isolatedFor": "admin@example.com",
+      "notes": "Credentialing initiated for Marcus Vance. Associated with 3 payers, 3 document links, and 1 notes.",
+      "ownerAccountEmail": "admin@example.com",
+      "intakeDate": "2026-09-06",
+      "locationId": "loc-3",
+      "validationOverridden": {
+        "date": "2026-09-06",
+        "reason": "Admin Direct Verification & Approval Sign-off",
+        "overriddenBy": "Administrator"
+      },
+      "payerIds": [
+        "pyr-aetna",
+        "pyr-alameda",
+        "pyr-anthem"
+      ],
+      "documentLinks": [
+        {
+          "uploadDate": "2026-09-06",
+          "name": "California State BCBA License Certificate",
+          "url": "https://dca.ca.gov/verify/license/LBA-CA-94821.pdf",
+          "type": "State License",
+          "id": "doc-APP-2026-4951-1"
+        },
+        {
+          "id": "doc-APP-2026-4951-2",
+          "name": "BACB Board Certification Verification (Cert #1-21-48902)",
+          "url": "https://bacb.com/verify/certs/1-21-48902.pdf",
+          "uploadDate": "2026-09-06",
+          "type": "Board Certification"
+        },
+        {
+          "uploadDate": "2026-09-06",
+          "url": "https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf",
+          "id": "doc-APP-2026-4951-3",
+          "type": "Malpractice Insurance",
+          "name": "Professional Malpractice Liability Certificate (COI $1M/$3M)"
+        }
+      ],
+      "documentsRequestedDate": "2026-09-06",
+      "submissionDate": "2026-09-06",
+      "assignedSpecialistId": "acc-admin-clean",
+      "documentsReceivedDate": "2026-09-06",
+      "validationIssues": [],
+      "documentIds": [
+        "doc-APP-2026-4951-1",
+        "doc-APP-2026-4951-2",
+        "doc-APP-2026-4951-3"
+      ],
+      "payerId": "pyr-aetna",
+      "applicationId": "APP-2026-4951",
+      "approvalDate": "2026-09-06",
+      "stage": "Linked",
+      "comments": [
+        {
+          "applicationId": "APP-2026-4951",
+          "authorRole": "System Administrator",
+          "id": "com-APP-2026-4951-1",
+          "timestamp": "2026-09-06T13:21:13.407Z",
+          "dateCreated": "September 6, 2026",
+          "authorId": "acc-admin-clean",
+          "timeCreated": "9:30 AM",
+          "providerId": "prv-954093",
+          "authorName": "Administrator",
+          "commentText": "Initial application intake initiated. Baseline CAQH credentials verified and NPI match confirmed."
+        }
+      ],
+      "clinicalStaffId": "cs-prv-954093",
+      "totalCycleDays": 0,
+      "paveTrackingNumber": "PAVE-206032",
+      "entityId": "ent-1",
+      "assignedSpecialistName": "Administrator",
+      "isDemo": true,
+      "linkEffectiveDate": "2026-09-06",
+      "linkingStatus": "Linked",
+      "effectiveDate": "2026-09-06",
+      "documents": [
+        {
+          "verifiedBy": "Administrator",
+          "uploadDate": "2026-09-06",
+          "expirationDate": "2028-10-31",
+          "documentUrl": "https://dca.ca.gov/verify/license/LBA-CA-94821.pdf",
+          "providerId": "prv-954093",
+          "type": "State License",
+          "verificationStatus": "Verified",
+          "id": "doc-APP-2026-4951-1",
+          "name": "California State BCBA License Certificate",
+          "fileSize": "1.2 MB",
+          "fileName": "California State BCBA License Certificate.pdf",
+          "verifiedDate": "2026-09-06"
+        },
+        {
+          "providerId": "prv-954093",
+          "fileSize": "1.2 MB",
+          "fileName": "BACB Board Certification Verification (Cert #1-21-48902).pdf",
+          "type": "Board Certification",
+          "uploadDate": "2026-09-06",
+          "verifiedBy": "Administrator",
+          "verifiedDate": "2026-09-06",
+          "name": "BACB Board Certification Verification (Cert #1-21-48902)",
+          "verificationStatus": "Verified",
+          "expirationDate": "2027-08-31",
+          "documentUrl": "https://bacb.com/verify/certs/1-21-48902.pdf",
+          "id": "doc-APP-2026-4951-2"
+        },
+        {
+          "providerId": "prv-954093",
+          "uploadDate": "2026-09-06",
+          "type": "Malpractice Insurance",
+          "verifiedBy": "Administrator",
+          "verificationStatus": "Verified",
+          "verifiedDate": "2026-09-06",
+          "name": "Professional Malpractice Liability Certificate (COI $1M/$3M)",
+          "fileSize": "1.2 MB",
+          "fileName": "Professional Malpractice Liability Certificate (COI $1M/$3M).pdf",
+          "expirationDate": "2027-06-30",
+          "documentUrl": "https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf",
+          "id": "doc-APP-2026-4951-3"
+        }
+      ]
+    }
+  ],
+  "employees": [],
+  "providers": [],
+  "clinical_staff": [],
+  "records": [],
+  "applications": [
+    {
+      "id": "APP-2026-4951",
+      "createdAt": "2026-09-06T13:22:34.094Z",
+      "documentsReceivedDate": "2026-09-06",
+      "checklist": [
+        {
+          "completedDate": "2026-09-06",
+          "category": "Administrative",
+          "isCompleted": true,
+          "id": "chk-1",
+          "title": "Intake and baseline verification",
+          "isRequired": true
+        },
+        {
+          "isCompleted": true,
+          "title": "CAQH profile attestation and NPI match",
+          "isRequired": true,
+          "completedDate": "2026-09-06",
+          "category": "Validation",
+          "id": "chk-2"
+        },
+        {
+          "category": "Portal",
+          "completedDate": "2026-09-06",
+          "isCompleted": true,
+          "isRequired": true,
+          "title": "Payer application packets submitted",
+          "id": "chk-3"
+        },
+        {
+          "isRequired": true,
+          "title": "Payer committee credentialing approval",
+          "id": "chk-4",
+          "category": "Administrative",
+          "isCompleted": false
+        },
+        {
+          "isRequired": true,
+          "title": "Provider linking to group TIN and location",
+          "category": "Administrative",
+          "id": "chk-5",
+          "isCompleted": false
+        },
+        {
+          "isRequired": true,
+          "title": "Effective date confirmation and billing release",
+          "category": "Administrative",
+          "isCompleted": false,
+          "id": "chk-6"
+        }
+      ],
+      "submissionDate": "2026-09-06",
+      "assignedSpecialistId": "acc-admin-clean",
+      "applicationId": "APP-2026-4951",
+      "isOverdue": false,
+      "followUps": [],
+      "updatedAt": "2026-09-06T13:22:34.094Z",
+      "paveTrackingNumber": "PAVE-206032",
+      "clinicalStaffId": "cs-prv-954093",
+      "documentsCompleteDate": "2026-09-06",
+      "payerIds": [
+        "pyr-aetna",
+        "pyr-alameda",
+        "pyr-anthem"
+      ],
+      "notes": "Credentialing initiated for Marcus Vance. Associated with 3 payers, 3 document links, and 1 notes.",
+      "assignedSpecialistName": "Administrator",
+      "linkingStatus": "Linking In Progress",
+      "contractStatus": "Not Started",
+      "payerId": "pyr-aetna",
+      "targetTurnaroundDate": "2026-12-03",
+      "validationIssues": [],
+      "daysInCurrentStage": 0,
+      "locationId": "loc-3",
+      "intakeDate": "2026-09-06",
+      "comments": [
+        {
+          "applicationId": "APP-2026-4951",
+          "authorId": "acc-admin-clean",
+          "timestamp": "2026-09-06T13:21:13.407Z",
+          "id": "com-APP-2026-4951-1",
+          "authorRole": "System Administrator",
+          "dateCreated": "September 6, 2026",
+          "timeCreated": "9:30 AM",
+          "providerId": "prv-954093",
+          "authorName": "Administrator",
+          "commentText": "Initial application intake initiated. Baseline CAQH credentials verified and NPI match confirmed."
+        }
+      ],
+      "entityId": "ent-1",
+      "applicationType": "New provider credentialing",
+      "discipline": "ABA",
+      "auditTrail": [
+        {
+          "notes": "Application APP-2026-4951 initiated with 3 payers, linked to Employee emp-prv-954093 and Clinical Staff cs-prv-954093.",
+          "id": "aud-1788700954094",
+          "timestamp": "2026-09-06T13:22:34.094Z",
+          "userName": "Administrator",
+          "userId": "acc-admin-clean",
+          "action": "Credentialing Application Created"
+        }
+      ],
+      "totalCycleDays": 0,
+      "employeeId": "emp-prv-954093",
+      "commentIds": [
+        "com-APP-2026-4951-1"
+      ],
+      "documentLinks": [
+        {
+          "name": "California State BCBA License Certificate",
+          "id": "doc-APP-2026-4951-1",
+          "type": "State License",
+          "uploadDate": "2026-09-06",
+          "url": "https://dca.ca.gov/verify/license/LBA-CA-94821.pdf"
+        },
+        {
+          "uploadDate": "2026-09-06",
+          "type": "Board Certification",
+          "id": "doc-APP-2026-4951-2",
+          "name": "BACB Board Certification Verification (Cert #1-21-48902)",
+          "url": "https://bacb.com/verify/certs/1-21-48902.pdf"
+        },
+        {
+          "id": "doc-APP-2026-4951-3",
+          "name": "Professional Malpractice Liability Certificate (COI $1M/$3M)",
+          "uploadDate": "2026-09-06",
+          "type": "Malpractice Insurance",
+          "url": "https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf"
+        }
+      ],
+      "documentsRequestedDate": "2026-09-06",
+      "documentIds": [
+        "doc-APP-2026-4951-1",
+        "doc-APP-2026-4951-2",
+        "doc-APP-2026-4951-3"
+      ],
+      "providerId": "prv-954093",
+      "documents": [
+        {
+          "type": "State License",
+          "expirationDate": "2028-10-31",
+          "name": "California State BCBA License Certificate",
+          "verificationStatus": "Verified",
+          "id": "doc-APP-2026-4951-1",
+          "fileSize": "1.2 MB",
+          "fileName": "California State BCBA License Certificate.pdf",
+          "documentUrl": "https://dca.ca.gov/verify/license/LBA-CA-94821.pdf",
+          "uploadDate": "2026-09-06",
+          "providerId": "prv-954093"
+        },
+        {
+          "type": "Board Certification",
+          "verificationStatus": "Verified",
+          "documentUrl": "https://bacb.com/verify/certs/1-21-48902.pdf",
+          "uploadDate": "2026-09-06",
+          "expirationDate": "2027-08-31",
+          "name": "BACB Board Certification Verification (Cert #1-21-48902)",
+          "providerId": "prv-954093",
+          "fileName": "BACB Board Certification Verification (Cert #1-21-48902).pdf",
+          "fileSize": "1.2 MB",
+          "id": "doc-APP-2026-4951-2"
+        },
+        {
+          "id": "doc-APP-2026-4951-3",
+          "type": "Malpractice Insurance",
+          "verificationStatus": "Verified",
+          "fileSize": "1.2 MB",
+          "fileName": "Professional Malpractice Liability Certificate (COI $1M/$3M).pdf",
+          "providerId": "prv-954093",
+          "uploadDate": "2026-09-06",
+          "expirationDate": "2027-06-30",
+          "name": "Professional Malpractice Liability Certificate (COI $1M/$3M)",
+          "documentUrl": "https://storage.cloud.google.com/ages-cred-docs/coi-malpractice-2026.pdf"
+        }
+      ],
+      "stage": "Application Submitted"
+    }
+  ],
+  "documents": [],
+  "comments": [],
+  "notifications": [
+    {
+      "id": "notif-1",
+      "title": "SLA Breach: Overdue Follow-up for Utah Medicaid",
+      "providerId": "prv-4",
+      "recordId": "APP-2026-0005",
+      "message": "Application APP-2026-0005 for Kaitlyn Zimmerman (BCBA) has an overdue follow-up since August 20, 2026.",
+      "severity": "error",
+      "timestamp": "2026-08-21 09:00",
+      "isRead": false,
+      "type": "OVERDUE_FOLLOWUP"
+    },
+    {
+      "id": "notif-1788608145700",
+      "title": "Provider Added: New Clinical Staff",
+      "message": "BCBA (ABA) registered in Master Directory.",
+      "isRead": false,
+      "timestamp": "9/5/2026, 5:05:45 PM",
+      "severity": "info",
+      "providerId": "prv-1788608145700",
+      "type": "MISSING_DOCS"
+    },
+    {
+      "id": "notif-2",
+      "isRead": false,
+      "type": "LINKING_PENDING",
+      "recordId": "APP-2026-0002",
+      "message": "Maya Patel (SLP) was approved by Alameda Alliance on 07/28/2026. Provider linking to group is still pending completion.",
+      "severity": "warning",
+      "providerId": "prv-2",
+      "title": "Provider Approved: Linking Pending with Alameda Alliance",
+      "timestamp": "2026-08-16 08:30"
+    },
+    {
+      "id": "notif-3",
+      "timestamp": "2026-08-11 10:15",
+      "title": "CAQH Re-attestation Due: Maya Patel",
+      "providerId": "prv-2",
+      "severity": "warning",
+      "isRead": false,
+      "type": "CAQH_ATTESTATION",
+      "message": "CAQH profile #19920144 requires immediate re-attestation to prevent credentialing interruption."
+    },
+    {
+      "id": "notif-4",
+      "title": "Urgent License Expiry: Derrick Sterling, OTR/L",
+      "severity": "error",
+      "providerId": "prv-6",
+      "timestamp": "2026-08-24 07:00",
+      "isRead": false,
+      "message": "California license OTR-CA-7721 expires on September 15, 2026 (in 20 days).",
+      "type": "LICENSE_EXPIRING"
+    },
+    {
+      "id": "notif-5",
+      "message": "SCFHP has requested supplemental lease documentation for Lucas Moreno (OT).",
+      "timestamp": "2026-08-18 14:22",
+      "providerId": "prv-3",
+      "title": "Additional Documentation Requested by DHCS / SCFHP",
+      "recordId": "APP-2026-0003",
+      "isRead": true,
+      "severity": "info",
+      "type": "PAVE_ACTION"
+    }
+  ]
+}

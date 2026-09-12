@@ -10,8 +10,6 @@ import {
   FileCheck, 
   Globe, 
   Mail, 
-  MapPin, 
-  Phone, 
   Plus, 
   Search, 
   ShieldCheck, 

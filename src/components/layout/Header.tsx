@@ -29,11 +29,6 @@ import {
   Sliders,
   Settings,
   Clock,
-  RefreshCw,
-  CloudCheck,
-  CloudUpload,
-  CloudOff,
-  Cloud,
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -71,26 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
     logout, 
     notifications, 
     sessionSecondsLeft,
-    cloudSyncStatus,
-    syncNow,
   } = useCredentialing();
-
-  const [isSyncingManual, setIsSyncingManual] = useState(false);
-  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
-
-  const handleManualSync = async () => {
-    try {
-      setIsSyncingManual(true);
-      await syncNow();
-      setSyncFeedback('Synced to Firebase!');
-      setTimeout(() => setSyncFeedback(null), 3000);
-    } catch (err) {
-      setSyncFeedback('Sync error');
-      setTimeout(() => setSyncFeedback(null), 4000);
-    } finally {
-      setIsSyncingManual(false);
-    }
-  };
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -159,27 +135,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Actions */}
           <div className="flex items-center space-x-2.5">
-            {/* Cloud Sync Status & Manual Push */}
-            <button
-              onClick={handleManualSync}
-              disabled={isSyncingManual || cloudSyncStatus === 'syncing'}
-              title="Cloud Database: pts-credentialing-1da61 (Click to sync now)"
-              className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                syncFeedback
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                  : cloudSyncStatus === 'synced'
-                  ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                  : cloudSyncStatus === 'syncing' || isSyncingManual
-                  ? 'bg-indigo-50 border-indigo-200 text-[#2B4C9D]'
-                  : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
-              }`}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingManual || cloudSyncStatus === 'syncing' ? 'animate-spin text-[#2B4C9D]' : cloudSyncStatus === 'synced' ? 'text-emerald-600' : 'text-amber-500'}`} />
-              <span>
-                {syncFeedback || (isSyncingManual || cloudSyncStatus === 'syncing' ? 'Syncing...' : 'Cloud Synced')}
-              </span>
-            </button>
-
             {/* Quick Add Application Button */}
             <button
               onClick={onOpenNewApplication}
@@ -231,6 +186,11 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="px-3 py-2 border-b border-slate-100">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-slate-900">{currentAccount?.name || 'User'}</p>
+                      {currentAccount?.authProvider === 'google' && (
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 flex items-center space-x-1" title="Authenticated via Google OAuth & Employee Access Control">
+                          <span>Google Verified</span>
+                        </span>
+                      )}
                       {isSuperAdmin(currentAccount) && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                           SUPER ADMIN

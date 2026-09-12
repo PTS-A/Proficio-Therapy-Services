@@ -12,17 +12,8 @@ import {
   FileText, 
   ShieldCheck, 
   Briefcase, 
-  Phone, 
-  Mail, 
-  Calendar, 
-  Clock, 
-  Tag, 
-  ExternalLink, 
-  ChevronRight, 
-  Share2, 
   Sparkles,
   Link2,
-  X,
   Printer,
   Edit3
 } from 'lucide-react';
@@ -49,7 +40,6 @@ export const ClinicalStaffReviewPage: React.FC<ClinicalStaffReviewPageProps> = (
     currentUser, 
     addRecord, 
     updateProvider,
-    records,
     addProviderCommentLog
   } = useCredentialing();
 
@@ -67,7 +57,6 @@ export const ClinicalStaffReviewPage: React.FC<ClinicalStaffReviewPageProps> = (
   const [linkStatus, setLinkStatus] = useState<'Linked' | 'Pending Approval' | 'In Progress'>('Linked');
   const [linkEffectiveDate, setLinkEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [linkSpecialistId, setLinkSpecialistId] = useState(users[0]?.id || currentUser.id);
-  const [linkNotes, setLinkNotes] = useState('');
   const [linkSuccessMessage, setLinkSuccessMessage] = useState<string | null>(null);
 
   if (!provider) {
@@ -98,7 +87,7 @@ export const ClinicalStaffReviewPage: React.FC<ClinicalStaffReviewPageProps> = (
     const selectedEntity = entities.find((e) => e.id === linkEntityId);
 
     // 1. Create a new Credentialing / Linking Record in system
-    const newRecord = addRecord({
+    addRecord({
       providerId: provider.id,
       payerId: linkPayerId,
       entityId: linkEntityId,
@@ -138,7 +127,6 @@ export const ClinicalStaffReviewPage: React.FC<ClinicalStaffReviewPageProps> = (
     });
 
     setLinkSuccessMessage(`Successfully linked with ${selectedPayer?.name}! Record created.`);
-    setLinkNotes('');
     setTimeout(() => setLinkSuccessMessage(null), 4000);
   };
 

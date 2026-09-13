@@ -12,7 +12,8 @@ export type ActiveTabType =
   | 'users' 
   | 'new-user' 
   | 'import' 
-  | 'settings';
+  | 'settings'
+  | 'automations';
 
 /**
  * Checks if the account is a Super Admin.
@@ -86,7 +87,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'new-user',
       'users',
       'import',
-      'settings'
+      'settings',
+      'automations'
     ];
   }
 
@@ -102,7 +104,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'locations',
         'payers',
         'entities',
-        'reports'
+        'reports',
+        'automations'
       ];
 
     case 'Credentialing Specialist':

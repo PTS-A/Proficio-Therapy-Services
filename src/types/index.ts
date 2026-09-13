@@ -815,3 +815,82 @@ export interface SystemSettings {
   enableDailySummaryEmail: boolean;
   nppesAutoValidation: boolean;
 }
+
+// --------------------------------------------------------------------------
+// AUTOMATED CREDENTIAL DEADLINE REMINDER SYSTEM TYPES
+// --------------------------------------------------------------------------
+
+export type AutomationEventType = 
+  | 'CREDENTIAL_EXPIRATION' 
+  | 'RECREDENTIAL_DUE' 
+  | 'LICENSE_EXPIRATION' 
+  | 'CAQH_REATTESTATION' 
+  | string;
+
+export type AutomationTargetType = 
+  | 'credentialing_records' 
+  | 'clinical_staff' 
+  | 'providers';
+
+export type AutomationRecipientRole = 
+  | 'employee' 
+  | 'assigned_specialist' 
+  | 'manager' 
+  | 'hr' 
+  | 'custom';
+
+export type AutomationDeliveryStatus = 
+  | 'sent' 
+  | 'delivered' 
+  | 'failed' 
+  | 'simulated' 
+  | 'skipped';
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  eventType: AutomationEventType;
+  targetType: AutomationTargetType;
+  daysBefore: number[];
+  recipientRoles: AutomationRecipientRole[];
+  customRecipientEmails: string[];
+  emailSubjectTemplate: string;
+  emailBodyTemplate: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AutomationExecutionLog {
+  id: string;
+  automationId: string;
+  eventType: string;
+  recordId: string;
+  targetType: string;
+  providerName: string;
+  recipientEmail: string;
+  recipientName: string;
+  recipientRole: string;
+  expirationDate: string;
+  daysBefore: number;
+  emailSubject: string;
+  emailBody?: string;
+  deliveryStatus: AutomationDeliveryStatus;
+  resendId?: string;
+  errorMessage?: string;
+  idempotencyKey: string;
+  executedAt: string;
+}
+
+export interface DeadlineEvaluationReport {
+  timestamp: string;
+  dryRun: boolean;
+  totalRecordsChecked: number;
+  upcomingDeadlinesFound: number;
+  remindersEvaluated: number;
+  emailsSent: number;
+  emailsSimulated: number;
+  duplicatesPrevented: number;
+  failures: number;
+  executions: AutomationExecutionLog[];
+}

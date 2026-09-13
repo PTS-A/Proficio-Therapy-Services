@@ -29,6 +29,7 @@ import {
   Sliders,
   Settings,
   Clock,
+  Mail,
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -43,7 +44,8 @@ export type ActiveTabType =
   | 'users'
   | 'new-user'
   | 'import'
-  | 'settings';
+  | 'settings'
+  | 'automations';
 
 interface HeaderProps {
   activeTab: ActiveTabType;
@@ -91,6 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'locations' as const, label: 'Locations', icon: MapPin },
     { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
+    { id: 'automations' as const, label: 'Automations', icon: Mail },
     { id: 'new-user' as const, label: 'Users & RBAC', icon: UserPlus },
   ];
 
@@ -286,6 +289,23 @@ export const Header: React.FC<HeaderProps> = ({
                         <div className="flex items-center space-x-2">
                           <Settings className="w-4 h-4 text-slate-400" />
                           <span>System Settings & Configuration</span>
+                        </div>
+                      </button>
+                    )}
+
+                    {canAccessTab(currentAccount, 'automations') && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('automations');
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                          activeTab === 'automations' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-4 h-4 text-[#2B4C9D]" />
+                          <span>Automated Deadline Emails</span>
                         </div>
                       </button>
                     )}

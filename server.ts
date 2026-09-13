@@ -56,8 +56,9 @@ async function startServer() {
     );
 
     res.json({
-      stage: 'PHASE_2_STORAGE_AND_DUAL_WRITE_ACTIVE',
-      firebaseActive: true,
+      stage: 'SUPABASE_SOLE_ACTIVE_PRIMARY',
+      firebaseActive: false,
+      firebaseSevered: true,
       supabaseReady: hasSeed && hasExport,
       hasSupabaseConfigured: hasSupabaseKeys,
       supabaseUrl: 'https://uqaiotacheqjvfbanxtp.supabase.co',
@@ -70,7 +71,7 @@ async function startServer() {
         combinedSql: 'supabase/full_migration_and_seed.sql',
         dataSnapshotJson: 'supabase/data_export.json',
       },
-      message: 'Firebase is decommissioned/suspended. Supabase PostgreSQL is the primary database.',
+      message: 'Firebase connection severed. Supabase PostgreSQL is the sole active production database.',
     });
   });
 
@@ -98,6 +99,8 @@ async function startServer() {
         'stage_configs',
         'system_config',
         'system_notifications',
+        'automation_definitions',
+        'automation_executions',
       ];
 
       const results: Record<string, { count: number | null; ok: boolean; error?: string }> = {};
@@ -271,7 +274,7 @@ async function startServer() {
   app.post('/api/auth/session/complete', (req, res) => {
     const { sessionId, status, account, details, error } = req.body || {};
     if (sessionId) {
-      const existing = oauthSessions.get(sessionId) || {
+      const existing: OAuthSessionState = oauthSessions.get(sessionId) || {
         id: sessionId,
         status: 'pending',
         createdAt: Date.now()
@@ -931,6 +934,131 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // --------------------------------------------------------------------------
+  // SCRIPT: AUTOMATED CREDENTIAL DEADLINE REMINDER ENGINE API
+  // --------------------------------------------------------------------------
+
+  // Get Resend status and scheduler overview
+  app.get('/api/automations/status', async (req, res) => {
+    try {
+      const { getResendStatus, getAutomationDefinitions, getAutomationExecutions } = await import('./server/automationEngine');
+      const resendStatus = getResendStatus();
+      const rules = await getAutomationDefinitions();
+      const recentExecs = await getAutomationExecutions(20);
+
+      res.json({
+        resend: resendStatus,
+        activeRulesCount: rules.filter(r => r.isActive).length,
+        totalRulesCount: rules.length,
+        totalExecutionsLogged: recentExecs.length,
+        lastExecution: recentExecs.length > 0 ? recentExecs[0].executedAt : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get all automation rules
+  app.get('/api/automations/definitions', async (req, res) => {
+    try {
+      const { getAutomationDefinitions } = await import('./server/automationEngine');
+      const rules = await getAutomationDefinitions();
+      res.json({ rules });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Save or update an automation rule
+  app.post('/api/automations/definitions', async (req, res) => {
+    try {
+      const { saveAutomationDefinition } = await import('./server/automationEngine');
+      const saved = await saveAutomationDefinition(req.body || {});
+      res.json({ success: true, rule: saved });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Delete an automation rule
+  app.delete('/api/automations/definitions/:id', async (req, res) => {
+    try {
+      const { deleteAutomationDefinition } = await import('./server/automationEngine');
+      await deleteAutomationDefinition(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get recent execution logs
+  app.get('/api/automations/executions', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string, 10) || 100;
+      const { getAutomationExecutions } = await import('./server/automationEngine');
+      const executions = await getAutomationExecutions(limit);
+      res.json({ executions });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Manual Trigger / Cron Endpoint for Deadline Check
+  app.post('/api/automations/run-check', async (req, res) => {
+    try {
+      const { dryRun = false, forceDaysBefore } = req.body || {};
+      const { evaluateAndExecuteDeadlines } = await import('./server/automationEngine');
+      
+      const report = await evaluateAndExecuteDeadlines({
+        dryRun: Boolean(dryRun),
+        forceDaysBefore: forceDaysBefore !== undefined ? Number(forceDaysBefore) : undefined,
+      });
+
+      res.json({ success: true, report });
+    } catch (err: any) {
+      console.error('[Automations API Error] run-check failed:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Test send an email for a specific rule and record
+  app.post('/api/automations/test-send', async (req, res) => {
+    try {
+      const { ruleId, recordId, targetEmail } = req.body || {};
+      if (!ruleId || !recordId || !targetEmail) {
+        return res.status(400).json({ error: 'ruleId, recordId, and targetEmail are required.' });
+      }
+
+      const { sendTestReminder } = await import('./server/automationEngine');
+      const result = await sendTestReminder(ruleId, recordId, targetEmail);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Scheduled background runner for deadline checks
+  // Runs 30s after server startup, then every 6 hours automatically
+  setTimeout(async () => {
+    try {
+      console.log('[Background Automation] Running initial credential deadline check...');
+      const { evaluateAndExecuteDeadlines } = await import('./server/automationEngine');
+      await evaluateAndExecuteDeadlines({ dryRun: false });
+    } catch (err) {
+      console.warn('[Background Automation] Initial deadline check non-fatal warning:', err);
+    }
+  }, 30000);
+
+  setInterval(async () => {
+    try {
+      console.log('[Background Automation] Running scheduled credential deadline check...');
+      const { evaluateAndExecuteDeadlines } = await import('./server/automationEngine');
+      await evaluateAndExecuteDeadlines({ dryRun: false });
+    } catch (err) {
+      console.warn('[Background Automation] Scheduled deadline check non-fatal warning:', err);
+    }
+  }, 6 * 60 * 60 * 1000);
 
   // Vite middleware for development / Static file serving for production
   if (!isProduction) {

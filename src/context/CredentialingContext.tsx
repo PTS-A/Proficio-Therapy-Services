@@ -1484,8 +1484,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const loginWithGoogle = async (
-    emailOverride?: string,
-    preferredFlow: 'popup' | 'redirect' = 'redirect'
+    emailOverride?: string
   ): Promise<{
     success: boolean;
     error?: string;
@@ -1495,7 +1494,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     account?: AppAccount;
   }> => {
     try {
-      const res = await initiateGoogleSignIn(emailOverride, preferredFlow);
+      const res = await initiateGoogleSignIn(emailOverride);
       if (!res.success || !res.data || !res.data.authorized || !res.data.account) {
         return {
           success: false,

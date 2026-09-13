@@ -15,6 +15,7 @@ import { NewApplicationModal } from './components/modals/NewApplicationModal';
 import { NewUserView } from './components/admin/NewUserView';
 import { DataImportView } from './components/admin/DataImportView';
 import { SystemConfigView } from './components/admin/SystemConfigView';
+import { AutomationDashboardView } from './components/automations/AutomationDashboardView';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { Discipline } from './types';
@@ -202,6 +203,13 @@ const MainContent: React.FC = () => {
           <SystemConfigView
             onBackToDashboard={() => setActiveTab('dashboard')}
           />
+        )}
+
+        {/* Dedicated Subpage: Automated Credential Deadline Reminder System */}
+        {activeTab === 'automations' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <AutomationDashboardView />
+          </div>
         )}
       </main>
 

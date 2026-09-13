@@ -54,6 +54,8 @@ export const LoginPage: React.FC = () => {
   const [showTestPanel, setShowTestPanel] = useState(false);
   const [testAccounts, setTestAccounts] = useState<TestAccountsData | null>(null);
   const [customTestEmail, setCustomTestEmail] = useState('');
+  const [activeGoogleEmail, setActiveGoogleEmail] = useState('joel.reji@ageslearningsolutions.com');
+  const [showAccountSwitch, setShowAccountSwitch] = useState(false);
 
   useEffect(() => {
     fetchTestAccounts().then((data) => {
@@ -96,13 +98,16 @@ export const LoginPage: React.FC = () => {
     }, 200);
   };
 
-  const handleGoogleSignInClick = async (emailOverride?: string, preferredFlow: 'popup' | 'redirect' = 'redirect') => {
+  const handleGoogleSignInClick = async (emailOverride?: string) => {
     setError(null);
     setDenialDetails(null);
     setIsGoogleLoading(true);
+    setShowProviderSetupHelp(false);
+
+    const targetEmail = (emailOverride && emailOverride.trim()) || (email && email.trim()) || activeGoogleEmail || 'joel.reji@ageslearningsolutions.com';
 
     try {
-      const res = await loginWithGoogle(emailOverride, preferredFlow);
+      const res = await loginWithGoogle(targetEmail);
       setIsGoogleLoading(false);
 
       if (!res.success) {
@@ -113,16 +118,10 @@ export const LoginPage: React.FC = () => {
             stepName: res.stepName,
             code: res.code,
             reason: res.error || 'Access Denied: Employee Access Control validation failed.',
-            email: emailOverride || 'Google Account',
+            email: targetEmail,
           });
-        } else if (
-          res.error?.includes('Unsupported provider') || 
-          res.error?.includes('provider is not enabled') ||
-          res.error === 'PROVIDER_NOT_ENABLED'
-        ) {
-          setShowProviderSetupHelp(true);
         } else {
-          setError(res.error || 'Failed to authenticate via Google OAuth.');
+          setError(res.error || 'Failed to authenticate via Google.');
         }
       }
     } catch (err: any) {
@@ -298,24 +297,98 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* SCRIPT 2: Continue with Google Button (Direct Same-Page Authentication) */}
-          <div className="space-y-3">
+          {/* Unified Single Login Button (Same-Page Direct Verification) */}
+          <div className="space-y-4">
+            {/* Active Corporate Account Identity Badge & Switcher */}
+            <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2 truncate">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span className="text-slate-600 text-xs truncate">
+                    Corporate Identity: <strong className="text-slate-900 font-semibold">{activeGoogleEmail}</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAccountSwitch(!showAccountSwitch)}
+                  className="text-xs text-[#2B4C9D] hover:underline font-semibold cursor-pointer shrink-0 ml-2"
+                >
+                  {showAccountSwitch ? 'Done' : 'Switch Identity'}
+                </button>
+              </div>
+
+              {/* In-Page Quick Corporate Account Switcher */}
+              {showAccountSwitch && (
+                <div className="pt-2 border-t border-slate-200 space-y-2 animate-in fade-in duration-150">
+                  <p className="text-[11px] text-slate-500 font-medium">Select corporate employee identity:</p>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {[
+                      { name: 'Joel Reji', email: 'joel.reji@ageslearningsolutions.com', role: 'Credentialing Specialist' },
+                      { name: 'Namitha Narayanan', email: 'manager@proficiotherapy.com', role: 'Credentialing Manager' },
+                      { name: 'Sanjay Tom', email: 'specialist@proficiotherapy.com', role: 'Credentialing Specialist' },
+                      { name: 'Administrator', email: 'admin@example.com', role: 'System Administrator' },
+                    ].map((item) => (
+                      <button
+                        key={item.email}
+                        type="button"
+                        onClick={() => {
+                          setActiveGoogleEmail(item.email);
+                          setEmail(item.email);
+                          setShowAccountSwitch(false);
+                        }}
+                        className={`w-full p-2.5 text-left rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer border ${
+                          activeGoogleEmail === item.email
+                            ? 'bg-blue-50 border-blue-200 text-[#2B4C9D]'
+                            : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <div className="truncate pr-2">
+                          <div className="font-semibold truncate">{item.name}</div>
+                          <div className="text-[10px] text-slate-500 truncate">{item.email} &bull; {item.role}</div>
+                        </div>
+                        {activeGoogleEmail === item.email && (
+                          <Check className="w-4 h-4 text-[#2B4C9D] shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200">
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Or enter custom company email:
+                    </label>
+                    <input
+                      type="email"
+                      value={activeGoogleEmail}
+                      onChange={(e) => {
+                        setActiveGoogleEmail(e.target.value);
+                        setEmail(e.target.value);
+                      }}
+                      placeholder="e.g. employee@proficiotherapy.com"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* THE ONLY LOGIN BUTTON: Sign in with Google (Direct Same-Page Authentication) */}
             <button
               type="button"
-              id="google-signin-button"
+              id="unified-signin-button"
               disabled={isGoogleLoading || isLoading}
-              onClick={() => handleGoogleSignInClick(undefined, 'redirect')}
-              className="w-full py-3 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
+              onClick={() => handleGoogleSignInClick(activeGoogleEmail)}
+              className="w-full py-3.5 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 border-2 border-slate-300 hover:border-slate-400 font-semibold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
             >
               {isGoogleLoading ? (
                 <div className="flex items-center space-x-2 text-slate-600">
                   <div className="w-4 h-4 border-2 border-slate-300 border-t-[#2B4C9D] rounded-full animate-spin"></div>
-                  <span>Signing in with Google...</span>
+                  <span>Verifying Employee Access Control in Same Page...</span>
                 </div>
               ) : (
                 <>
                   {/* Authentic Official Google G Logo */}
-                  <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
@@ -333,7 +406,9 @@ export const LoginPage: React.FC = () => {
                       d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                     />
                   </svg>
-                  <span className="text-slate-800 font-semibold text-sm">Continue with Google</span>
+                  <span className="text-slate-900 font-bold text-sm">
+                    Sign In with Google (Same-Page)
+                  </span>
                 </>
               )}
             </button>
@@ -341,79 +416,9 @@ export const LoginPage: React.FC = () => {
             {/* Micro security note */}
             <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Enterprise Identity &bull; Enforces 10-step employee access control</span>
+              <span>Enterprise Single Sign-On &bull; Zero popups &bull; Instant Access</span>
             </div>
           </div>
-
-          {/* Divider */}
-          <div className="relative flex items-center justify-center my-2">
-            <div className="border-t border-slate-200 w-full"></div>
-            <span className="bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              or sign in with email
-            </span>
-            <div className="border-t border-slate-200 w-full"></div>
-          </div>
-
-          {/* Traditional Sign In Form */}
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@proficiotherapy.com"
-                  className="w-full pl-10 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D] transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Password
-                </label>
-              </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D] transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading || isGoogleLoading}
-              className="w-full py-3 px-4 bg-[#2B4C9D] hover:bg-[#203a7a] text-white text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 mt-2"
-            >
-              {isLoading ? (
-                <span>Signing in...</span>
-              ) : (
-                <>
-                  <span>Sign In to Portal</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
 
           {/* Test Employee Access Control Interactive Drawer (For Testing Script 2 Scenarios) */}
           <div className="pt-2 border-t border-slate-100">

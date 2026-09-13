@@ -1271,12 +1271,12 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
 
               <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 opacity-80">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-slate-500">Legacy Engine</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700">SUSPENDED</span>
+                  <span className="text-[10px] font-bold uppercase text-slate-500">Firebase Engine</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200">SEVERED & DISCONNECTED</span>
                 </div>
                 <div className="text-sm font-bold text-slate-700">Google Cloud Firestore</div>
                 <p className="text-[11px] text-slate-500 leading-snug">
-                  Decommissioned and suspended. Zero active client traffic or billable queries dispatched to Firebase.
+                  All connection links, shadow writes, and SDK calls have been permanently severed. 100% of operations run on Supabase.
                 </p>
               </div>
 

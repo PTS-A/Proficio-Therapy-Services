@@ -1,50 +1,43 @@
 /**
- * PROFICIO THERAPY SERVICES — UNIFIED DATABASE BRIDGE
- * Transparent switching and dual-engine orchestration between Google Firebase and Supabase.
- * Default: 'firebase' (100% stable primary with shadow replication to Supabase).
+ * PROFICIO THERAPY SERVICES — DATABASE BRIDGE
+ * Supabase PostgreSQL is the sole, active production database provider.
+ * All connections, queries, real-time subscriptions, and mutations operate exclusively via Supabase.
  */
 
-import * as firebaseLib from './firebase';
 import * as supabaseLib from './supabase';
 
-export type BackendProvider = 'supabase' | 'firebase';
+export type BackendProvider = 'supabase';
 
 const STORAGE_KEY_PROVIDER = 'pts_active_backend_provider';
 
-let activeProvider: BackendProvider = (
-  (typeof localStorage !== 'undefined' && (localStorage.getItem(STORAGE_KEY_PROVIDER) as BackendProvider)) ||
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DATA_PROVIDER as BackendProvider) ||
-  'supabase'
-);
+let activeProvider: BackendProvider = 'supabase';
 
-// Flag to indicate whether Firebase is suspended / decommissioned
+// Ensure Supabase is locked in storage
+if (typeof localStorage !== 'undefined') {
+  localStorage.setItem(STORAGE_KEY_PROVIDER, 'supabase');
+}
+
 export const isFirebaseDecommissioned = true;
 
 export function getActiveBackendProvider(): BackendProvider {
-  return activeProvider;
+  return 'supabase';
 }
 
-export function setActiveBackendProvider(provider: BackendProvider): void {
-  activeProvider = provider;
+export function setActiveBackendProvider(_provider: string): void {
+  activeProvider = 'supabase';
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_PROVIDER, provider);
+    localStorage.setItem(STORAGE_KEY_PROVIDER, 'supabase');
   }
-  console.log(`[DatabaseBridge] Switched active backend provider to: ${provider}`);
+  console.log(`[DatabaseBridge] Backend provider locked to: supabase`);
 }
 
 export async function testConnection(): Promise<boolean> {
-  if (activeProvider === 'supabase') {
-    const res = await supabaseLib.testConnection();
-    return res.ok;
-  }
-  return firebaseLib.testConnection();
+  const res = await supabaseLib.testConnection();
+  return res.ok;
 }
 
 export async function drainMutationQueue(): Promise<void> {
-  if (activeProvider === 'supabase') {
-    return Promise.resolve();
-  }
-  return firebaseLib.drainMutationQueue();
+  return Promise.resolve();
 }
 
 export async function checkBackendHealth(): Promise<{
@@ -52,117 +45,75 @@ export async function checkBackendHealth(): Promise<{
   supabase: { ok: boolean; message: string; mode: string };
   activeProvider: BackendProvider;
 }> {
-  let fbStatus = { 
-    ok: true, 
-    message: isFirebaseDecommissioned ? 'Firebase suspended / decommissioned in favor of Supabase.' : 'Google Cloud Firestore is online.',
-    suspended: isFirebaseDecommissioned 
-  };
-  
-  if (!isFirebaseDecommissioned) {
-    try {
-      await firebaseLib.ensureAuth();
-    } catch (err: any) {
-      fbStatus = { ok: false, message: err?.message || 'Firebase error', suspended: false };
-    }
-  }
-
   const sbStatus = await supabaseLib.testConnection();
 
   return {
-    firebase: fbStatus,
+    firebase: {
+      ok: false,
+      message: 'Firebase connection severed. Decommissioned in favor of Supabase PostgreSQL.',
+      suspended: true,
+    },
     supabase: sbStatus,
-    activeProvider,
+    activeProvider: 'supabase',
   };
 }
 
 /**
  * Unified saveDocument:
- * Dispatches to active provider and ensures shadow consistency.
+ * Dispatches exclusively to Supabase.
  */
 export async function saveDocument<T extends Record<string, any>>(
   collectionName: string,
   docId: string,
   data: T
 ): Promise<void> {
-  if (activeProvider === 'supabase') {
-    await supabaseLib.saveDocument(collectionName, docId, data);
-    if (!isFirebaseDecommissioned) {
-      firebaseLib.saveDocument(collectionName, docId, data).catch(() => {});
-    }
-  } else {
-    await firebaseLib.saveDocument(collectionName, docId, data);
-  }
+  await supabaseLib.saveDocument(collectionName, docId, data);
 }
 
 /**
  * Unified deleteDocument:
- * Deletes from active provider.
+ * Deletes exclusively from Supabase.
  */
 export async function deleteDocument(collectionName: string, docId: string): Promise<void> {
-  if (activeProvider === 'supabase') {
-    await supabaseLib.deleteDocument(collectionName, docId);
-    if (!isFirebaseDecommissioned) {
-      firebaseLib.deleteDocument(collectionName, docId).catch(() => {});
-    }
-  } else {
-    await firebaseLib.deleteDocument(collectionName, docId);
-  }
+  await supabaseLib.deleteDocument(collectionName, docId);
 }
 
 /**
  * Unified fetchCollection:
- * Reads from active provider.
+ * Reads exclusively from Supabase.
  */
 export async function fetchCollection<T = any>(collectionName: string): Promise<T[]> {
-  if (activeProvider === 'supabase') {
-    return supabaseLib.fetchCollection<T>(collectionName);
-  }
-  return firebaseLib.fetchCollection<T>(collectionName);
+  return supabaseLib.fetchCollection<T>(collectionName);
 }
 
 /**
  * Unified saveBatch:
- * Batch persists to active provider.
+ * Batch persists exclusively to Supabase.
  */
 export async function saveBatch<T extends { id: string }>(collectionName: string, items: T[]): Promise<void> {
-  if (activeProvider === 'supabase') {
-    await supabaseLib.saveBatch(collectionName, items);
-    if (!isFirebaseDecommissioned) {
-      firebaseLib.saveBatch(collectionName, items).catch(() => {});
-    }
-  } else {
-    await firebaseLib.saveBatch(collectionName, items);
-  }
+  await supabaseLib.saveBatch(collectionName, items);
 }
 
 /**
  * Unified subscribeToCollection:
- * Listens in real-time from active provider.
+ * Listens in real-time exclusively from Supabase.
  */
 export function subscribeToCollection<T = any>(
   collectionName: string,
   onUpdate: (items: T[]) => void,
   onError?: (err: any) => void
 ): () => void {
-  if (activeProvider === 'supabase') {
-    return supabaseLib.subscribeToCollection<T>(collectionName, onUpdate, onError);
-  }
-  return firebaseLib.subscribeToCollection<T>(collectionName, onUpdate, onError);
+  return supabaseLib.subscribeToCollection<T>(collectionName, onUpdate, onError);
 }
 
 /**
  * Unified sync status listener
  */
 export function subscribeToSyncStatus(listener: (status: any) => void): () => void {
-  if (activeProvider === 'supabase') {
-    return supabaseLib.subscribeToSyncStatus(listener);
-  }
-  return firebaseLib.subscribeToSyncStatus(listener);
+  return supabaseLib.subscribeToSyncStatus(listener);
 }
 
 export async function ensureAuth(): Promise<void> {
-  if (activeProvider === 'supabase') {
-    return supabaseLib.ensureAuth();
-  }
-  return firebaseLib.ensureAuth();
+  return supabaseLib.ensureAuth();
 }
+

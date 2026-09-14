@@ -17,8 +17,6 @@ if (typeof localStorage !== 'undefined') {
   localStorage.setItem(STORAGE_KEY_PROVIDER, 'supabase');
 }
 
-export const isFirebaseDecommissioned = true;
-
 export function getActiveBackendProvider(): BackendProvider {
   return 'supabase';
 }
@@ -41,18 +39,12 @@ export async function drainMutationQueue(): Promise<void> {
 }
 
 export async function checkBackendHealth(): Promise<{
-  firebase: { ok: boolean; message: string; suspended: boolean };
   supabase: { ok: boolean; message: string; mode: string };
   activeProvider: BackendProvider;
 }> {
   const sbStatus = await supabaseLib.testConnection();
 
   return {
-    firebase: {
-      ok: false,
-      message: 'Firebase connection severed. Decommissioned in favor of Supabase PostgreSQL.',
-      suspended: true,
-    },
     supabase: sbStatus,
     activeProvider: 'supabase',
   };

@@ -464,7 +464,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         } catch {}
       }
-      return INITIAL_PROVIDERS;
+      return [];
     }
 
     const saved = localStorage.getItem('cred_providers');
@@ -537,7 +537,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         } catch {}
       }
-      return INITIAL_CREDENTIALING_RECORDS;
+      return [];
     }
 
     const saved = localStorage.getItem('cred_records');
@@ -567,7 +567,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     return INITIAL_EMPLOYEES;
   });
 
-  // Isolated Demo Employees: Strictly accessible and populated only for admin@example.com
+  // Isolated Demo Employees: Clean by default
   const [demoEmployees, setDemoEmployees] = useState<Employee[]>(() => {
     const savedAccount = localStorage.getItem('cred_current_account');
     if (savedAccount) {
@@ -577,9 +577,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           const savedDemo = localStorage.getItem('cred_demo_employees_admin');
           if (savedDemo) {
             const parsedDemo = JSON.parse(savedDemo);
-            if (Array.isArray(parsedDemo) && parsedDemo.length > 0) return parsedDemo;
+            if (Array.isArray(parsedDemo) && parsedDemo.length > 0) {
+              return parsedDemo.filter((e: any) => !isDemoEmployee(e));
+            }
           }
-          return DEMO_EMPLOYEES;
         }
       } catch (e) {}
     }
@@ -596,7 +597,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch {}
 
     if (isAdminAccount) {
-      return INITIAL_CLINICAL_STAFF;
+      const saved = localStorage.getItem('cred_demo_clinical_staff');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+      return [];
     }
 
     const saved = localStorage.getItem('cred_clinical_staff');
@@ -654,10 +662,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return INITIAL_NOTIFICATIONS;
+    return [];
   });
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -809,34 +817,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (isAdminActive) {
-        // Admin account: load isolated demo collections
-        if (!cloudDemoProviders || cloudDemoProviders.length === 0) {
-          await saveBatch('demo_providers', INITIAL_PROVIDERS);
-          setProviders(INITIAL_PROVIDERS);
-        } else {
-          setProviders(cloudDemoProviders);
-        }
-
-        if (!cloudDemoRecords || cloudDemoRecords.length === 0) {
-          await saveBatch('demo_records', INITIAL_CREDENTIALING_RECORDS);
-          setRecords(INITIAL_CREDENTIALING_RECORDS);
-        } else {
-          setRecords(cloudDemoRecords);
-        }
-
-        if (!cloudDemoClinicalStaff || cloudDemoClinicalStaff.length === 0) {
-          await saveBatch('demo_clinical_staff', INITIAL_CLINICAL_STAFF);
-          setClinicalStaff(INITIAL_CLINICAL_STAFF);
-        } else {
-          setClinicalStaff(cloudDemoClinicalStaff);
-        }
-
-        if (!cloudDemoEmployees || cloudDemoEmployees.length === 0) {
-          await saveBatch('demo_employees', DEMO_EMPLOYEES);
-          setDemoEmployees(DEMO_EMPLOYEES);
-        } else {
-          setDemoEmployees(cloudDemoEmployees);
-        }
+        // Admin account: clean database state, no fake records
+        setProviders(cloudDemoProviders || []);
+        setRecords(cloudDemoRecords || []);
+        setClinicalStaff(cloudDemoClinicalStaff || []);
+        setDemoEmployees(cloudDemoEmployees || []);
       } else {
         // Normal accounts: Strictly clean production datasets. NEVER seed demo data.
         const cleanProviders = (cloudProviders || []).filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com');
@@ -873,8 +858,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (!cloudNotifications || cloudNotifications.length === 0) {
-        await saveBatch('notifications', INITIAL_NOTIFICATIONS);
-        setNotifications(INITIAL_NOTIFICATIONS);
+        setNotifications([]);
       } else {
         setNotifications(cloudNotifications);
       }
@@ -1403,24 +1387,24 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (isTargetAdmin) {
       const savedDemoProviders = localStorage.getItem('cred_demo_providers');
-      setProviders(savedDemoProviders ? JSON.parse(savedDemoProviders) : INITIAL_PROVIDERS);
+      setProviders(savedDemoProviders ? JSON.parse(savedDemoProviders) : []);
 
       const savedDemoRecords = localStorage.getItem('cred_demo_records');
-      setRecords(savedDemoRecords ? JSON.parse(savedDemoRecords) : INITIAL_CREDENTIALING_RECORDS);
+      setRecords(savedDemoRecords ? JSON.parse(savedDemoRecords) : []);
 
       const savedDemoStaff = localStorage.getItem('cred_demo_clinical_staff');
-      setClinicalStaff(savedDemoStaff ? JSON.parse(savedDemoStaff) : INITIAL_CLINICAL_STAFF);
+      setClinicalStaff(savedDemoStaff ? JSON.parse(savedDemoStaff) : []);
 
       const savedDemo = localStorage.getItem('cred_demo_employees_admin');
       if (savedDemo) {
         try {
           const parsed = JSON.parse(savedDemo);
-          setDemoEmployees(Array.isArray(parsed) && parsed.length > 0 ? parsed : DEMO_EMPLOYEES);
+          setDemoEmployees(Array.isArray(parsed) ? parsed.filter((e: any) => !isDemoEmployee(e)) : []);
         } catch {
-          setDemoEmployees(DEMO_EMPLOYEES);
+          setDemoEmployees([]);
         }
       } else {
-        setDemoEmployees(DEMO_EMPLOYEES);
+        setDemoEmployees([]);
       }
     } else {
       // Normal accounts and all other accounts get clean production data:
@@ -1447,7 +1431,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     const savedNotifications = localStorage.getItem('cred_notifications');
-    setNotifications(savedNotifications ? JSON.parse(savedNotifications) : INITIAL_NOTIFICATIONS);
+    setNotifications(savedNotifications ? JSON.parse(savedNotifications) : []);
   };
 
   // Auth Operations

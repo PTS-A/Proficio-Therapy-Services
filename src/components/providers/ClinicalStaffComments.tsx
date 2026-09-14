@@ -196,9 +196,9 @@ export const ClinicalStaffComments: React.FC<ClinicalStaffCommentsProps> = ({ pr
                 <option value={currentAccount?.name || currentUser.name}>
                   {currentAccount?.name || currentUser.name} ({currentAccount?.systemRole || currentUser.role})
                 </option>
-                <option value="Sanjay Tom">Sanjay Tom (Credentialing Specialist)</option>
-                <option value="Namitha Narayanan">Namitha Narayanan (Credentialing Lead / Manager)</option>
-                <option value="Dr. Rachel Green">Dr. Rachel Green (Clinical Team)</option>
+                <option value="Credentialing Specialist">Credentialing Specialist</option>
+                <option value="Credentialing Lead / Manager">Credentialing Lead / Manager</option>
+                <option value="Clinical Supervisor">Clinical Supervisor / Peer Review</option>
                 <option value="HR Coordinator">HR / Onboarding Team</option>
                 <option value="Billing Specialist">Billing & Claims Dept</option>
               </select>

@@ -88,8 +88,6 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
   const [supabaseHealth, setSupabaseHealth] = useState<{
     tested: boolean;
     loading: boolean;
-    firebaseOk?: boolean;
-    firebaseSuspended?: boolean;
     supabaseOk?: boolean;
     supabaseMsg?: string;
     totalVerifiedRows?: number;
@@ -111,8 +109,6 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
       setSupabaseHealth({
         tested: true,
         loading: false,
-        firebaseOk: result.firebase.ok,
-        firebaseSuspended: result.firebase.suspended,
         supabaseOk: result.supabase.ok,
         supabaseMsg: result.supabase.message,
         totalVerifiedRows: verifyData?.totalRows,
@@ -1195,7 +1191,7 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
                     </span>
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Supabase PostgreSQL is the active operational database. Google Firebase is fully suspended/decommissioned.
+                    Supabase PostgreSQL is the active operational database.
                   </p>
                 </div>
               </div>
@@ -1221,7 +1217,7 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
                 <div className="flex items-center space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>
-                    <strong>Verification Result:</strong> Supabase PostgreSQL: {supabaseHealth.supabaseMsg || 'Online & Verified'} | Firebase: Suspended & Decommissioned
+                    <strong>Verification Result:</strong> Supabase PostgreSQL: {supabaseHealth.supabaseMsg || 'Online & Verified'}
                     {supabaseHealth.totalVerifiedRows !== undefined && ` (${supabaseHealth.totalVerifiedRows} Live Rows Confirmed)`}
                   </span>
                 </div>
@@ -1269,14 +1265,14 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
                 </p>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 opacity-80">
+              <div className="p-3.5 bg-sky-50/70 rounded-xl border border-sky-200 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-slate-500">Firebase Engine</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200">SEVERED & DISCONNECTED</span>
+                  <span className="text-[10px] font-bold uppercase text-sky-800">Database Engine</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">POSTGRESQL 15+</span>
                 </div>
-                <div className="text-sm font-bold text-slate-700">Google Cloud Firestore</div>
-                <p className="text-[11px] text-slate-500 leading-snug">
-                  All connection links, shadow writes, and SDK calls have been permanently severed. 100% of operations run on Supabase.
+                <div className="text-sm font-bold text-sky-950">Supabase Cloud</div>
+                <p className="text-[11px] text-sky-800 leading-snug">
+                  Zero external dependencies. Pure relational PostgreSQL engine with native foreign key cascades.
                 </p>
               </div>
 
@@ -1305,9 +1301,9 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
 
             <div className="pt-2 text-xs text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="space-y-0.5">
-                <div className="font-bold text-slate-800">Migration & Backup Artifacts:</div>
+                <div className="font-bold text-slate-800">Database Schema & Backups:</div>
                 <div className="text-[11px] text-slate-500 font-mono">
-                  &bull; 103 Documents migrated &bull; supabase/full_migration_and_seed.sql &bull; 16 Relational Tables Verified
+                  &bull; 16 Relational Tables &bull; supabase/full_migration_and_seed.sql &bull; Cloud Storage Active
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1336,10 +1332,9 @@ export const SystemConfigView: React.FC<SystemConfigViewProps> = ({ onBackToDash
               <div className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <div className="font-bold text-emerald-950">Migration & Cutover Successfully Completed</div>
+                  <div className="font-bold text-emerald-950">Supabase Infrastructure Active</div>
                   <p className="text-emerald-900 leading-relaxed text-[11px]">
-                    All clinical entities, locations, payers, providers, employees, clinical staff, credentialing records, workflow stages, system settings, and notifications are now running directly on <strong>Supabase PostgreSQL</strong>.
-                    Firebase has been suspended and decommissioned from active operations.
+                    All clinical entities, locations, payers, providers, employees, clinical staff, credentialing records, workflow stages, system settings, and notifications run exclusively on <strong>Supabase PostgreSQL</strong>.
                   </p>
                 </div>
               </div>

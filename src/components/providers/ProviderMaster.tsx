@@ -598,55 +598,71 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
 
           {/* Provider List */}
           <div className="divide-y divide-slate-100 max-h-[640px] overflow-y-auto pr-1">
-            {filteredProviders.map((p) => {
-              const isSelected = activeProvider?.id === p.id;
-
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setActiveProfileId(p.id)}
-                  className={`py-3 px-3 rounded-xl transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-sky-50/80 border border-sky-200 shadow-xs'
-                      : 'hover:bg-slate-50 border border-transparent'
-                  }`}
+            {filteredProviders.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                <p className="text-xs font-bold text-slate-700">No Clinical Staff Records</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Add a new provider or staff member to get started.</p>
+                <button
+                  type="button"
+                  onClick={handleOpenAdd}
+                  className="mt-3 inline-flex items-center space-x-1 px-3 py-1.5 bg-[#2B4C9D] text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors shadow-xs"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold text-xs text-slate-900">
-                      {p.firstName} {p.lastName}, {p.credentials}
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Provider</span>
+                </button>
+              </div>
+            ) : (
+              filteredProviders.map((p) => {
+                const isSelected = activeProvider?.id === p.id;
+
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => setActiveProfileId(p.id)}
+                    className={`py-3 px-3 rounded-xl transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-sky-50/80 border border-sky-200 shadow-xs'
+                        : 'hover:bg-slate-50 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-xs text-slate-900">
+                        {p.firstName} {p.lastName}, {p.credentials}
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          p.disciplines.includes('ABA')
+                            ? 'bg-sky-100 text-sky-800'
+                            : p.disciplines.includes('Speech')
+                            ? 'bg-teal-100 text-teal-800'
+                            : 'bg-purple-100 text-purple-800'
+                        }`}
+                      >
+                        {p.providerType}
+                      </span>
                     </div>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        p.disciplines.includes('ABA')
-                          ? 'bg-sky-100 text-sky-800'
-                          : p.disciplines.includes('Speech')
-                          ? 'bg-teal-100 text-teal-800'
-                          : 'bg-purple-100 text-purple-800'
-                      }`}
-                    >
-                      {p.providerType}
-                    </span>
-                  </div>
 
-                  <div className="text-[11px] text-slate-500 mt-1 flex items-center space-x-2">
-                    <span className="font-mono font-semibold">NPI: {p.npi}</span>
-                    <span>•</span>
-                    <span>{p.licenseState} Lic: {p.licenseNumber}</span>
-                  </div>
+                    <div className="text-[11px] text-slate-500 mt-1 flex items-center space-x-2">
+                      <span className="font-mono font-semibold">NPI: {p.npi}</span>
+                      <span>•</span>
+                      <span>{p.licenseState} Lic: {p.licenseNumber}</span>
+                    </div>
 
-                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-                    <span className="font-medium text-slate-700">
-                      {p.groupAffiliation || 'Ages Learning Solutions'}
-                    </span>
-                    <span className={`font-semibold px-2 py-0.2 rounded-md ${
-                      p.caqhStatus === 'Attested' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                    }`}>
-                      CAQH: {p.caqhStatus}
-                    </span>
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                      <span className="font-medium text-slate-700">
+                        {p.groupAffiliation || 'Ages Learning Solutions'}
+                      </span>
+                      <span className={`font-semibold px-2 py-0.2 rounded-md ${
+                        p.caqhStatus === 'Attested' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        CAQH: {p.caqhStatus}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -1532,8 +1548,24 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
               )}
             </>
           ) : (
-            <div className="text-center py-12 text-slate-400 text-xs">
-              Select a clinical staff member to view 360° profile.
+            <div className="text-center py-16 px-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+              <Users className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+              <h4 className="text-xs font-bold text-slate-700">No Clinical Staff Member Selected</h4>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                {providers.length === 0 
+                  ? "Your database is clean and ready. Add your first clinical staff member to begin tracking 360° credentialing profiles."
+                  : "Select a provider from the roster on the left to view comprehensive credentials, license attestations, and active applications."}
+              </p>
+              {providers.length === 0 && (
+                <button
+                  type="button"
+                  onClick={handleOpenAdd}
+                  className="mt-4 inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#2B4C9D] text-white rounded-xl text-xs font-bold hover:bg-blue-800 transition-colors shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add First Provider</span>
+                </button>
+              )}
             </div>
           )}
         </div>

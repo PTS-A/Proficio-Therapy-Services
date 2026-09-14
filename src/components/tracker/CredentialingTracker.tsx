@@ -14,6 +14,7 @@ import {
   Clock, 
   Download, 
   Eye, 
+  FileText,
   Grid, 
   Layers, 
   Link2, 
@@ -499,8 +500,24 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
               <tbody className="divide-y divide-slate-100 font-normal">
                 {filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-slate-400">
-                      No credentialing records match the current filter criteria.
+                    <td colSpan={11} className="py-16 text-center text-slate-400">
+                      <FileText className="w-9 h-9 mx-auto text-slate-300 mb-2.5" />
+                      <p className="font-bold text-slate-700 text-xs">No Credentialing Applications Found</p>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                        {records.length === 0 
+                          ? "Your application tracking pipeline is clean and ready. Click '+ New Application' to begin logging credentialing submissions."
+                          : "No applications match your selected filter criteria. Try clearing search filters."}
+                      </p>
+                      {records.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={onOpenNewApplication}
+                          className="mt-4 inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#2B4C9D] text-white rounded-xl text-xs font-bold hover:bg-blue-800 transition-colors shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Create First Application</span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ) : (

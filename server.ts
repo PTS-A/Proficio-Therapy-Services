@@ -57,8 +57,6 @@ async function startServer() {
 
     res.json({
       stage: 'SUPABASE_SOLE_ACTIVE_PRIMARY',
-      firebaseActive: false,
-      firebaseSevered: true,
       supabaseReady: hasSeed && hasExport,
       hasSupabaseConfigured: hasSupabaseKeys,
       supabaseUrl: 'https://uqaiotacheqjvfbanxtp.supabase.co',
@@ -71,7 +69,7 @@ async function startServer() {
         combinedSql: 'supabase/full_migration_and_seed.sql',
         dataSnapshotJson: 'supabase/data_export.json',
       },
-      message: 'Firebase connection severed. Supabase PostgreSQL is the sole active production database.',
+      message: 'Supabase PostgreSQL is the sole active production database.',
     });
   });
 
@@ -123,7 +121,6 @@ async function startServer() {
         allTablesVerified: allOk,
         totalRows,
         tables: results,
-        firebaseSuspended: true,
         activePrimary: 'Supabase PostgreSQL',
       });
     } catch (err: any) {

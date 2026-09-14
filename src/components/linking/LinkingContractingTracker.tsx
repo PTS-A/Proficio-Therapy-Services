@@ -121,64 +121,74 @@ export const LinkingContractingTracker: React.FC<LinkingContractingTrackerProps>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredLinking.map((rec) => {
-                const provider = providers.find((p) => p.id === rec.providerId);
-                const payer = payers.find((p) => p.id === rec.payerId);
-                const entity = entities.find((e) => e.id === rec.entityId);
+              {filteredLinking.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <Link2 className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                    <p className="font-semibold text-slate-600 text-xs">No Linking Records Found</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Approved applications ready to be linked to group NPIs will appear here.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredLinking.map((rec) => {
+                  const provider = providers.find((p) => p.id === rec.providerId);
+                  const payer = payers.find((p) => p.id === rec.payerId);
+                  const entity = entities.find((e) => e.id === rec.entityId);
 
-                return (
-                  <tr
-                    key={rec.id}
-                    onClick={() => onSelectRecord(rec.id)}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
-                  >
-                    <td className="py-3 px-4 font-mono font-bold text-[#2B4C9D]">{rec.id}</td>
-                    <td className="py-3 px-3 font-bold text-slate-900">
-                      {provider?.firstName} {provider?.lastName}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                        {rec.discipline}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-medium text-slate-800">{payer?.name}</td>
-                    <td className="py-3 px-3">
-                      <div className="font-semibold text-slate-800">{entity?.dba || entity?.legalName}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">Group NPI: {entity?.npiType2}</div>
-                    </td>
-                    <td className="py-3 px-3 font-semibold text-emerald-600">
-                      {rec.approvalDate || 'In Review'}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          rec.linkingStatus === 'Linked'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : rec.linkingStatus === 'Pending Approval'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}
-                      >
-                        {rec.linkingStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-mono font-bold text-slate-800">
-                      {rec.linkEffectiveDate || <span className="text-slate-400 font-normal">Pending Link</span>}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectRecord(rec.id);
-                        }}
-                        className="px-2.5 py-1 rounded bg-indigo-50 text-[#2B4C9D] hover:bg-indigo-100 font-semibold text-xs cursor-pointer"
-                      >
-                        Manage Link
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                  return (
+                    <tr
+                      key={rec.id}
+                      onClick={() => onSelectRecord(rec.id)}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3 px-4 font-mono font-bold text-[#2B4C9D]">{rec.id}</td>
+                      <td className="py-3 px-3 font-bold text-slate-900">
+                        {provider?.firstName} {provider?.lastName}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                          {rec.discipline}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 font-medium text-slate-800">{payer?.name}</td>
+                      <td className="py-3 px-3">
+                        <div className="font-semibold text-slate-800">{entity?.dba || entity?.legalName}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">Group NPI: {entity?.npiType2}</div>
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-emerald-600">
+                        {rec.approvalDate || 'In Review'}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            rec.linkingStatus === 'Linked'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : rec.linkingStatus === 'Pending Approval'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {rec.linkingStatus}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 font-mono font-bold text-slate-800">
+                        {rec.linkEffectiveDate || <span className="text-slate-400 font-normal">Pending Link</span>}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectRecord(rec.id);
+                          }}
+                          className="px-2.5 py-1 rounded bg-indigo-50 text-[#2B4C9D] hover:bg-indigo-100 font-semibold text-xs cursor-pointer"
+                        >
+                          Manage Link
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

@@ -23,8 +23,15 @@ export const isSuperAdmin = (account: AppAccount | null | undefined): boolean =>
   if (!account) return false;
   if (account.isSuperAdmin === true) return true;
   if (account.systemRole === 'System Administrator') return true;
-  const cleanEmail = account.email?.toLowerCase().trim();
-  return cleanEmail === 'admin@example.com' || cleanEmail === 'superadmin@proficiotherapy.com';
+  if (
+    account.accessLevel === 'ADMINISTRATOR' && 
+    (account.permissions?.some(p => p.toLowerCase().includes('super admin')) ||
+     account.roleTitle?.includes('Governance') ||
+     account.roleTitle?.includes('Security Officer'))
+  ) {
+    return true;
+  }
+  return false;
 };
 
 /**

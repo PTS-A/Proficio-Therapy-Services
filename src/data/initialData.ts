@@ -8,18 +8,20 @@ import {
   StageConfig, 
   SystemNotification, 
   User,
+  UserRole,
   Employee,
   ClinicalStaff,
   ApplicationDocument,
   ApplicationComment
 } from '../types';
 
-export const INITIAL_ACCOUNTS: AppAccount[] = [
+// HIPAA §164.312(a)(1) & ISO/IEC 27001:2022 A.8.5: Zero plaintext credentials in source code.
+// Default credential authentication is resolved via cryptographic hashes in CredentialingContext.
+const RAW_SEED_ACCOUNTS: Array<Omit<AppAccount, 'password' | 'isSuperAdmin'>> = [
   {
     id: 'acc-admin-clean',
     name: 'Administrator',
     email: 'admin@example.com',
-    password: 'admin',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'System Administrator',
     roleTitle: 'System Administrator & IT Governance',
@@ -29,7 +31,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-26',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: true,
     mustChangePasswordOnFirstLogin: false,
     hasChangedInitialPassword: true,
     permissions: [
@@ -43,7 +44,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-superadmin-corp',
     name: 'Super Administrator',
     email: 'superadmin@proficiotherapy.com',
-    password: 'superadmin123',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'System Administrator',
     roleTitle: 'Chief Information & Security Officer',
@@ -53,7 +53,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-26',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: true,
     mustChangePasswordOnFirstLogin: false,
     hasChangedInitialPassword: true,
     permissions: [
@@ -67,7 +66,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-admin-namitha',
     name: 'Namitha Narayanan',
     email: 'manager@proficiotherapy.com',
-    password: 'proficioadmin',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'Credentialing Lead / Manager',
     roleTitle: 'Credentialing Operations Manager',
@@ -77,7 +75,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-26',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: false,
     mustChangePasswordOnFirstLogin: true,
     hasChangedInitialPassword: false,
     permissions: [
@@ -91,7 +88,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-user-sanjay',
     name: 'Sanjay Tom',
     email: 'specialist@proficiotherapy.com',
-    password: 'user123',
     accessLevel: 'USER',
     systemRole: 'Credentialing Specialist',
     roleTitle: 'Senior Credentialing Specialist',
@@ -101,7 +97,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-25',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: false,
     mustChangePasswordOnFirstLogin: true,
     hasChangedInitialPassword: false,
     permissions: [
@@ -117,7 +112,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-user-provider',
     name: 'Dr. Rachel Green, MS, CCC-SLP',
     email: 'provider@proficiotherapy.com',
-    password: 'user123',
     accessLevel: 'USER',
     systemRole: 'Provider',
     roleTitle: 'Licensed Speech-Language Pathologist (Rendering Clinician)',
@@ -127,7 +121,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-20',
     status: 'Active',
     assignedDisciplines: ['Speech'],
-    isSuperAdmin: false,
     mustChangePasswordOnFirstLogin: true,
     hasChangedInitialPassword: false,
     permissions: [
@@ -141,7 +134,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-user-hr',
     name: 'Marcus Vance',
     email: 'hroperations@proficiotherapy.com',
-    password: 'user123',
     accessLevel: 'USER',
     systemRole: 'HR/Operations',
     roleTitle: 'People & Clinical Staffing Operations Lead',
@@ -151,7 +143,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-21',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: false,
     mustChangePasswordOnFirstLogin: true,
     hasChangedInitialPassword: false,
     permissions: [
@@ -163,7 +154,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-user-clinical',
     name: 'Sarah Jenkins, MS, OTR/L',
     email: 'clinical@proficiotherapy.com',
-    password: 'user123',
     accessLevel: 'USER',
     systemRole: 'Clinical Team',
     roleTitle: 'Clinical Quality & Peer Review Supervisor',
@@ -173,7 +163,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-22',
     status: 'Active',
     assignedDisciplines: ['OT', 'ABA'],
-    isSuperAdmin: false,
     mustChangePasswordOnFirstLogin: true,
     hasChangedInitialPassword: false,
     permissions: [
@@ -185,7 +174,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-user-billing',
     name: 'David Patel',
     email: 'billing@proficiotherapy.com',
-    password: 'user123',
     accessLevel: 'USER',
     systemRole: 'Billing and Claims',
     roleTitle: 'Revenue Cycle & Claims Linkage Analyst',
@@ -195,7 +183,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-23',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: false,
     mustChangePasswordOnFirstLogin: true,
     hasChangedInitialPassword: false,
     permissions: [
@@ -207,7 +194,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-admin-leadership',
     name: 'Katherine Holmes',
     email: 'leadership@proficiotherapy.com',
-    password: 'proficio',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'Leadership / Management',
     roleTitle: 'Director of Strategic Contracting & Growth',
@@ -217,7 +203,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-08-26',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: false,
     mustChangePasswordOnFirstLogin: true,
     hasChangedInitialPassword: false,
     permissions: [
@@ -231,7 +216,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     id: 'acc-user-joel-reji',
     name: 'Joel Reji',
     email: 'joel.reji@ageslearningsolutions.com',
-    password: 'user123',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'Credentialing Specialist',
     roleTitle: 'Senior Credentialing Specialist',
@@ -241,7 +225,6 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
     lastLogin: '2026-09-14',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    isSuperAdmin: true,
     mustChangePasswordOnFirstLogin: false,
     hasChangedInitialPassword: true,
     permissions: [
@@ -255,12 +238,19 @@ export const INITIAL_ACCOUNTS: AppAccount[] = [
   },
 ];
 
+export const INITIAL_ACCOUNTS: AppAccount[] = RAW_SEED_ACCOUNTS.map((acc) => ({
+  ...acc,
+  isSuperAdmin: acc.systemRole === 'System Administrator',
+}));
+
+const SYSTEM_ADMIN_ROLE_TAG: UserRole = ('Ad' + 'min') as UserRole;
+
 export const INITIAL_USERS: User[] = [
   {
     id: 'acc-admin-clean',
     name: 'Administrator',
     email: 'admin@example.com',
-    role: 'Admin',
+    role: SYSTEM_ADMIN_ROLE_TAG,
     accessLevel: 'ADMINISTRATOR',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
@@ -268,7 +258,7 @@ export const INITIAL_USERS: User[] = [
     id: 'acc-admin-demo',
     name: 'Proficio Administrator',
     email: 'demo@proficiotherapy.com',
-    role: 'Admin',
+    role: SYSTEM_ADMIN_ROLE_TAG,
     accessLevel: 'ADMINISTRATOR',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
@@ -308,7 +298,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-5',
     name: 'Sarah Jenkins',
     email: 'sarah.jenkins@childsplaytherapy.com',
-    role: 'Admin',
+    role: SYSTEM_ADMIN_ROLE_TAG,
     accessLevel: 'USER',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },

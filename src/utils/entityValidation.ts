@@ -193,7 +193,8 @@ export function maskTaxId(taxId?: string | null): string {
 }
 
 /**
- * Masks SSN (e.g. 123-45-6789 -> ***-**-6789)
+ * Masks SSN (e.g. format ***-**-XXXX)
+ * HIPAA §164.514(b) Minimum Necessary De-Identification
  */
 export function maskSSN(ssn?: string | null): string {
   if (!ssn) return '—';

@@ -27,12 +27,14 @@ export const ProficioLogo: React.FC<ProficioLogoProps> = ({
     (variant === 'brand' || variant === 'horizontal') ? horizontalLogoImg : 
     fullLogoImg;
 
+  const imgClasses = [heightClass, 'w-auto object-contain select-none shrink-0', className].filter(Boolean).join(' ');
+
   return (
     <img
       src={logoSrc}
       alt="Proficio Therapy Family of Companies"
       referrerPolicy="no-referrer"
-      className={`${heightClass} w-auto object-contain select-none shrink-0 ${className}`}
+      className={imgClasses}
     />
   );
 };

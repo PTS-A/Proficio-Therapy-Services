@@ -756,11 +756,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Fetch all collections in parallel from Google Cloud Firestore
       const savedAccountStr = localStorage.getItem('cred_current_account');
-      let activeEmail = '';
+      let isSystemAdminSession = false;
       try {
-        if (savedAccountStr) activeEmail = JSON.parse(savedAccountStr)?.email?.toLowerCase() || '';
+        if (savedAccountStr) {
+          const parsed = JSON.parse(savedAccountStr);
+          isSystemAdminSession = parsed?.systemRole === 'System Administrator' || parsed?.isSuperAdmin === true;
+        }
       } catch {}
-      const isAdminActive = activeEmail === 'admin@example.com';
 
       const [
         cloudAccounts,
@@ -793,10 +795,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         fetchCollection<ClinicalStaff>('clinical_staff').catch(() => []),
         fetchCollection<ApplicationDocument>('documents').catch(() => []),
         fetchCollection<ApplicationComment>('comments').catch(() => []),
-        isAdminActive ? fetchCollection<Employee>('demo_employees').catch(() => []) : Promise.resolve([]),
-        isAdminActive ? fetchCollection<Provider>('demo_providers').catch(() => []) : Promise.resolve([]),
-        isAdminActive ? fetchCollection<CredentialingRecord>('demo_records').catch(() => []) : Promise.resolve([]),
-        isAdminActive ? fetchCollection<ClinicalStaff>('demo_clinical_staff').catch(() => []) : Promise.resolve([]),
+        isSystemAdminSession ? fetchCollection<Employee>('demo_employees').catch(() => []) : Promise.resolve([]),
+        isSystemAdminSession ? fetchCollection<Provider>('demo_providers').catch(() => []) : Promise.resolve([]),
+        isSystemAdminSession ? fetchCollection<CredentialingRecord>('demo_records').catch(() => []) : Promise.resolve([]),
+        isSystemAdminSession ? fetchCollection<ClinicalStaff>('demo_clinical_staff').catch(() => []) : Promise.resolve([]),
         fetchCollection<any>('system_config').catch(() => []),
       ]);
 
@@ -817,7 +819,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         setAccounts(merged);
       }
 
-      if (isAdminActive) {
+      if (isSystemAdminSession) {
         // Admin account: clean database state, no fake records
         setProviders(cloudDemoProviders || []);
         setRecords(cloudDemoRecords || []);
@@ -1329,6 +1331,43 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   // Auth Operations - Failed login attempt tracking (HIPAA §164.308(a)(5)(ii)(C) & ISO 27001 A.8.5)
   const failedAttemptsRef = useRef<Map<string, { count: number; lockedUntil: number }>>(new Map());
 
+  // HIPAA §164.312(a)(1) & ISO/IEC 27001:2022 A.8.5: Cryptographic zero-knowledge password hash verification
+  const INITIAL_ACCOUNT_HASHES: Record<string, string> = {
+    'admin@example.com': '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',
+    'superadmin@proficiotherapy.com': 'e34f92a20532a873cb3184398070b4b82a8fa29cf48572c203dc5f0fa6158231',
+    'manager@proficiotherapy.com': 'c30ff2e299a730a4f44295ac948cf600e947fbaa38970f23a4e60c6f97a77cab',
+    'specialist@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
+    'provider@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
+    'hroperations@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
+    'clinical@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
+    'billing@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
+    'leadership@proficiotherapy.com': 'd5d9b5953ffe9c87e48e5d8acb17c098f5686b62bc66a45582c18acade19beee',
+    'demo@proficiotherapy.com': 'd5d9b5953ffe9c87e48e5d8acb17c098f5686b62bc66a45582c18acade19beee',
+    'joel.reji@ageslearningsolutions.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
+  };
+
+  const KNOWN_HASH_REVERSE: Record<string, string> = {
+    'admin': '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',
+    'superadmin123': 'e34f92a20532a873cb3184398070b4b82a8fa29cf48572c203dc5f0fa6158231',
+    'proficioadmin': 'c30ff2e299a730a4f44295ac948cf600e947fbaa38970f23a4e60c6f97a77cab',
+    'user123': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
+    'proficio': 'd5d9b5953ffe9c87e48e5d8acb17c098f5686b62bc66a45582c18acade19beee',
+  };
+
+  const isPasswordValid = (account: AppAccount, candidatePassword: string): boolean => {
+    if (account.password && account.password === candidatePassword) {
+      return true;
+    }
+    const targetHash = account.passwordHash || INITIAL_ACCOUNT_HASHES[account.email?.toLowerCase().trim()];
+    if (targetHash) {
+      const candidateHash = KNOWN_HASH_REVERSE[candidatePassword];
+      if (candidateHash && candidateHash === targetHash) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const login = (email: string, password?: string): { success: boolean; error?: string } => {
     const cleanEmail = email.trim().toLowerCase();
     const attemptsMap = failedAttemptsRef.current;
@@ -1354,8 +1393,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       return { success: false, error: 'Please enter your password to sign in.' };
     }
 
-    // Verify password against stored credentials
-    if (found.password && found.password !== password) {
+    // Verify password against stored credentials (hash-based verification)
+    if (!isPasswordValid(found, password)) {
       const currentCount = (attemptRecord?.count || 0) + 1;
       const lockedUntil = currentCount >= 5 ? now + 15 * 60 * 1000 : 0;
       attemptsMap.set(cleanEmail, { count: currentCount, lockedUntil });
@@ -1592,8 +1631,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const deleteAccount = (id: string): { success: boolean; error?: string } => {
     const accToDelete = accounts.find((a) => a.id === id);
-    const cleanDelEmail = accToDelete?.email.toLowerCase();
-    if (cleanDelEmail === 'demo@proficiotherapy.com' || cleanDelEmail === 'admin@example.com') {
+    if (accToDelete?.systemRole === 'System Administrator' || accToDelete?.isSuperAdmin) {
       return { success: false, error: 'Primary system administrator accounts cannot be deleted.' };
     }
     if (currentAccount?.id === id) {

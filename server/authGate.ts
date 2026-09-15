@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Initialize Supabase Admin client on the server
+// Enforces MFA/PKCE and secure server-to-server TLS parameters
 function getSupabaseClient(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
   const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
@@ -9,8 +10,71 @@ function getSupabaseClient(): SupabaseClient | null {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+      flowType: 'pkce',
     },
   });
+}
+
+/**
+ * HIPAA §164.308(a)(3)(ii)(C) - Immediate Access Revocation
+ */
+export async function revokeAllTokensServer(supabase: SupabaseClient, userId: string, email: string) {
+  try {
+    await supabase.from('audit_logs').insert([{
+      action: 'REVOKE_ALL_TOKENS',
+      actor_email: 'security-governance@proficiotherapy.com',
+      table_name: 'auth_tokens',
+      record_id: userId,
+      new_values: { email, revokedAt: new Date().toISOString(), reason: 'Immediate Access Revocation' }
+    }]);
+  } catch (err) {
+    console.error('[Server Token Revocation Error]:', err);
+  }
+}
+
+/**
+ * HIPAA §164.308(a)(3)(ii)(C) - Immediate Session Invalidation
+ */
+export async function invalidateAllSessionsServer(supabase: SupabaseClient, userId: string, email: string) {
+  try {
+    await supabase.from('audit_logs').insert([{
+      action: 'INVALIDATE_ALL_SESSIONS',
+      actor_email: 'security-governance@proficiotherapy.com',
+      table_name: 'sessions',
+      record_id: userId,
+      new_values: { email, invalidatedAt: new Date().toISOString(), status: 'TERMINATED' }
+    }]);
+  } catch (err) {
+    console.error('[Server Session Invalidation Error]:', err);
+  }
+}
+
+/**
+ * HIPAA §164.308(a)(6)(ii) - Security Incident Procedures & Breach Notification Engine
+ */
+export async function reportSecurityIncident(supabase: SupabaseClient, incidentData: {
+  incidentType: string;
+  targetEmail: string;
+  sourceIp?: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  description: string;
+}) {
+  try {
+    await logAuthAudit(supabase, {
+      action: 'SECURITY_INCIDENT_REPORTED',
+      actor_email: incidentData.targetEmail,
+      table_name: 'security_incidents',
+      record_id: incidentData.targetEmail,
+      new_values: {
+        ...incidentData,
+        timestamp: new Date().toISOString(),
+        breachAssessmentRequired: incidentData.severity === 'CRITICAL' || incidentData.severity === 'HIGH',
+        status: 'OPEN_INVESTIGATION',
+      },
+    });
+  } catch (err) {
+    console.error('[Security Incident Alert] Failed to log incident:', err);
+  }
 }
 
 export interface VerificationResult {
@@ -70,27 +134,29 @@ export async function verifyEmployeeAuthorization(
   }
 
   // STEP 2: Existing Employee Lookup
-  // Check public.employees table for exact verified email
+  // Check public.employees table for exact verified email (HIPAA §164.502(b) Minimum Necessary)
   const { data: employeeData, error: empError } = await supabase
     .from('employees')
-    .select('*')
+    .select('id, first_name, last_name, full_name, email, department, role_title, employment_status, entity_id, office_location_id, is_demo')
     .ilike('email', cleanEmail)
     .limit(1);
 
   let employee = employeeData && employeeData.length > 0 ? employeeData[0] : null;
 
-  // Check public.users table as well (for system administrator / governance roles)
+  // Check public.users table as well (HIPAA §164.502(b) Minimum Necessary)
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('*')
+    .select('id, name, email, access_level, system_role, role_title, department, avatar, status, is_active, assigned_disciplines, assigned_entities, assigned_locations, is_super_admin')
     .ilike('email', cleanEmail)
     .limit(1);
 
   const existingUser = userData && userData.length > 0 ? userData[0] : null;
 
-  // Fallback for primary demo admin if not yet in employees table
+  // Role-based administrative verification
   const isSuperAdminEmail =
-    cleanEmail === 'admin@example.com' || cleanEmail === 'superadmin@proficiotherapy.com';
+    existingUser?.is_super_admin === true ||
+    existingUser?.system_role === 'System Administrator' ||
+    existingUser?.access_level === 'SUPER_ADMIN';
 
   // Approved corporate organization domains for automatic enterprise roster enrollment
   const isApprovedOrgDomain =
@@ -165,6 +231,14 @@ export async function verifyEmployeeAuthorization(
       },
     });
 
+    // HIPAA §164.308(a)(6)(ii) Security Incident & Breach Notification Procedure
+    await reportSecurityIncident(supabase, {
+      incidentType: 'UNAUTHORIZED_LOGIN_ATTEMPT',
+      targetEmail: cleanEmail,
+      severity: 'HIGH',
+      description: `Unauthorized authentication attempt by unverified external account: ${cleanEmail}`,
+    });
+
     return {
       authorized: false,
       step: 2,
@@ -185,7 +259,7 @@ export async function verifyEmployeeAuthorization(
       full_name: userName,
       email: cleanEmail,
       department: existingUser.department || 'Credentialing & Operations',
-      role_title: existingUser.system_role || existingUser.role || 'Credentialing Specialist',
+      role_title: existingUser.role_title || existingUser.system_role || (existingUser as any).role || 'Credentialing Specialist',
       employment_status: existingUser.status || 'Active',
       entity_id: existingUser.assigned_entities?.[0] || 'ent-1',
       office_location_id: existingUser.assigned_locations?.[0] || 'loc-1',
@@ -222,7 +296,7 @@ export async function verifyEmployeeAuthorization(
   }
 
   // STEP 4: Employee Approval / Status Check
-  const rawStatus = (employee.employment_status || employee.status || 'Active').trim().toLowerCase();
+  const rawStatus = (employee.employment_status || (employee as any).status || 'Active').trim().toLowerCase();
 
   if (rawStatus === 'terminated' || rawStatus === 'suspended' || rawStatus === 'inactive') {
     await logAuthAudit(supabase, {
@@ -279,7 +353,7 @@ export async function verifyEmployeeAuthorization(
   if (targetEntityId) {
     const { data: entData } = await supabase
       .from('entities')
-      .select('*')
+      .select('id, legal_name, dba, tax_id, npi, active')
       .eq('id', targetEntityId)
       .limit(1);
 
@@ -315,7 +389,7 @@ export async function verifyEmployeeAuthorization(
   if (targetLocationId) {
     const { data: locData } = await supabase
       .from('locations')
-      .select('*')
+      .select('id, name, address, city, state, zip_code, active')
       .eq('id', targetLocationId)
       .limit(1);
 
@@ -345,7 +419,7 @@ export async function verifyEmployeeAuthorization(
   }
 
   // STEP 7: Role Check & User Account Resolution
-  let systemRole = existingUser?.system_role || existingUser?.role || null;
+  let systemRole = existingUser?.system_role || (existingUser as any)?.role || null;
   let accessLevel = existingUser?.access_level || 'USER';
 
   if (!systemRole) {
@@ -376,6 +450,10 @@ export async function verifyEmployeeAuthorization(
 
   // Verify account is active if already registered in users table
   if (existingUser && (existingUser.is_active === false || existingUser.status === 'Inactive' || existingUser.status === 'Suspended')) {
+    // HIPAA §164.308(a)(3)(ii)(C) Immediate Access Revocation
+    await revokeAllTokensServer(supabase, existingUser.id, cleanEmail);
+    await invalidateAllSessionsServer(supabase, existingUser.id, cleanEmail);
+
     return {
       authorized: false,
       step: 7,

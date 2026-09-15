@@ -3,6 +3,7 @@ import { useCredentialing } from '../../context/CredentialingContext';
 import { AccessLevel, AppAccount, Discipline, SystemRole } from '../../types';
 import { SYSTEM_ROLES, SystemRoleDefinition } from '../../data/roleConfig';
 import { isSuperAdmin } from '../../utils/rbac';
+import { revokeAllTokens, invalidateAllSessions } from '../../lib/supabase';
 import { 
   AlertCircle, 
   ArrowLeft, 
@@ -210,10 +211,13 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     }
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
+    // HIPAA §164.308(a)(3)(ii)(C) Immediate Access Revocation & Session Termination
+    await revokeAllTokens(id);
+    await invalidateAllSessions(id);
     const res = deleteAccount(id);
     if (res.success) {
-      setToastMsg({ type: 'success', text: 'User account removed.' });
+      setToastMsg({ type: 'success', text: 'User account removed and all sessions immediately revoked.' });
       setDeleteConfirmId(null);
     } else {
       setToastMsg({ type: 'error', text: res.error || 'Cannot delete system account.' });

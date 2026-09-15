@@ -471,6 +471,21 @@ async function recordExecution(log: AutomationExecutionLog): Promise<void> {
         link: `/tracker?id=${log.recordId}`,
         created_at: new Date().toISOString(),
       });
+
+      // ISO 27001 A.12.4.1 Comprehensive Logging & Event Monitoring
+      await sb.from('audit_logs').insert({
+        action: 'AUTOMATION_EXECUTION',
+        actor_email: 'automation-daemon@proficiotherapy.com',
+        table_name: 'automation_executions',
+        record_id: log.id,
+        new_values: {
+          automationId: log.automationId,
+          eventType: log.eventType,
+          deliveryStatus: log.deliveryStatus,
+          timestamp: log.executedAt,
+          correlationId: log.idempotencyKey,
+        },
+      });
     } catch (e) {
       console.warn('[Automation Engine] Supabase log persistence non-blocking error:', e);
     }

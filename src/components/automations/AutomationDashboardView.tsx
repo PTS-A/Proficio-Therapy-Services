@@ -60,6 +60,7 @@ export const AutomationDashboardView: React.FC = () => {
   const [testTargetEmail, setTestTargetEmail] = useState<string>(currentAccount?.email || '');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Load data
   const loadData = async () => {
@@ -123,12 +124,13 @@ export const AutomationDashboardView: React.FC = () => {
       if (res.success) {
         setIsEditModalOpen(false);
         setEditingRule(null);
+        setActionError(null);
         await loadData();
       } else {
-        alert('Failed to save rule: ' + (res.error || 'Unknown error'));
+        setActionError(res.error || 'Failed to save rule.');
       }
     } catch (err: any) {
-      alert('Error: ' + err.message);
+      setActionError(err.message || 'Error saving rule');
     }
   };
 
@@ -138,10 +140,13 @@ export const AutomationDashboardView: React.FC = () => {
     try {
       const res = await deleteAutomationRule(id);
       if (res.success) {
+        setActionError(null);
         await loadData();
+      } else {
+        setActionError(res.error || 'Failed to delete rule');
       }
     } catch (err: any) {
-      alert('Failed to delete rule: ' + err.message);
+      setActionError(err.message || 'Failed to delete rule');
     }
   };
 
@@ -211,6 +216,17 @@ export const AutomationDashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
+      {actionError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-xs text-rose-700">
+          <span className="font-semibold">{actionError}</span>
+          <button
+            onClick={() => setActionError(null)}
+            className="px-2 py-1 text-rose-600 hover:text-rose-800 font-bold cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* Top Banner / System Status */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">

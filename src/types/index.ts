@@ -25,6 +25,7 @@ export interface AppAccount {
   name: string;
   email: string;
   password?: string;
+  passwordHash?: string;
   accessLevel: AccessLevel;
   systemRole?: SystemRole;
   roleTitle?: string;

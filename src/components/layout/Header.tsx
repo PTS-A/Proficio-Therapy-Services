@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { Discipline } from '../../types';
 import { ProficioLogo } from '../common/ProficioLogo';
+import { subscribeToSyncStatus, triggerGlobalSync } from '../../lib/supabase';
 import { 
   canAccessTab, 
   isSuperAdmin, 
@@ -30,6 +31,7 @@ import {
   Settings,
   Clock,
   Mail,
+  RefreshCw,
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -71,9 +73,26 @@ export const Header: React.FC<HeaderProps> = ({
   } = useCredentialing();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState({ isSyncing: false, isOnline: true });
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  useEffect(() => {
+    return subscribeToSyncStatus((status) => {
+      setSyncStatus(status);
+    });
+  }, []);
+
+  const handleManualSync = async () => {
+    setIsManualSyncing(true);
+    try {
+      await triggerGlobalSync();
+    } finally {
+      setTimeout(() => setIsManualSyncing(false), 500);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -138,6 +157,21 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Actions */}
           <div className="flex items-center space-x-2.5">
+            {/* Supabase Live Sync Indicator */}
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={syncStatus.isSyncing || isManualSyncing}
+              className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] text-slate-600 font-medium transition-colors cursor-pointer"
+              title="Supabase Database Real-Time Sync Status (Click to force refresh)"
+            >
+              <RefreshCw className={`w-3 h-3 ${syncStatus.isSyncing || isManualSyncing ? 'animate-spin text-[#2B4C9D]' : 'text-slate-400'}`} />
+              <span className="flex items-center space-x-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${syncStatus.isSyncing || isManualSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
+                <span>{syncStatus.isSyncing || isManualSyncing ? 'Syncing...' : 'DB Synced'}</span>
+              </span>
+            </button>
+
             {/* Quick Add Application Button */}
             <button
               onClick={onOpenNewApplication}

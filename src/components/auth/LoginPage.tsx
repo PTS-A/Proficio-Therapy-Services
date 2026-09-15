@@ -9,14 +9,6 @@ import {
   Clock,
   ShieldCheck,
   ShieldAlert,
-  ChevronDown,
-  ChevronUp,
-  UserCheck,
-  UserX,
-  Building2,
-  MapPin,
-  CheckCircle2,
-  XCircle,
   X,
   Copy,
   Check,
@@ -25,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { ProficioLogo } from '../common/ProficioLogo';
-import { fetchTestAccounts, TestAccountsData } from '../../services/authService';
 
 export const LoginPage: React.FC = () => {
   const { login, loginWithGoogle, sessionTimeoutMessage } = useCredentialing();
@@ -50,18 +41,7 @@ export const LoginPage: React.FC = () => {
     email?: string;
   } | null>(null);
 
-  // Testing Drawer State
-  const [showTestPanel, setShowTestPanel] = useState(false);
-  const [testAccounts, setTestAccounts] = useState<TestAccountsData | null>(null);
-  const [customTestEmail, setCustomTestEmail] = useState('');
-  const [activeGoogleEmail, setActiveGoogleEmail] = useState('joel.reji@ageslearningsolutions.com');
-  const [showAccountSwitch, setShowAccountSwitch] = useState(false);
-
   useEffect(() => {
-    fetchTestAccounts().then((data) => {
-      if (data) setTestAccounts(data);
-    });
-
     // Check for access control denial stored by OAuth callback
     const storedDenial = localStorage.getItem('cred_oauth_denial');
     if (storedDenial) {
@@ -79,47 +59,71 @@ export const LoginPage: React.FC = () => {
     }
 
     // Clean up any query parameters from URL
-    if (window.location.search.includes('denied') || window.location.search.includes('oauth_error')) {
+    if (window.location.search.includes('denied') || window.location.search.includes('oauth_error') || window.location.search.includes('403')) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    // Listen for broadcast messages from OAuth popup if used
+    try {
+      const channel = new BroadcastChannel('cred_auth_channel');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+          window.location.reload();
+        } else if (event.data?.type === 'OAUTH_AUTH_DENIED') {
+          setDenialDetails({
+            step: event.data.details?.step || 2,
+            stepName: event.data.details?.stepName || 'Employee Check',
+            code: event.data.details?.code || 'ACCESS_DENIED',
+            reason: event.data.details?.reason || 'Access denied.',
+            email: event.data.email,
+          });
+        }
+      };
+      return () => {
+        channel.close();
+      };
+    } catch {}
   }, []);
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setDenialDetails(null);
+
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setIsLoading(true);
 
     setTimeout(() => {
       const res = login(email, password);
       setIsLoading(false);
       if (!res.success) {
-        setError(res.error || 'Invalid email or password.');
+        setError(res.error || 'Invalid email or password. Please try again.');
       }
     }, 200);
   };
 
-  const handleGoogleSignInClick = async (emailOverride?: string) => {
+  const handleGoogleSignInClick = async () => {
     setError(null);
     setDenialDetails(null);
     setIsGoogleLoading(true);
     setShowProviderSetupHelp(false);
 
-    const targetEmail = (emailOverride && emailOverride.trim()) || (email && email.trim()) || activeGoogleEmail || 'joel.reji@ageslearningsolutions.com';
-
     try {
-      const res = await loginWithGoogle(targetEmail);
+      const res = await loginWithGoogle();
       setIsGoogleLoading(false);
 
       if (!res.success) {
-        if (res.step && res.step < 10) {
-          // Dedicated Access Control Denial Modal
-          setDenialDetails({
-            step: res.step,
-            stepName: res.stepName,
-            code: res.code,
-            reason: res.error || 'Access Denied: Employee Access Control validation failed.',
-            email: targetEmail,
-          });
+        if (res.error?.includes('provider is not enabled') || res.error?.includes('Unsupported provider')) {
+          setShowProviderSetupHelp(true);
         } else {
           setError(res.error || 'Failed to authenticate via Google.');
         }
@@ -138,7 +142,7 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 py-10">
-      <div className="w-full max-w-lg space-y-5">
+      <div className="w-full max-w-md space-y-5">
         {/* Large Brand Image Header */}
         <div className="text-center flex flex-col items-center">
           <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xs border border-slate-200/90 w-full flex justify-center items-center">
@@ -223,7 +227,7 @@ export const LoginPage: React.FC = () => {
                 Supabase returned: <code className="text-[11px] bg-amber-100/70 text-amber-900 px-1.5 py-0.5 rounded font-mono">Unsupported provider: provider is not enabled</code>
               </p>
               <p className="text-slate-600 leading-relaxed">
-                To enable live Google OAuth popups, follow these 3 quick steps in your Supabase Dashboard:
+                To enable live Google OAuth sign-in, follow these 3 quick steps in your Supabase Dashboard:
               </p>
 
               <ol className="list-decimal list-inside space-y-2 text-slate-700 pt-1">
@@ -231,19 +235,19 @@ export const LoginPage: React.FC = () => {
                   Go to <span className="font-semibold text-slate-900">Authentication</span> &rarr; <span className="font-semibold text-slate-900">Providers</span> &rarr; <span className="font-semibold text-slate-900">Google</span> in your Supabase Dashboard.
                 </li>
                 <li>
-                  Toggle <span className="font-semibold text-emerald-700">"Enable Google provider"</span> to <span className="font-semibold text-emerald-700">ON</span>.
+                  Toggle <span className="font-semibold text-emerald-700">&ldquo;Enable Google provider&rdquo;</span> to <span className="font-semibold text-emerald-700">ON</span>.
                 </li>
                 <li>
-                  In your <span className="font-semibold text-slate-900">Google Cloud Console</span> (APIs &amp; Services &rarr; Credentials), add this exact Callback URL to your OAuth 2.0 Web Client:
+                  In your <span className="font-semibold text-slate-900">Google Cloud Console</span> (APIs &amp; Services &rarr; Credentials), add this Callback URL to your OAuth 2.0 Web Client:
                   <div className="mt-1.5 flex items-center space-x-1.5 bg-slate-50 p-2 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800">
                     <span className="flex-1 truncate">https://uqaiotacheqjvfbanxtp.supabase.co/auth/v1/callback</span>
                     <button
                       type="button"
                       onClick={() => copyToClipboard('https://uqaiotacheqjvfbanxtp.supabase.co/auth/v1/callback', 'callback')}
-                      className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-sans font-medium text-slate-700 flex items-center space-x-1 cursor-pointer shrink-0"
+                      className="p-1 hover:bg-slate-200 rounded text-slate-600 cursor-pointer transition-colors"
+                      title="Copy URL"
                     >
-                      {copiedField === 'callback' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedField === 'callback' ? 'Copied' : 'Copy'}</span>
+                      {copiedField === 'callback' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </li>
@@ -253,27 +257,16 @@ export const LoginPage: React.FC = () => {
               </ol>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+            <div className="flex items-center justify-end pt-1">
               <a
                 href="https://supabase.com/dashboard/project/uqaiotacheqjvfbanxtp/auth/providers"
                 target="_blank"
                 rel="noreferrer"
-                className="w-full sm:w-auto px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
+                className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
               >
                 <span>Open Supabase Auth Providers</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProviderSetupHelp(false);
-                  setShowTestPanel(true);
-                }}
-                className="w-full sm:w-auto px-3 py-2 bg-white hover:bg-amber-100/50 border border-amber-300 text-amber-950 rounded-xl font-semibold text-xs flex items-center justify-center space-x-1 cursor-pointer transition-colors"
-              >
-                <span>Test Corporate Employee Login Now &rarr;</span>
-              </button>
             </div>
           </div>
         )}
@@ -285,7 +278,7 @@ export const LoginPage: React.FC = () => {
               Sign In to Credentialing Hub
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Authenticate with your verified company Google account or enter credentials.
+              Enter your corporate email and password or authenticate with Google.
             </p>
           </div>
 
@@ -297,98 +290,93 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Unified Single Login Button (Same-Page Direct Verification) */}
-          <div className="space-y-4">
-            {/* Active Corporate Account Identity Badge & Switcher */}
-            <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-2 truncate">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span className="text-slate-600 text-xs truncate">
-                    Corporate Identity: <strong className="text-slate-900 font-semibold">{activeGoogleEmail}</strong>
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAccountSwitch(!showAccountSwitch)}
-                  className="text-xs text-[#2B4C9D] hover:underline font-semibold cursor-pointer shrink-0 ml-2"
-                >
-                  {showAccountSwitch ? 'Done' : 'Switch Identity'}
-                </button>
+          {/* Standard Email / Password Form */}
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@proficiotherapy.com"
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D] transition-all text-slate-900"
+                />
               </div>
-
-              {/* In-Page Quick Corporate Account Switcher */}
-              {showAccountSwitch && (
-                <div className="pt-2 border-t border-slate-200 space-y-2 animate-in fade-in duration-150">
-                  <p className="text-[11px] text-slate-500 font-medium">Select corporate employee identity:</p>
-                  <div className="grid grid-cols-1 gap-1.5">
-                    {[
-                      { name: 'Joel Reji', email: 'joel.reji@ageslearningsolutions.com', role: 'Credentialing Specialist' },
-                      { name: 'Namitha Narayanan', email: 'manager@proficiotherapy.com', role: 'Credentialing Manager' },
-                      { name: 'Sanjay Tom', email: 'specialist@proficiotherapy.com', role: 'Credentialing Specialist' },
-                      { name: 'Administrator', email: 'admin@example.com', role: 'System Administrator' },
-                    ].map((item) => (
-                      <button
-                        key={item.email}
-                        type="button"
-                        onClick={() => {
-                          setActiveGoogleEmail(item.email);
-                          setEmail(item.email);
-                          setShowAccountSwitch(false);
-                        }}
-                        className={`w-full p-2.5 text-left rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer border ${
-                          activeGoogleEmail === item.email
-                            ? 'bg-blue-50 border-blue-200 text-[#2B4C9D]'
-                            : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <div className="truncate pr-2">
-                          <div className="font-semibold truncate">{item.name}</div>
-                          <div className="text-[10px] text-slate-500 truncate">{item.email} &bull; {item.role}</div>
-                        </div>
-                        {activeGoogleEmail === item.email && (
-                          <Check className="w-4 h-4 text-[#2B4C9D] shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-200">
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Or enter custom company email:
-                    </label>
-                    <input
-                      type="email"
-                      value={activeGoogleEmail}
-                      onChange={(e) => {
-                        setActiveGoogleEmail(e.target.value);
-                        setEmail(e.target.value);
-                      }}
-                      placeholder="e.g. employee@proficiotherapy.com"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D]"
-                    />
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* THE ONLY LOGIN BUTTON: Sign in with Google (Direct Same-Page Authentication) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D] transition-all text-slate-900"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || isGoogleLoading}
+              className="w-full py-2.5 px-4 bg-[#2B4C9D] hover:bg-[#203a7a] active:bg-[#1a2f64] text-white font-semibold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-slate-400 font-medium">Or continue with</span>
+            </div>
+          </div>
+
+          {/* Official Google OAuth Button */}
+          <div>
             <button
               type="button"
-              id="unified-signin-button"
+              id="google-signin-button"
               disabled={isGoogleLoading || isLoading}
-              onClick={() => handleGoogleSignInClick(activeGoogleEmail)}
-              className="w-full py-3.5 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 border-2 border-slate-300 hover:border-slate-400 font-semibold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
+              onClick={handleGoogleSignInClick}
+              className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 border border-slate-300 hover:border-slate-400 font-semibold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isGoogleLoading ? (
                 <div className="flex items-center space-x-2 text-slate-600">
                   <div className="w-4 h-4 border-2 border-slate-300 border-t-[#2B4C9D] rounded-full animate-spin"></div>
-                  <span>Verifying Employee Access Control in Same Page...</span>
+                  <span>Connecting to Google OAuth...</span>
                 </div>
               ) : (
                 <>
-                  {/* Authentic Official Google G Logo */}
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  {/* Official Google G Logo */}
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
@@ -406,129 +394,18 @@ export const LoginPage: React.FC = () => {
                       d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                     />
                   </svg>
-                  <span className="text-slate-900 font-bold text-sm">
-                    Sign In with Google (Same-Page)
+                  <span className="text-slate-800 font-semibold text-sm">
+                    Sign in with Google
                   </span>
                 </>
               )}
             </button>
-
-            {/* Micro security note */}
-            <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Enterprise Single Sign-On &bull; Zero popups &bull; Instant Access</span>
-            </div>
           </div>
 
-          {/* Test Employee Access Control Interactive Drawer (For Testing Script 2 Scenarios) */}
-          <div className="pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setShowTestPanel(!showTestPanel)}
-              className="w-full flex items-center justify-between py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-[#2B4C9D]" />
-                <span>Test Google OAuth &amp; Access Control Scenarios</span>
-              </div>
-              {showTestPanel ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-
-            {showTestPanel && (
-              <div className="mt-3 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 space-y-4 text-xs">
-                <div>
-                  <div className="flex items-center space-x-1.5 text-emerald-700 font-bold mb-1.5">
-                    <UserCheck className="w-3.5 h-3.5" />
-                    <span>Authorized Company Google Accounts (Success)</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mb-2">
-                    Click to authenticate through Google OAuth with active enrolled employees:
-                  </p>
-                  <div className="space-y-1.5">
-                    {testAccounts?.authorizedAccounts.map((acc) => (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        onClick={() => handleGoogleSignInClick(acc.email)}
-                        className="w-full p-2 bg-white hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 rounded-lg text-left transition-all cursor-pointer flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="font-semibold text-slate-800 flex items-center space-x-1.5">
-                            <span>{acc.name}</span>
-                            <span className="text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-normal">
-                              {acc.role}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-slate-500 flex items-center space-x-2 mt-0.5">
-                            <span>{acc.email}</span>
-                            <span>&bull;</span>
-                            <span>{acc.location}</span>
-                          </div>
-                        </div>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 opacity-60 group-hover:opacity-100 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center space-x-1.5 text-rose-700 font-bold mb-1.5">
-                    <UserX className="w-3.5 h-3.5" />
-                    <span>Security Denial Test Cases (10-Step Chain Enforcement)</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mb-2">
-                    Click to test and verify rejection at specific access control gates:
-                  </p>
-                  <div className="space-y-1.5">
-                    {testAccounts?.negativeTestCases.map((neg) => (
-                      <button
-                        key={neg.email}
-                        type="button"
-                        onClick={() => handleGoogleSignInClick(neg.email)}
-                        className="w-full p-2 bg-white hover:bg-rose-50/60 border border-slate-200 hover:border-rose-300 rounded-lg text-left transition-all cursor-pointer flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="font-semibold text-slate-800 flex items-center space-x-1.5">
-                            <span>{neg.name}</span>
-                            <span className="text-[10px] px-1.5 py-0.2 bg-rose-100 text-rose-800 rounded font-normal">
-                              {neg.expectedStep}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            <span>{neg.email}</span> &bull; <span className="text-rose-600 font-medium">{neg.expectedResult}</span>
-                          </div>
-                        </div>
-                        <XCircle className="w-4 h-4 text-rose-600 opacity-60 group-hover:opacity-100 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Custom Google Email Tester */}
-                <div className="pt-2 border-t border-slate-200/80">
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Test Arbitrary Google Email Verification:
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="email"
-                      value={customTestEmail}
-                      onChange={(e) => setCustomTestEmail(e.target.value)}
-                      placeholder="e.g. employee@proficiotherapy.com"
-                      className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#2B4C9D]"
-                    />
-                    <button
-                      type="button"
-                      disabled={!customTestEmail.includes('@')}
-                      onClick={() => handleGoogleSignInClick(customTestEmail)}
-                      className="px-3 py-1.5 bg-[#2B4C9D] hover:bg-[#203a7a] text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer disabled:opacity-40"
-                    >
-                      Verify
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* Micro security note */}
+          <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400 pt-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Secure Enterprise Authentication &bull; Supabase Database</span>
           </div>
         </div>
 

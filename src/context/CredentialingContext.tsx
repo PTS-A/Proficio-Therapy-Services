@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { isSuperAdmin } from '../utils/rbac';
 import {
   AppAccount,
@@ -59,9 +59,10 @@ import {
   subscribeToCollection,
   subscribeToSyncStatus,
   drainMutationQueue,
+  triggerGlobalSync,
 } from '../lib/databaseBridge';
-import { initiateGoogleSignIn, checkForPendingOAuth } from '../services/authService';
-import { supabase } from '../lib/supabase';
+import { initiateGoogleSignIn, checkForPendingOAuth, authenticateCorporateGoogleUser } from '../services/authService';
+import { supabase, logAuditEvent } from '../lib/supabase';
 import { 
   HolidayItem, 
   NotificationTemplate, 
@@ -916,7 +917,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Real-time continuous live subscriptions to Firestore collections
+  // Real-time continuous live subscriptions to Supabase collections
   useEffect(() => {
     const unsubs: (() => void)[] = [];
 
@@ -934,73 +935,37 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     unsubs.push(
       subscribeToCollection<Provider>('providers', (cloudProviders) => {
-        const savedAccountStr = localStorage.getItem('cred_current_account');
-        const isAdmin = savedAccountStr?.includes('admin@example.com');
-        if (!isAdmin) {
-          setProviders((cloudProviders || []).filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com'));
-        }
-      })
-    );
-
-    unsubs.push(
-      subscribeToCollection<Provider>('demo_providers', (cloudDemoProviders) => {
-        const savedAccountStr = localStorage.getItem('cred_current_account');
-        const isAdmin = savedAccountStr?.includes('admin@example.com');
-        if (isAdmin && cloudDemoProviders && cloudDemoProviders.length > 0) {
-          setProviders(cloudDemoProviders);
-        }
+        setProviders(cloudProviders || []);
       })
     );
 
     unsubs.push(
       subscribeToCollection<Payer>('payers', (cloudPayers) => {
-        if (cloudPayers && cloudPayers.length > 0) {
-          setPayers(cloudPayers);
-        }
+        setPayers(cloudPayers || []);
       })
     );
 
     unsubs.push(
       subscribeToCollection<LegalEntity>('entities', (cloudEntities) => {
-        if (cloudEntities && cloudEntities.length > 0) {
-          setEntities(cloudEntities);
-        }
+        setEntities(cloudEntities || []);
       })
     );
 
     unsubs.push(
       subscribeToCollection<Location>('locations', (cloudLocations) => {
-        if (cloudLocations && cloudLocations.length > 0) {
-          setLocations(cloudLocations);
-        }
+        setLocations(cloudLocations || []);
       })
     );
 
     unsubs.push(
       subscribeToCollection<CredentialingRecord>('records', (cloudRecords) => {
-        const savedAccountStr = localStorage.getItem('cred_current_account');
-        const isAdmin = savedAccountStr?.includes('admin@example.com');
-        if (!isAdmin) {
-          setRecords((cloudRecords || []).filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com'));
-        }
-      })
-    );
-
-    unsubs.push(
-      subscribeToCollection<CredentialingRecord>('demo_records', (cloudDemoRecords) => {
-        const savedAccountStr = localStorage.getItem('cred_current_account');
-        const isAdmin = savedAccountStr?.includes('admin@example.com');
-        if (isAdmin && cloudDemoRecords && cloudDemoRecords.length > 0) {
-          setRecords(cloudDemoRecords);
-        }
+        setRecords(cloudRecords || []);
       })
     );
 
     unsubs.push(
       subscribeToCollection<SystemNotification>('notifications', (cloudNotes) => {
-        if (cloudNotes && cloudNotes.length > 0) {
-          setNotifications(cloudNotes);
-        }
+        setNotifications(cloudNotes || []);
       })
     );
 
@@ -1014,55 +979,25 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     unsubs.push(
       subscribeToCollection<Employee>('employees', (cloudEmployees) => {
-        if (cloudEmployees && cloudEmployees.length > 0) {
-          setEmployees(cloudEmployees.filter((e) => !isDemoEmployee(e)));
-        }
-      })
-    );
-
-    unsubs.push(
-      subscribeToCollection<Employee>('demo_employees', (cloudDemoEmployees) => {
-        const savedAccountStr = localStorage.getItem('cred_current_account');
-        const isAdmin = savedAccountStr?.includes('admin@example.com');
-        if (isAdmin && cloudDemoEmployees && cloudDemoEmployees.length > 0) {
-          setDemoEmployees(cloudDemoEmployees);
-        }
+        setEmployees((cloudEmployees || []).filter((e) => !isDemoEmployee(e)));
       })
     );
 
     unsubs.push(
       subscribeToCollection<ClinicalStaff>('clinical_staff', (cloudStaff) => {
-        const savedAccountStr = localStorage.getItem('cred_current_account');
-        const isAdmin = savedAccountStr?.includes('admin@example.com');
-        if (!isAdmin) {
-          setClinicalStaff((cloudStaff || []).filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com'));
-        }
-      })
-    );
-
-    unsubs.push(
-      subscribeToCollection<ClinicalStaff>('demo_clinical_staff', (cloudDemoStaff) => {
-        const savedAccountStr = localStorage.getItem('cred_current_account');
-        const isAdmin = savedAccountStr?.includes('admin@example.com');
-        if (isAdmin && cloudDemoStaff && cloudDemoStaff.length > 0) {
-          setClinicalStaff(cloudDemoStaff);
-        }
+        setClinicalStaff(cloudStaff || []);
       })
     );
 
     unsubs.push(
       subscribeToCollection<ApplicationDocument>('documents', (cloudDocs) => {
-        if (cloudDocs && cloudDocs.length > 0) {
-          setDocumentsList(cloudDocs);
-        }
+        setDocumentsList(cloudDocs || []);
       })
     );
 
     unsubs.push(
       subscribeToCollection<ApplicationComment>('comments', (cloudComments) => {
-        if (cloudComments && cloudComments.length > 0) {
-          setCommentsList(cloudComments);
-        }
+        setCommentsList(cloudComments || []);
       })
     );
 
@@ -1126,12 +1061,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [stageConfigs]);
 
   useEffect(() => {
-    localStorage.setItem('cred_accounts', JSON.stringify(accounts));
+    // Sanitize accounts before caching: strip plaintext passwords (HIPAA §164.308 / ISO A.8.5)
+    const sanitized = accounts.map(({ password, ...rest }) => rest);
+    localStorage.setItem('cred_accounts', JSON.stringify(sanitized));
   }, [accounts]);
 
   useEffect(() => {
     if (currentAccount) {
-      localStorage.setItem('cred_current_account', JSON.stringify(currentAccount));
+      // Never store plaintext password in browser storage (HIPAA §164.312(a)(2)(iv))
+      const { password, ...sanitized } = currentAccount;
+      localStorage.setItem('cred_current_account', JSON.stringify(sanitized));
     }
     // Do NOT wipe cred_current_account when currentAccount is null during mount/re-renders.
     // Explicit session clearing happens only in logout() or session timeout expiration.
@@ -1383,70 +1322,76 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentAccount, SESSION_TIMEOUT_MS]);
 
   const switchDataForAccount = (_targetAccount: AppAccount) => {
-    const isTargetAdmin = _targetAccount.email.toLowerCase() === 'admin@example.com';
-
-    if (isTargetAdmin) {
-      const savedDemoProviders = localStorage.getItem('cred_demo_providers');
-      setProviders(savedDemoProviders ? JSON.parse(savedDemoProviders) : []);
-
-      const savedDemoRecords = localStorage.getItem('cred_demo_records');
-      setRecords(savedDemoRecords ? JSON.parse(savedDemoRecords) : []);
-
-      const savedDemoStaff = localStorage.getItem('cred_demo_clinical_staff');
-      setClinicalStaff(savedDemoStaff ? JSON.parse(savedDemoStaff) : []);
-
-      const savedDemo = localStorage.getItem('cred_demo_employees_admin');
-      if (savedDemo) {
-        try {
-          const parsed = JSON.parse(savedDemo);
-          setDemoEmployees(Array.isArray(parsed) ? parsed.filter((e: any) => !isDemoEmployee(e)) : []);
-        } catch {
-          setDemoEmployees([]);
-        }
-      } else {
-        setDemoEmployees([]);
-      }
-    } else {
-      // Normal accounts and all other accounts get clean production data:
-      const savedProviders = localStorage.getItem('cred_providers');
-      setProviders(savedProviders ? JSON.parse(savedProviders).filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com') : []);
-
-      const savedRecords = localStorage.getItem('cred_records');
-      setRecords(savedRecords ? JSON.parse(savedRecords).filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com') : []);
-
-      const savedClinicalStaff = localStorage.getItem('cred_clinical_staff');
-      setClinicalStaff(savedClinicalStaff ? JSON.parse(savedClinicalStaff).filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com') : []);
-
-      setDemoEmployees([]);
-      setEmployees((prev) => prev.filter((e) => !isDemoEmployee(e)));
-      const saved = localStorage.getItem('cred_employees');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            localStorage.setItem('cred_employees', JSON.stringify(parsed.filter((e: any) => !isDemoEmployee(e))));
-          }
-        } catch {}
-      }
-    }
-
-    const savedNotifications = localStorage.getItem('cred_notifications');
-    setNotifications(savedNotifications ? JSON.parse(savedNotifications) : []);
+    // Synchronize all live collections from Supabase immediately upon account switch
+    triggerGlobalSync().catch(console.error);
   };
 
-  // Auth Operations
+  // Auth Operations - Failed login attempt tracking (HIPAA §164.308(a)(5)(ii)(C) & ISO 27001 A.8.5)
+  const failedAttemptsRef = useRef<Map<string, { count: number; lockedUntil: number }>>(new Map());
+
   const login = (email: string, password?: string): { success: boolean; error?: string } => {
     const cleanEmail = email.trim().toLowerCase();
+    const attemptsMap = failedAttemptsRef.current;
+    const now = Date.now();
+
+    // Check account lockout
+    const attemptRecord = attemptsMap.get(cleanEmail);
+    if (attemptRecord && attemptRecord.lockedUntil > now) {
+      const minutesLeft = Math.ceil((attemptRecord.lockedUntil - now) / (60 * 1000));
+      return {
+        success: false,
+        error: `Account temporarily locked due to repeated failed sign-in attempts. Please retry in ${minutesLeft} minute(s) or contact an administrator.`,
+      };
+    }
+
     const found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
 
     if (!found) {
       return { success: false, error: 'No account found with this email address.' };
     }
 
-    // If password provided, verify it
-    if (password && found.password && found.password !== password) {
+    if (!password || !password.trim()) {
+      return { success: false, error: 'Please enter your password to sign in.' };
+    }
+
+    // Verify password against stored credentials
+    if (found.password && found.password !== password) {
+      const currentCount = (attemptRecord?.count || 0) + 1;
+      const lockedUntil = currentCount >= 5 ? now + 15 * 60 * 1000 : 0;
+      attemptsMap.set(cleanEmail, { count: currentCount, lockedUntil });
+
+      logAuditEvent({
+        userId: found.id,
+        userName: found.name,
+        userEmail: cleanEmail,
+        action: 'AUTH_FAILED',
+        entityType: 'AUTH',
+        entityId: found.id,
+        details: { reason: 'Incorrect credentials', attempts: currentCount },
+      }).catch(() => {});
+
+      if (currentCount >= 5) {
+        return {
+          success: false,
+          error: 'Maximum failed sign-in attempts exceeded. Account is temporarily locked for 15 minutes to protect against brute-force intrusion.',
+        };
+      }
+
       return { success: false, error: 'Incorrect password. Please check your password and try again.' };
     }
+
+    // Clear failed attempts upon successful authentication
+    attemptsMap.delete(cleanEmail);
+
+    logAuditEvent({
+      userId: found.id,
+      userName: found.name,
+      userEmail: cleanEmail,
+      action: 'AUTH_SUCCESS',
+      entityType: 'AUTH',
+      entityId: found.id,
+      details: { role: found.systemRole },
+    }).catch(() => {});
 
     const updated = {
       ...found,
@@ -1468,7 +1413,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const loginWithGoogle = async (
-    emailOverride?: string
+    emailOverride?: string,
+    preferredFlow: 'popup' | 'redirect' = 'popup'
   ): Promise<{
     success: boolean;
     error?: string;
@@ -1476,46 +1422,62 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     stepName?: string;
     code?: string;
     account?: AppAccount;
+    url?: string;
   }> => {
     try {
-      const res = await initiateGoogleSignIn(emailOverride);
-      if (!res.success || !res.data || !res.data.authorized || !res.data.account) {
+      // If direct corporate identity verification is requested
+      if (emailOverride) {
+        const verifyRes = await authenticateCorporateGoogleUser(emailOverride);
+        if (!verifyRes.success || !verifyRes.account) {
+          return {
+            success: false,
+            error: verifyRes.error || 'Employee Access Control validation failed.',
+            step: verifyRes.step,
+            stepName: verifyRes.stepName,
+          };
+        }
+
+        const verifiedAcc: AppAccount = verifyRes.account;
+        setCurrentAccount(verifiedAcc);
+        switchDataForAccount(verifiedAcc);
+
+        setAccounts((prev) => {
+          const idx = prev.findIndex((a) => a.email.toLowerCase() === verifiedAcc.email.toLowerCase());
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = { ...copy[idx], ...verifiedAcc };
+            return copy;
+          }
+          return [...prev, verifiedAcc];
+        });
+
+        localStorage.setItem('cred_current_account', JSON.stringify(verifiedAcc));
+        localStorage.removeItem('cred_timeout_reason');
+        setSessionTimeoutMessage(null);
+        lastActivityRef.current = Date.now();
+        localStorage.setItem('cred_last_activity', String(Date.now()));
+        setSessionSecondsLeft(20 * 60);
+
         return {
-          success: false,
-          error: res.error || res.data?.reason || 'Access Denied: Employee Access Control validation failed.',
-          step: res.data?.step,
-          stepName: res.data?.stepName,
-          code: res.data?.code,
+          success: true,
+          account: verifiedAcc,
+          step: 10,
+          stepName: 'Application Access',
+          code: 'AUTHORIZED',
         };
       }
 
-      const verifiedAcc: AppAccount = res.data.account;
-      setCurrentAccount(verifiedAcc);
-      switchDataForAccount(verifiedAcc);
-
-      setAccounts((prev) => {
-        const idx = prev.findIndex((a) => a.email.toLowerCase() === verifiedAcc.email.toLowerCase());
-        if (idx >= 0) {
-          const copy = [...prev];
-          copy[idx] = { ...copy[idx], ...verifiedAcc };
-          return copy;
-        }
-        return [...prev, verifiedAcc];
-      });
-
-      localStorage.setItem('cred_current_account', JSON.stringify(verifiedAcc));
-      localStorage.removeItem('cred_timeout_reason');
-      setSessionTimeoutMessage(null);
-      lastActivityRef.current = Date.now();
-      localStorage.setItem('cred_last_activity', String(Date.now()));
-      setSessionSecondsLeft(20 * 60);
-
+      // Live Google OAuth via Supabase
+      const res = await initiateGoogleSignIn({ preferPopup: preferredFlow === 'popup' });
+      if (!res.success) {
+        return {
+          success: false,
+          error: res.error || 'Could not initiate Google Sign-In.',
+        };
+      }
       return {
         success: true,
-        account: verifiedAcc,
-        step: 10,
-        stepName: 'Application Access',
-        code: 'AUTHORIZED',
+        url: res.url,
       };
     } catch (err: any) {
       return {
@@ -1547,8 +1509,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       return { success: false, error: 'No active user session found.' };
     }
     const cleanPwd = newPassword.trim();
-    if (cleanPwd.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters in length.' };
+    if (cleanPwd.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters in length.' };
+    }
+    if (!/[A-Z]/.test(cleanPwd) || !/[a-z]/.test(cleanPwd) || !/[0-9]/.test(cleanPwd)) {
+      return { success: false, error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number.' };
     }
 
     const updated: AppAccount = {
@@ -1561,6 +1526,17 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentAccount(updated);
     setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
     saveDocument('users', updated.id, updated).catch(console.error);
+
+    logAuditEvent({
+      userId: currentAccount.id,
+      userName: currentAccount.name,
+      userEmail: currentAccount.email,
+      action: 'PASSWORD_CHANGE',
+      entityType: 'USER',
+      entityId: currentAccount.id,
+      details: { timestamp: new Date().toISOString() },
+    }).catch(() => {});
+
     return { success: true };
   };
 

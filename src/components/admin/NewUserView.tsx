@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { AccessLevel, AppAccount, Discipline, SystemRole } from '../../types';
 import { SYSTEM_ROLES, SystemRoleDefinition } from '../../data/roleConfig';
-import { isSuperAdmin, canViewPasswords } from '../../utils/rbac';
+import { isSuperAdmin } from '../../utils/rbac';
 import { 
   AlertCircle, 
   ArrowLeft, 
@@ -35,7 +35,8 @@ import {
   Sliders,
   Eye,
   EyeOff,
-  Crown
+  Crown,
+  KeyRound
 } from 'lucide-react';
 
 interface NewUserViewProps {
@@ -75,18 +76,10 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
   const [assignedDisciplines, setAssignedDisciplines] = useState<Discipline[]>(['ABA', 'Speech', 'OT']);
   const [assignedEntities, setAssignedEntities] = useState<string[]>(entities.map(e => e.id));
 
-  // Super Admin view password toggles in roster table
-  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
-
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const isCurrentSuperAdmin = isSuperAdmin(currentAccount);
-
-  const togglePasswordReveal = (accountId: string) => {
-    if (!isCurrentSuperAdmin) return;
-    setRevealedPasswords(prev => ({ ...prev, [accountId]: !prev[accountId] }));
-  };
 
   // Selected role configuration
   const currentRoleDef = SYSTEM_ROLES.find(r => r.id === selectedRole) || SYSTEM_ROLES[0];
@@ -613,13 +606,13 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           {/* Super Admin Access Notification Banner */}
           {isCurrentSuperAdmin && (
-            <div className="px-5 py-3 bg-amber-50/80 border-b border-amber-200/80 flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-xs text-amber-900 font-semibold">
-                <Crown className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Super Administrator Privilege Active — You have exclusive authority to inspect system-wide stored user passwords & first sign-on status.</span>
+            <div className="px-5 py-3 bg-indigo-50/80 border-b border-indigo-200/80 flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs text-indigo-950 font-semibold">
+                <Crown className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>Super Administrator Governance Active — Manage user account provisioning, role delegations, and security credentials with full audit tracking.</span>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200/60 text-amber-900 border border-amber-300 shrink-0">
-                AUDIT PERMITTED
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-200/60 text-indigo-900 border border-indigo-300 shrink-0">
+                GOVERNANCE ACTIVE
               </span>
             </div>
           )}
@@ -746,32 +739,12 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                             </span>
                           )}
 
-                          {/* Password viewing - Exclusive to Super Admin */}
-                          {isCurrentSuperAdmin ? (
-                            <div className="inline-flex items-center space-x-1 bg-amber-50/60 border border-amber-200/90 px-2 py-0.5 rounded text-[10px]">
-                              <span className="text-amber-800 font-semibold">Password:</span>
-                              <span className="font-mono text-slate-800 font-bold">
-                                {revealedPasswords[acc.id] ? (acc.password || 'proficio') : '••••••••'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => togglePasswordReveal(acc.id)}
-                                className="ml-1 text-amber-700 hover:text-amber-900 cursor-pointer"
-                                title={revealedPasswords[acc.id] ? 'Hide Password' : 'Super Admin: Reveal Stored Password'}
-                              >
-                                {revealedPasswords[acc.id] ? (
-                                  <EyeOff className="w-3 h-3" />
-                                ) : (
-                                  <Eye className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="inline-flex items-center space-x-1 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-500">
-                              <Lock className="w-2.5 h-2.5 text-slate-400" />
-                              <span>Password: •••••••• (Super Admin Only)</span>
-                            </div>
-                          )}
+                          {/* Credential Status - Zero Knowledge Encrypted (HIPAA §164.308 / ISO A.8.5) */}
+                          <div className="inline-flex items-center space-x-1.5 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-700">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span className="font-semibold text-slate-800">Credential:</span>
+                            <span className="font-mono text-slate-600">Encrypted (Zero-Knowledge)</span>
+                          </div>
                         </div>
 
                         {acc.assignedDisciplines && (

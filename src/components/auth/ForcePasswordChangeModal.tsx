@@ -35,13 +35,18 @@ export const ForcePasswordChangeModal: React.FC = () => {
     const cleanNew = newPassword.trim();
     const cleanConfirm = confirmPassword.trim();
 
-    if (cleanNew.length < 6) {
-      setError('New password must be at least 6 characters in length.');
+    if (cleanNew.length < 8) {
+      setError('Password must be at least 8 characters in length.');
       return;
     }
 
-    if (cleanNew === 'admin' || cleanNew === 'proficio' || cleanNew === 'user123') {
-      setError('Please choose a unique custom password rather than a default system placeholder.');
+    if (!/[A-Z]/.test(cleanNew) || !/[a-z]/.test(cleanNew) || !/[0-9]/.test(cleanNew)) {
+      setError('Password must contain at least one uppercase letter, one lowercase letter, and one number.');
+      return;
+    }
+
+    if (['admin', 'proficio', 'user123', 'password', 'password123', 'superadmin'].some(b => cleanNew.toLowerCase().includes(b))) {
+      setError('Please choose a unique custom password rather than a predictable dictionary pattern.');
       return;
     }
 

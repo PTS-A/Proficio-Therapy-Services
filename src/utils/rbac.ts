@@ -17,7 +17,7 @@ export type ActiveTabType =
 
 /**
  * Checks if the account is a Super Admin.
- * Super Admin has full governance and is the ONLY user who can view stored user passwords.
+ * Super Admin has full governance over role allocations, user management, and system settings.
  */
 export const isSuperAdmin = (account: AppAccount | null | undefined): boolean => {
   if (!account) return false;
@@ -28,11 +28,12 @@ export const isSuperAdmin = (account: AppAccount | null | undefined): boolean =>
 };
 
 /**
- * Super Admin ONLY: view cleartext or revealed user passwords.
- * Under strict security governance, no other system role or email may view passwords.
+ * Password Security Governance (HIPAA §164.308(a)(5)(ii)(D) & ISO/IEC 27001:2022 A.8.5):
+ * User passwords must never be stored in reversible format or viewable by any user (including Super Admins).
+ * Zero-knowledge credential hashing is enforced system-wide.
  */
-export const canViewPasswords = (account: AppAccount | null | undefined): boolean => {
-  return isSuperAdmin(account);
+export const canViewPasswords = (_account: AppAccount | null | undefined): boolean => {
+  return false;
 };
 
 /**

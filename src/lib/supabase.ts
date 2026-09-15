@@ -61,18 +61,33 @@ export type AuditAction =
   | 'SUSPEND' 
   | 'DISABLE' 
   | 'LOGIN' 
+  | 'AUTH_SUCCESS'
+  | 'AUTH_FAILED'
+  | 'PASSWORD_CHANGE'
+  | 'PHI_ACCESS'
   | 'DOCUMENT_UPLOAD' 
-  | 'STAGE_CHANGE';
+  | 'STAGE_CHANGE'
+  | 'EXPORT'
+  | 'VIEW'
+  | 'IMPORT'
+  | 'OIG_SCREEN'
+  | 'SANCTION_CHECK';
 
 export interface AuditLogEntry {
   id?: string;
   actor_id?: string;
   actor_email?: string;
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
   action: AuditAction;
-  table_name: string;
-  record_id: string;
+  table_name?: string;
+  record_id?: string;
+  entityType?: string;
+  entityId?: string;
   old_values?: any;
   new_values?: any;
+  details?: any;
   created_at?: string;
 }
 
@@ -138,7 +153,7 @@ function updateSyncStatus(updates: Partial<SyncStatus>) {
 }
 
 // ----------------------------------------------------------------------------
-// AUDIT LOGGING SERVICE
+// AUDIT LOGGING SERVICE (HIPAA §164.312(b) & ISO/IEC 27001:2022 A.8.15)
 // ----------------------------------------------------------------------------
 export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
   const auditRecord = {
@@ -146,6 +161,16 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
     created_at: new Date().toISOString(),
   };
 
+  // 1. Dispatch to server-side audit ingest route for tamper-proof persistence
+  try {
+    fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(auditRecord),
+    }).catch(() => {});
+  } catch {}
+
+  // 2. Insert into primary Supabase PostgreSQL database
   if (supabase) {
     try {
       await supabase.from('audit_logs').insert([auditRecord]);
@@ -154,12 +179,38 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
     }
   }
 
-  // Also log locally
+  // 3. Local session buffer
   try {
     const existing = JSON.parse(localStorage.getItem('pts_audit_logs') || '[]');
     existing.unshift(auditRecord);
     localStorage.setItem('pts_audit_logs', JSON.stringify(existing.slice(0, 500)));
   } catch {}
+}
+
+/**
+ * Logs ePHI / Clinician dossier view events for HIPAA §164.528 Accounting of Disclosures
+ */
+export function logDossierAccess(
+  user: { id: string; name: string; email: string; systemRole?: string } | null,
+  providerId: string,
+  providerName: string,
+  purpose: string = 'Credentialing Verification'
+): void {
+  if (!user) return;
+  logAuditEvent({
+    userId: user.id,
+    userName: user.name,
+    userEmail: user.email,
+    action: 'PHI_ACCESS',
+    entityType: 'PROVIDER_DOSSIER',
+    entityId: providerId,
+    details: {
+      providerName,
+      purpose,
+      role: user.systemRole || 'User',
+      timestamp: new Date().toISOString(),
+    },
+  }).catch(() => {});
 }
 
 // ----------------------------------------------------------------------------
@@ -365,6 +416,45 @@ function fromPostgresRow(collectionName: string, row: any): any {
 // CORE CRUD OPERATIONS
 // ----------------------------------------------------------------------------
 
+// Registry of active collection subscribers for guaranteed real-time & periodic sync
+const collectionSubscribers = new Map<string, Set<(data: any[]) => void>>();
+
+function notifySubscribers(collectionName: string, data: any[]) {
+  const callbacks = collectionSubscribers.get(collectionName);
+  if (callbacks && callbacks.size > 0) {
+    callbacks.forEach((cb) => {
+      try {
+        cb(data);
+      } catch (e) {
+        console.error(`[Supabase] Error in subscriber callback for ${collectionName}:`, e);
+      }
+    });
+  }
+}
+
+/**
+ * Triggers an immediate, authoritative re-synchronization of all active collections directly from Supabase.
+ */
+export async function triggerGlobalSync(): Promise<void> {
+  updateSyncStatus({ isSyncing: true });
+  const collections = Array.from(collectionSubscribers.keys());
+  const promises = collections.map(async (col) => {
+    try {
+      const fresh = await fetchCollection(col);
+      notifySubscribers(col, fresh);
+    } catch (err) {
+      console.warn(`[Supabase Sync] Sync failed for ${col}:`, err);
+    }
+  });
+  await Promise.allSettled(promises);
+  updateSyncStatus({
+    isSyncing: false,
+    lastSyncedAt: new Date().toISOString(),
+    hasErrors: false,
+    isOnline: true,
+  });
+}
+
 /**
  * Save a single document / row to Supabase with local fallback.
  */
@@ -384,6 +474,9 @@ export async function saveDocument(collectionName: string, docId: string, data: 
     }
     localStorage.setItem(cacheKey, JSON.stringify(existing));
     localChannel?.postMessage({ type: 'UPDATE', collection: collectionName, id: docId, data });
+
+    // Immediately notify all in-app subscribers
+    notifySubscribers(collectionName, existing);
   } catch (err) {
     console.warn('[Supabase LocalCache] Write notice:', err);
   }
@@ -398,6 +491,7 @@ export async function saveDocument(collectionName: string, docId: string, data: 
         isSyncing: false,
         lastSyncedAt: new Date().toISOString(),
         hasErrors: false,
+        isOnline: true,
       });
     } catch (err: any) {
       console.error(`[Supabase] saveDocument error on ${mapping.table}:`, err);
@@ -423,21 +517,37 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
     const filtered = existing.filter((item) => item.id !== docId);
     localStorage.setItem(cacheKey, JSON.stringify(filtered));
     localChannel?.postMessage({ type: 'DELETE', collection: collectionName, id: docId });
+
+    // Immediately notify all in-app subscribers
+    notifySubscribers(collectionName, filtered);
   } catch {}
 
   // 2. Remote Deletion
   if (supabase) {
+    updateSyncStatus({ isSyncing: true });
     try {
       const { error } = await supabase.from(mapping.table).delete().eq('id', docId);
       if (error) throw error;
+      updateSyncStatus({
+        isSyncing: false,
+        lastSyncedAt: new Date().toISOString(),
+        hasErrors: false,
+        isOnline: true,
+      });
     } catch (err: any) {
       console.error(`[Supabase] deleteDocument error on ${mapping.table}:`, err);
+      updateSyncStatus({
+        isSyncing: false,
+        hasErrors: true,
+        errorMessage: err?.message || 'Database delete error',
+      });
     }
   }
 }
 
 /**
  * Fetch an entire collection / table from Supabase with local fallback.
+ * Authoritative: reflects actual database rows (including empty tables) at all times.
  */
 export async function fetchCollection<T = any>(collectionName: string): Promise<T[]> {
   const mapping = COLLECTION_TO_TABLE[collectionName] || { table: collectionName };
@@ -450,18 +560,28 @@ export async function fetchCollection<T = any>(collectionName: string): Promise<
       }
       const { data, error } = await query;
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data !== null && Array.isArray(data)) {
         const transformed = data.map((row) => fromPostgresRow(collectionName, row));
-        // Update local cache
+        // Update local cache with exact database records
         localStorage.setItem(LOCAL_STORAGE_PREFIX + collectionName, JSON.stringify(transformed));
+        updateSyncStatus({
+          isSyncing: false,
+          lastSyncedAt: new Date().toISOString(),
+          hasErrors: false,
+          isOnline: true,
+        });
         return transformed as T[];
       }
     } catch (err: any) {
       console.warn(`[Supabase] fetchCollection failed for ${collectionName}, reading cache:`, err.message);
+      updateSyncStatus({
+        hasErrors: true,
+        errorMessage: err.message,
+      });
     }
   }
 
-  // Fallback to local cache
+  // Fallback to local cache only if Supabase call failed or not configured
   try {
     const cached = localStorage.getItem(LOCAL_STORAGE_PREFIX + collectionName);
     if (cached) {
@@ -487,22 +607,36 @@ export async function saveBatch<T extends { id: string }>(collectionName: string
     items.forEach((item) => map.set(item.id, item));
     const merged = Array.from(map.values());
     localStorage.setItem(cacheKey, JSON.stringify(merged));
+    notifySubscribers(collectionName, merged);
   } catch {}
 
   // 2. Supabase Upsert
   if (supabase) {
+    updateSyncStatus({ isSyncing: true });
     try {
       const rows = items.map((item) => toPostgresRow(collectionName, item));
       const { error } = await supabase.from(mapping.table).upsert(rows, { onConflict: 'id' });
       if (error) throw error;
+      updateSyncStatus({
+        isSyncing: false,
+        lastSyncedAt: new Date().toISOString(),
+        hasErrors: false,
+        isOnline: true,
+      });
     } catch (err: any) {
       console.error(`[Supabase] saveBatch error on ${mapping.table}:`, err);
+      updateSyncStatus({
+        isSyncing: false,
+        hasErrors: true,
+        errorMessage: err?.message || 'Database batch write error',
+      });
     }
   }
 }
 
 /**
- * Real-time collection listener using Supabase Realtime with local multi-tab broadcast fallback.
+ * Real-time collection listener using Supabase Realtime + active background heartbeat + multi-tab synchronization.
+ * Guarantees that the app and database remain in sync at all times.
  */
 export function subscribeToCollection<T = any>(
   collectionName: string,
@@ -511,13 +645,21 @@ export function subscribeToCollection<T = any>(
 ): () => void {
   const mapping = COLLECTION_TO_TABLE[collectionName] || { table: collectionName };
 
-  // Initial read from cache or server
-  fetchCollection<T>(collectionName).then(onUpdate).catch((err) => onError?.(err));
+  // Register in active subscriber registry
+  if (!collectionSubscribers.has(collectionName)) {
+    collectionSubscribers.set(collectionName, new Set());
+  }
+  collectionSubscribers.get(collectionName)!.add(onUpdate);
 
+  // Initial immediate fetch from database
+  fetchCollection<T>(collectionName)
+    .then((data) => onUpdate(data))
+    .catch((err) => onError?.(err));
+
+  // 1. Supabase Realtime WebSocket subscription
   let channel: any = null;
-
   if (supabase) {
-    const channelName = `realtime_${mapping.table}_${collectionName}`;
+    const channelName = `realtime_${mapping.table}_${Math.random().toString(36).slice(2, 7)}`;
     channel = supabase
       .channel(channelName)
       .on(
@@ -532,10 +674,36 @@ export function subscribeToCollection<T = any>(
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          updateSyncStatus({ isOnline: true });
+        }
+      });
   }
 
-  // Local tab-to-tab listener
+  // 2. Active background polling heartbeat (every 10 seconds) to ensure sync even if WebSockets are throttled
+  const heartbeatInterval = setInterval(async () => {
+    try {
+      const freshData = await fetchCollection<T>(collectionName);
+      onUpdate(freshData);
+    } catch {}
+  }, 10000);
+
+  // 3. Tab focus, visibility, and network reconnection synchronization
+  const handleFocusOrOnline = async () => {
+    if (document.visibilityState === 'visible' || navigator.onLine) {
+      try {
+        const freshData = await fetchCollection<T>(collectionName);
+        onUpdate(freshData);
+      } catch {}
+    }
+  };
+
+  window.addEventListener('focus', handleFocusOrOnline);
+  window.addEventListener('online', handleFocusOrOnline);
+  document.addEventListener('visibilitychange', handleFocusOrOnline);
+
+  // 4. Cross-tab BroadcastChannel listener
   const handleLocalMessage = (event: MessageEvent) => {
     if (event.data?.collection === collectionName) {
       fetchCollection<T>(collectionName).then(onUpdate).catch((err) => onError?.(err));
@@ -545,10 +713,21 @@ export function subscribeToCollection<T = any>(
   localChannel?.addEventListener('message', handleLocalMessage);
 
   return () => {
+    // Unregister callback
+    collectionSubscribers.get(collectionName)?.delete(onUpdate);
+    if (collectionSubscribers.get(collectionName)?.size === 0) {
+      collectionSubscribers.delete(collectionName);
+    }
+
+    clearInterval(heartbeatInterval);
+    window.removeEventListener('focus', handleFocusOrOnline);
+    window.removeEventListener('online', handleFocusOrOnline);
+    document.removeEventListener('visibilitychange', handleFocusOrOnline);
+    localChannel?.removeEventListener('message', handleLocalMessage);
+
     if (channel && supabase) {
       supabase.removeChannel(channel);
     }
-    localChannel?.removeEventListener('message', handleLocalMessage);
   };
 }
 

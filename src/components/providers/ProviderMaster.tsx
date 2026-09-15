@@ -44,6 +44,7 @@ import {
 
 import { ClinicalStaffComments } from './ClinicalStaffComments';
 import { ClinicalStaffDocuments } from './ClinicalStaffDocuments';
+import { maskTaxId } from '../../utils/entityValidation';
 import { ClinicalStaffReviewPage } from './ClinicalStaffReviewPage';
 
 interface ProviderMasterProps {
@@ -1087,7 +1088,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                                         <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                         <span>{entity?.dba || entity?.legalName || 'AGES Learning Solutions'}</span>
                                       </div>
-                                      <div className="text-[10px] text-slate-400 font-mono pl-5">EIN: {entity?.ein || '47-2891234'}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono pl-5">EIN: {maskTaxId(entity?.ein || '47-2891234')}</div>
                                     </td>
                                     <td className="px-3 py-2 font-medium text-slate-800">
                                       <div className="font-semibold text-sky-800">{payer?.name || 'Payer Network'}</div>
@@ -1185,7 +1186,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                           {entities.find(e => e.id === (activeProvider.primaryEntityId || activeProvider.entityIds[0]))?.legalName || activeProvider.groupAffiliation}
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono">
-                          EIN: {entities.find(e => e.id === (activeProvider.primaryEntityId || activeProvider.entityIds[0]))?.ein || '47-2891234'}
+                          EIN: {maskTaxId(entities.find(e => e.id === (activeProvider.primaryEntityId || activeProvider.entityIds[0]))?.ein || '47-2891234')}
                         </span>
                       </div>
 
@@ -2274,7 +2275,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                   <option value="">-- Select Practice Entity --</option>
                   {entities.map((entity) => (
                     <option key={entity.id} value={entity.id}>
-                      {entity.dba || entity.legalName} (EIN: {entity.ein})
+                      {entity.dba || entity.legalName} (EIN: {maskTaxId(entity.ein)})
                     </option>
                   ))}
                 </select>

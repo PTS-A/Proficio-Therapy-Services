@@ -179,3 +179,50 @@ export function validateCredentialingRecord(
 
   return issues;
 }
+
+/**
+ * Masks Tax ID / EIN (e.g. 12-3456789 -> **-***6789)
+ * HIPAA §164.514(b) Minimal Necessary PHI exposure
+ */
+export function maskTaxId(taxId?: string | null): string {
+  if (!taxId) return '—';
+  const clean = taxId.replace(/\D/g, '');
+  if (clean.length < 4) return '***';
+  const last4 = clean.slice(-4);
+  return `**-***${last4}`;
+}
+
+/**
+ * Masks SSN (e.g. 123-45-6789 -> ***-**-6789)
+ */
+export function maskSSN(ssn?: string | null): string {
+  if (!ssn) return '—';
+  const clean = ssn.replace(/\D/g, '');
+  if (clean.length < 4) return '***';
+  const last4 = clean.slice(-4);
+  return `***-**-${last4}`;
+}
+
+/**
+ * Validates a 10-digit National Provider Identifier (NPI) using the CMS Luhn-80840 algorithm
+ */
+export function validateNpiChecksum(npi: string): boolean {
+  const clean = (npi || '').trim();
+  if (!/^\d{10}$/.test(clean)) return false;
+
+  // CMS standard: prefix with 80840 (US Health Industry Numbering)
+  const full = '80840' + clean;
+  let sum = 0;
+  const parity = full.length % 2;
+
+  for (let i = 0; i < full.length; i++) {
+    let digit = parseInt(full[i], 10);
+    if (i % 2 === parity) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+  }
+
+  return sum % 10 === 0;
+}

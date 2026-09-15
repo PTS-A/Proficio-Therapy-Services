@@ -105,6 +105,10 @@ export function subscribeToSyncStatus(listener: (status: any) => void): () => vo
   return supabaseLib.subscribeToSyncStatus(listener);
 }
 
+export async function triggerGlobalSync(): Promise<void> {
+  return supabaseLib.triggerGlobalSync();
+}
+
 export async function ensureAuth(): Promise<void> {
   return supabaseLib.ensureAuth();
 }

@@ -265,18 +265,72 @@ export async function checkForPendingOAuth(): Promise<{
 }
 
 /**
- * Initiates Google authentication and 10-step employee access verification directly on the same page
+ * Initiates Google OAuth authentication via Supabase.
+ * Retrieves the OAuth URL with skipBrowserRedirect so callers can launch a popup or redirect safely.
  */
-export async function initiateGoogleSignIn(
-  emailOverride?: string
-): Promise<{ success: boolean; data?: VerificationResponse; error?: string }> {
-  // Use specified email, typed input, or default to Joel Reji (primary active corporate user)
-  const targetEmail = (emailOverride && emailOverride.trim()) || 'joel.reji@ageslearningsolutions.com';
-
-  const result = await verifyEmployeeWithServer(targetEmail);
-  if (!result.authorized) {
-    return { success: false, error: result.reason, data: result };
+export async function initiateGoogleSignIn(options?: {
+  preferPopup?: boolean;
+}): Promise<{ success: boolean; url?: string; popupOpened?: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Database and authentication service is not connected.' };
   }
-  return { success: true, data: result };
+
+  try {
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: true,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data?.url) {
+      if (options?.preferPopup) {
+        const popup = window.open(
+          data.url,
+          'google_oauth_popup',
+          'width=520,height=660,left=150,top=100,status=no,toolbar=no'
+        );
+        return { success: true, url: data.url, popupOpened: !!popup };
+      }
+      window.location.href = data.url;
+      return { success: true, url: data.url };
+    }
+
+    return { success: false, error: 'Unable to acquire authorization URL from Google.' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Google OAuth failed to initialize' };
+  }
+}
+
+/**
+ * Authenticates directly with the authoritative 10-step Employee Access Control backend
+ * for an approved corporate identity (e.g. Joel Reji).
+ */
+export async function authenticateCorporateGoogleUser(
+  email: string = 'joel.reji@ageslearningsolutions.com'
+): Promise<{ success: boolean; account?: AppAccount; error?: string; step?: number; stepName?: string }> {
+  const result = await verifyEmployeeWithServer(email);
+  if (!result.authorized || !result.account) {
+    return {
+      success: false,
+      error: result.reason || 'Access Denied: Employee Access Control validation failed.',
+      step: result.step,
+      stepName: result.stepName,
+    };
+  }
+  return {
+    success: true,
+    account: result.account,
+  };
 }
 

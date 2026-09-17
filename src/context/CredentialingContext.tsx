@@ -1843,6 +1843,39 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         isSuperAdmin: details.systemRole === 'System Administrator',
       });
 
+      // Update employee roster locally and in Supabase
+      const names = details.fullName.trim().split(' ');
+      const firstName = details.firstName || names[0] || 'Employee';
+      const lastName = details.lastName || (names.length > 1 ? names.slice(1).join(' ') : 'Staff');
+      const empId = resData.employeeId || `emp-${details.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+      const newEmployee: Employee = {
+        id: empId,
+        firstName,
+        lastName,
+        fullName: details.fullName.trim(),
+        email: details.email.trim().toLowerCase(),
+        phone: details.phone,
+        department: details.department,
+        roleTitle: details.roleTitle || details.systemRole,
+        employmentStatus: 'Full-Time',
+        startDate: new Date().toISOString().split('T')[0],
+        entityId: details.entityId,
+        officeLocationId: details.locationId,
+        notes: `Access Level: ${details.accessLevel} | System Role: ${details.systemRole} | Disciplines: ${(details.assignedDisciplines || []).join(', ')}`,
+        isDemo: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setEmployees((prev) => {
+        const filtered = prev.filter((e) => e.id !== empId && e.email?.toLowerCase() !== details.email.toLowerCase());
+        const updated = [newEmployee, ...filtered];
+        localStorage.setItem('cred_employees', JSON.stringify(updated));
+        return updated;
+      });
+      saveDocument('employees', empId, newEmployee).catch(console.error);
+
       // Update local access request state
       setAccessRequests((prev) => {
         const updated = prev.map((r) =>
@@ -1865,6 +1898,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         localStorage.setItem('cred_access_requests', JSON.stringify(updated));
         return updated;
       });
+
+      // Trigger global sync with Supabase
+      triggerGlobalSync().catch(console.error);
 
       return { success: true, account: accResult.account };
     } catch (err: any) {
@@ -2492,6 +2528,30 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       isRead: false,
     };
     setNotifications((prev) => [approvalNotif, ...prev]);
+    saveDocument('notifications', approvalNotif.id, approvalNotif).catch(console.error);
+
+    // 5. Explicitly log audit trail to Supabase audit_logs
+    logAuditEvent({
+      userEmail: currentUser.email || currentAccount?.email || 'admin@example.com',
+      userName: currentUser.name || currentAccount?.name || 'Administrator',
+      action: 'APPROVE',
+      entityType: 'credentialing_records',
+      entityId: record.id,
+      details: {
+        stage: finalStage,
+        approvalDate: appDate,
+        effectiveDate: effDate,
+        linkingStatus: isAutoLink ? 'Linked' : 'Pending Approval',
+        referenceNumber: options?.referenceNumber,
+        notes: options?.notes,
+        payerName: payer?.name,
+        discipline: record.discipline,
+        approvedAt: new Date().toISOString(),
+      },
+    }).catch(console.error);
+
+    // 6. Automatically sync state to Supabase
+    triggerGlobalSync().catch(console.error);
 
     return { success: true };
   };

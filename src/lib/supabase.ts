@@ -213,9 +213,15 @@ function updateSyncStatus(updates: Partial<SyncStatus>) {
 // AUDIT LOGGING SERVICE (HIPAA §164.312(b) & ISO/IEC 27001:2022 A.8.15)
 // ----------------------------------------------------------------------------
 export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
-  const auditRecord = {
+  const auditRecord: any = {
     ...entry,
-    created_at: new Date().toISOString(),
+    actor_email: entry.actor_email || entry.userEmail || 'system@proficio.com',
+    action: entry.action,
+    table_name: entry.table_name || entry.entityType || 'general',
+    record_id: entry.record_id || entry.entityId || null,
+    old_values: entry.old_values || null,
+    new_values: entry.new_values || entry.details || null,
+    created_at: entry.created_at || new Date().toISOString(),
   };
 
   // 1. Dispatch to server-side audit ingest route for tamper-proof persistence
@@ -230,7 +236,18 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
   // 2. Insert into primary Supabase PostgreSQL database
   if (supabase) {
     try {
-      await supabase.from('audit_logs').insert([auditRecord]);
+      const isUuid = entry.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.id);
+      const dbRow: any = {
+        actor_email: auditRecord.actor_email,
+        action: auditRecord.action,
+        table_name: auditRecord.table_name,
+        record_id: auditRecord.record_id,
+        old_values: auditRecord.old_values,
+        new_values: auditRecord.new_values,
+        created_at: auditRecord.created_at,
+      };
+      if (isUuid) dbRow.id = entry.id;
+      await supabase.from('audit_logs').insert([dbRow]);
     } catch (err) {
       console.warn('[Supabase Audit] Failed to write audit log to database:', err);
     }
@@ -550,6 +567,75 @@ export async function saveDocument(collectionName: string, docId: string, data: 
   if (supabase) {
     updateSyncStatus({ isSyncing: true });
     try {
+      // If saving a credentialing record, ensure foreign key references exist in Supabase first
+      if (mapping.table === 'credentialing_records') {
+        // 1. Ensure provider exists
+        if (payload.provider_id) {
+          try {
+            const { data: provExists } = await supabase.from('providers').select('id').eq('id', payload.provider_id).maybeSingle();
+            if (!provExists) {
+              let cachedProvider: any = null;
+              try {
+                const list: any[] = JSON.parse(localStorage.getItem('cred_providers') || '[]');
+                cachedProvider = list.find((p) => p.id === payload.provider_id);
+              } catch {}
+              await supabase.from('providers').upsert({
+                id: payload.provider_id,
+                first_name: cachedProvider?.firstName || 'Provider',
+                last_name: cachedProvider?.lastName || payload.provider_id,
+                email: cachedProvider?.email || null,
+                disciplines: cachedProvider?.disciplines || [payload.discipline || 'ABA'],
+                active: true,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'id' });
+            }
+          } catch (fkErr) {
+            console.warn('[Supabase] Auto-resolving provider dependency notice:', fkErr);
+          }
+        }
+
+        // 2. Ensure payer exists
+        if (payload.payer_id) {
+          try {
+            const { data: payerExists } = await supabase.from('payers').select('id').eq('id', payload.payer_id).maybeSingle();
+            if (!payerExists) {
+              await supabase.from('payers').upsert({
+                id: payload.payer_id,
+                name: payload.payer_id,
+                active: true,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'id' });
+            }
+          } catch (fkErr) {
+            console.warn('[Supabase] Auto-resolving payer dependency notice:', fkErr);
+          }
+        }
+
+        // 3. Ensure entity exists
+        if (payload.entity_id) {
+          try {
+            const { data: entityExists } = await supabase.from('entities').select('id').eq('id', payload.entity_id).maybeSingle();
+            if (!entityExists) {
+              payload.entity_id = null;
+            }
+          } catch {
+            payload.entity_id = null;
+          }
+        }
+
+        // 4. Ensure location exists
+        if (payload.location_id) {
+          try {
+            const { data: locExists } = await supabase.from('locations').select('id').eq('id', payload.location_id).maybeSingle();
+            if (!locExists) {
+              payload.location_id = null;
+            }
+          } catch {
+            payload.location_id = null;
+          }
+        }
+      }
+
       const { error } = await supabase.from(mapping.table).upsert(payload, { onConflict: 'id' });
       if (error) throw error;
       updateSyncStatus({

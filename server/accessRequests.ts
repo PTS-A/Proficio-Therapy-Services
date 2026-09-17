@@ -45,10 +45,11 @@ export interface BasicOnboardingDetails {
 let inMemoryRequests: ServerAccessRequest[] = [];
 
 function getSupabaseClient(): SupabaseClient | null {
-  const url = process.env.VITE_SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!key) return null;
-  return createClient(url, key);
+  const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';
+  const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!cleanUrl || !key) return null;
+  return createClient(cleanUrl, key);
 }
 
 export async function fetchAllAccessRequests(): Promise<ServerAccessRequest[]> {
@@ -229,6 +230,41 @@ export async function approveAndOnboardAccessRequest(
 
     if (userError) {
       console.error('[AccessRequests] Failed to upsert user record:', userError);
+    }
+
+    // 3. Insert immutable audit trail entry in Supabase audit_logs
+    try {
+      await sb.from('audit_logs').insert({
+        actor_email: details.reviewedBy || 'Super Administrator',
+        action: 'APPROVE',
+        table_name: 'users',
+        record_id: userId,
+        new_values: {
+          email: cleanEmail,
+          fullName: cleanName,
+          systemRole: details.systemRole,
+          accessLevel: details.accessLevel,
+          department: details.department,
+          employeeId: empId,
+          approvedAt: new Date().toISOString(),
+        },
+      });
+    } catch (auditErr) {
+      console.warn('[AccessRequests] Audit log notice:', auditErr);
+    }
+
+    // 4. Insert notification into Supabase system_notifications
+    try {
+      await sb.from('system_notifications').insert({
+        type: 'ACCESS_REQUEST_APPROVED',
+        title: `Access Request Approved: ${cleanName}`,
+        message: `${cleanName} (${cleanEmail}) was approved and onboarded as ${details.systemRole} by ${details.reviewedBy || 'Super Administrator'}.`,
+        severity: 'info',
+        recipient_email: cleanEmail,
+        is_read: false,
+      });
+    } catch (notifErr) {
+      console.warn('[AccessRequests] Notification notice:', notifErr);
     }
   }
 

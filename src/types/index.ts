@@ -36,13 +36,82 @@ export interface AppAccount {
   assignedDisciplines?: Discipline[];
   assignedEntities?: string[];
   permissions?: string[];
-  status?: 'Active' | 'Inactive' | 'Pending Activation';
+  status?: 'Active' | 'Inactive' | 'Pending Activation' | 'Locked' | 'Emergency Lockdown';
   assignedLocations?: string[];
   authProvider?: 'google' | 'password';
   googleId?: string;
   mustChangePasswordOnFirstLogin?: boolean;
   hasChangedInitialPassword?: boolean;
   isSuperAdmin?: boolean;
+  // Multi-Factor Authentication (TOTP / RFC 6238)
+  mfaEnabled?: boolean;
+  mfaSecret?: string;
+  mfaEnrolledAt?: string;
+  mfaBackupCodes?: string[];
+  // Emergency Kill-Switch & Account Lockout
+  isEmergencyLocked?: boolean;
+  emergencyLockedAt?: string;
+  emergencyLockedReason?: string;
+}
+
+export interface SecurityIncident {
+  id: string;
+  title: string;
+  caseNumber: string;
+  dateDiscovered: string;
+  dateOccurred?: string;
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Investigating' | 'Risk Assessed' | 'Mitigated' | 'Reported to OCR' | 'Closed';
+  incidentType: 
+    | 'Unauthorized Access / Snooping' 
+    | 'Phishing / Credential Harvest' 
+    | 'Misdirected ePHI Transmission' 
+    | 'Lost / Stolen Unencrypted Device' 
+    | 'Malware / Ransomware Threat' 
+    | 'Abnormal Bulk Data Export' 
+    | 'Other Security Incident';
+  affectedSystems: string[];
+  recordsEstimated: number;
+  reportedBy: string;
+  leadInvestigator: string;
+  description: string;
+  containmentActions: string;
+  // HIPAA 4-Factor Risk Assessment (§164.402)
+  riskAssessment?: {
+    factor1NatureOfPHI: 'Low Risk (De-identified / Limited)' | 'Moderate Risk (Clinical only)' | 'High Risk (SSN / Financial / Sensitive PHI)';
+    factor2UnauthorizedRecipient: 'Trusted Entity (Covered Entity / BAA)' | 'Internal Employee Without Access' | 'External Unknown Third-Party' | 'Malicious Actor';
+    factor3ActualViewOrAcquisition: 'Demonstrably Not Viewed / Encrypted' | 'Likely Not Viewed' | 'Confirmed Acquired or Viewed';
+    factor4MitigationExtent: 'Immediate Complete Mitigation (Tokens revoked / Data wiped)' | 'Substantial Mitigation' | 'Minimal or Incomplete Mitigation';
+    conclusion: 'Low Probability of Compromise (Non-Breach)' | 'Breach Presumed (Notification Required)';
+    assessedBy: string;
+    assessedDate: string;
+  };
+  ocrReportRequired: boolean;
+  ocrReportedDate?: string;
+  ocrConfirmationNumber?: string;
+  individualNoticeSentDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplianceTelemetryStatus {
+  overallScore: number;
+  grade: 'A+' | 'A' | 'B' | 'C' | 'F';
+  lastScanTimestamp: string;
+  safeguardAudits: {
+    id: string;
+    cfrCitation: string;
+    title: string;
+    category: 'Administrative' | 'Physical' | 'Technical';
+    status: 'Compliant' | 'Enforced' | 'Warning' | 'Non-Compliant';
+    details: string;
+    verificationMethod: string;
+  }[];
+  activeSessionCount: number;
+  globalLockdownActive: boolean;
+  mfaEnforcementRate: number;
+  tlsStrictVerification: boolean;
+  failedAuthAttempts24h: number;
 }
 
 export interface User {

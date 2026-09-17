@@ -407,35 +407,18 @@ const DEFAULT_TEMPLATES: NotificationTemplate[] = [
 const CredentialingContext = createContext<CredentialingContextType | undefined>(undefined);
 
 export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts State - Ensure all 8 system role profiles exist
+  // Accounts State - Directly synchronized with Supabase users table
   const [accounts, setAccounts] = useState<AppAccount[]>(() => {
-    const saved = localStorage.getItem('cred_accounts');
-    if (saved) {
-      try {
-        const parsed: AppAccount[] = JSON.parse(saved);
-        let list = [...parsed];
-        
-        // Ensure all 8 system role profiles from INITIAL_ACCOUNTS are present
-        INITIAL_ACCOUNTS.forEach((initAcc) => {
-          const index = list.findIndex((a) => a.email.toLowerCase() === initAcc.email.toLowerCase());
-          if (index === -1) {
-            list.push(initAcc);
-          } else {
-            // Keep existing password/customizations but ensure role metadata & Super Admin flags
-            list[index] = {
-              ...initAcc,
-              ...list[index],
-              systemRole: list[index].systemRole || initAcc.systemRole,
-              isSuperAdmin: initAcc.isSuperAdmin ?? list[index].isSuperAdmin,
-            };
-          }
-        });
-        return list;
-      } catch (e) {
-        return INITIAL_ACCOUNTS;
+    try {
+      const saved = localStorage.getItem('pts_supabase_cache_users') || localStorage.getItem('cred_accounts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed as AppAccount[];
+        }
       }
-    }
-    return INITIAL_ACCOUNTS;
+    } catch (e) {}
+    return [];
   });
 
   // Session Timeout State (20 minutes inactivity)
@@ -490,34 +473,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [providers, setProviders] = useState<Provider[]>(() => {
-    const savedAccount = localStorage.getItem('cred_current_account');
-    let isAdminAccount = false;
     try {
-      if (savedAccount) {
-        isAdminAccount = JSON.parse(savedAccount)?.email?.toLowerCase() === 'admin@example.com';
+      const saved = localStorage.getItem('pts_supabase_cache_providers') || localStorage.getItem('cred_providers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-
-    if (isAdminAccount) {
-      const saved = localStorage.getItem('cred_demo_providers');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch {}
-      }
-      return [];
-    }
-
-    const saved = localStorage.getItem('cred_providers');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com');
-        }
-      } catch {}
-    }
     return [];
   });
 
@@ -549,12 +511,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const parsed: Location[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure new initial in-home locations are merged if missing
-          const existingIds = new Set(parsed.map((l) => l.id));
-          const missingInitials = INITIAL_LOCATIONS.filter((l) => !existingIds.has(l.id));
-          if (missingInitials.length > 0) {
-            return [...parsed, ...missingInitials];
-          }
           return parsed;
         }
       } catch (e) {}
@@ -563,101 +519,40 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [records, setRecords] = useState<CredentialingRecord[]>(() => {
-    const savedAccount = localStorage.getItem('cred_current_account');
-    let isAdminAccount = false;
     try {
-      if (savedAccount) {
-        isAdminAccount = JSON.parse(savedAccount)?.email?.toLowerCase() === 'admin@example.com';
+      const saved = localStorage.getItem('pts_supabase_cache_records') || localStorage.getItem('cred_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-
-    if (isAdminAccount) {
-      const saved = localStorage.getItem('cred_demo_records');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch {}
-      }
-      return [];
-    }
-
-    const saved = localStorage.getItem('cred_records');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com');
-        }
-      } catch {}
-    }
     return [];
   });
 
-  // Dedicated Database Collections (Section 5)
+  // Dedicated Database Collections
   // Production Employees: Strictly real non-demo employees
   const [employees, setEmployees] = useState<Employee[]>(() => {
-    const saved = localStorage.getItem('cred_employees');
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem('pts_supabase_cache_employees') || localStorage.getItem('cred_employees');
+      if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((e: any) => !isDemoEmployee(e));
-        }
-      } catch (e) {}
-    }
-    return INITIAL_EMPLOYEES;
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
   });
 
   // Isolated Demo Employees: Clean by default
-  const [demoEmployees, setDemoEmployees] = useState<Employee[]>(() => {
-    const savedAccount = localStorage.getItem('cred_current_account');
-    if (savedAccount) {
-      try {
-        const acc = JSON.parse(savedAccount);
-        if (acc?.email?.toLowerCase() === 'admin@example.com') {
-          const savedDemo = localStorage.getItem('cred_demo_employees_admin');
-          if (savedDemo) {
-            const parsedDemo = JSON.parse(savedDemo);
-            if (Array.isArray(parsedDemo) && parsedDemo.length > 0) {
-              return parsedDemo.filter((e: any) => !isDemoEmployee(e));
-            }
-          }
-        }
-      } catch (e) {}
-    }
-    return [];
-  });
+  const [demoEmployees, setDemoEmployees] = useState<Employee[]>([]);
 
   const [clinicalStaff, setClinicalStaff] = useState<ClinicalStaff[]>(() => {
-    const savedAccount = localStorage.getItem('cred_current_account');
-    let isAdminAccount = false;
     try {
-      if (savedAccount) {
-        isAdminAccount = JSON.parse(savedAccount)?.email?.toLowerCase() === 'admin@example.com';
-      }
-    } catch {}
-
-    if (isAdminAccount) {
-      const saved = localStorage.getItem('cred_demo_clinical_staff');
+      const saved = localStorage.getItem('pts_supabase_cache_clinical_staff') || localStorage.getItem('cred_clinical_staff');
       if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch {}
-      }
-      return [];
-    }
-
-    const saved = localStorage.getItem('cred_clinical_staff');
-    if (saved) {
-      try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com');
-        }
-      } catch (e) {}
-    }
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
     return [];
   });
 
@@ -683,20 +578,33 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     return [];
   });
 
-  const [users] = useState<User[]>(INITIAL_USERS);
+  const users: User[] = useMemo(() => {
+    return accounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      role: a.accessLevel === 'ADMINISTRATOR' || a.systemRole === 'System Administrator' ? 'Admin' : 'Specialist',
+      accessLevel: a.accessLevel,
+    }));
+  }, [accounts]);
+
   const [currentUser, setCurrentUser] = useState<User>(() => {
     if (currentAccount) {
-      const match = INITIAL_USERS.find((u) => u.email.toLowerCase() === currentAccount.email.toLowerCase());
-      if (match) return match;
       return {
         id: currentAccount.id,
         name: currentAccount.name,
         email: currentAccount.email,
-        role: currentAccount.accessLevel === 'ADMINISTRATOR' ? 'Admin' : 'Specialist',
+        role: currentAccount.accessLevel === 'ADMINISTRATOR' || currentAccount.systemRole === 'System Administrator' ? 'Admin' : 'Specialist',
         accessLevel: currentAccount.accessLevel,
       };
     }
-    return INITIAL_USERS[0];
+    return {
+      id: 'acc-admin-clean',
+      name: 'Administrator',
+      email: 'admin@example.com',
+      role: 'Admin',
+      accessLevel: 'ADMINISTRATOR',
+    };
   });
 
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
@@ -805,16 +713,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      // Fetch all collections in parallel from Google Cloud Firestore
-      const savedAccountStr = localStorage.getItem('cred_current_account');
-      let isSystemAdminSession = false;
-      try {
-        if (savedAccountStr) {
-          const parsed = JSON.parse(savedAccountStr);
-          isSystemAdminSession = parsed?.systemRole === 'System Administrator' || parsed?.isSuperAdmin === true;
-        }
-      } catch {}
-
+      // Fetch all collections in parallel from Supabase
       const [
         cloudAccounts,
         cloudProviders,
@@ -828,10 +727,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         cloudClinicalStaff,
         cloudDocuments,
         cloudComments,
-        cloudDemoEmployees,
-        cloudDemoProviders,
-        cloudDemoRecords,
-        cloudDemoClinicalStaff,
         cloudConfigs,
       ] = await Promise.all([
         fetchCollection<AppAccount>('users').catch(() => []),
@@ -846,49 +741,29 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         fetchCollection<ClinicalStaff>('clinical_staff').catch(() => []),
         fetchCollection<ApplicationDocument>('documents').catch(() => []),
         fetchCollection<ApplicationComment>('comments').catch(() => []),
-        isSystemAdminSession ? fetchCollection<Employee>('demo_employees').catch(() => []) : Promise.resolve([]),
-        isSystemAdminSession ? fetchCollection<Provider>('demo_providers').catch(() => []) : Promise.resolve([]),
-        isSystemAdminSession ? fetchCollection<CredentialingRecord>('demo_records').catch(() => []) : Promise.resolve([]),
-        isSystemAdminSession ? fetchCollection<ClinicalStaff>('demo_clinical_staff').catch(() => []) : Promise.resolve([]),
         fetchCollection<any>('system_config').catch(() => []),
       ]);
 
-      // Seed if empty or populate state
-      if (!cloudAccounts || cloudAccounts.length === 0) {
-        console.log('[Cloud Database] Seeding initial users to Google Cloud Firestore...');
-        await saveBatch('users', INITIAL_ACCOUNTS);
-        setAccounts(INITIAL_ACCOUNTS);
-      } else {
-        let merged = [...cloudAccounts];
-        INITIAL_ACCOUNTS.forEach((initAcc) => {
-          const idx = merged.findIndex((a) => a.email.toLowerCase() === initAcc.email.toLowerCase());
-          if (idx === -1) {
-            merged.push(initAcc);
-            saveDocument('users', initAcc.id, initAcc).catch(console.error);
-          }
-        });
-        setAccounts(merged);
+      // Populate state directly from Supabase (Single Source of Truth)
+      const usersList = cloudAccounts || [];
+      setAccounts(usersList);
+
+      // Synchronize current logged-in account permissions and role directly with the database
+      if (currentAccount) {
+        const fresh = usersList.find(
+          (a) => a.email?.toLowerCase().trim() === currentAccount.email?.toLowerCase().trim() || a.id === currentAccount.id
+        );
+        if (fresh) {
+          setCurrentAccount(fresh);
+          localStorage.setItem('cred_current_account', JSON.stringify(fresh));
+        }
       }
 
-      if (isSystemAdminSession) {
-        // Admin account: clean database state, no fake records
-        setProviders(cloudDemoProviders || []);
-        setRecords(cloudDemoRecords || []);
-        setClinicalStaff(cloudDemoClinicalStaff || []);
-        setDemoEmployees(cloudDemoEmployees || []);
-      } else {
-        // Normal accounts: Strictly clean production datasets. NEVER seed demo data.
-        const cleanProviders = (cloudProviders || []).filter((p: any) => !p.isDemo && p.ownerAccountEmail !== 'admin@example.com');
-        setProviders(cleanProviders);
-
-        const cleanRecords = (cloudRecords || []).filter((r: any) => !r.isDemo && r.ownerAccountEmail !== 'admin@example.com');
-        setRecords(cleanRecords);
-
-        const cleanStaff = (cloudClinicalStaff || []).filter((cs: any) => !cs.isDemo && cs.ownerAccountEmail !== 'admin@example.com');
-        setClinicalStaff(cleanStaff);
-
-        setDemoEmployees([]);
-      }
+      setProviders(cloudProviders || []);
+      setRecords(cloudRecords || []);
+      setClinicalStaff(cloudClinicalStaff || []);
+      setEmployees(cloudEmployees || []);
+      setDemoEmployees([]);
 
       if (!cloudPayers || cloudPayers.length === 0) {
         await saveBatch('payers', INITIAL_PAYERS);
@@ -923,10 +798,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       } else {
         setStageConfigs(cloudStages.sort((a, b) => a.order - b.order));
       }
-
-      // Sanitize production employees: strictly real employees, never demo records
-      const sanitizedProductionEmployees = (cloudEmployees || []).filter((e) => !isDemoEmployee(e));
-      setEmployees(sanitizedProductionEmployees);
 
       setDocumentsList(cloudDocuments || []);
       setCommentsList(cloudComments || []);
@@ -963,9 +834,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       setCloudSyncStatus('synced');
-      console.log('[Cloud Database] Hydration complete. Automatic real-time database synchronization active.');
+      console.log('[Supabase Database] Hydration complete. Real-time database synchronization active.');
     } catch (err) {
-      console.error('[Cloud Database] Error syncing from Firestore:', err);
+      console.error('[Supabase Database] Error syncing from Supabase:', err);
       setCloudSyncStatus('offline');
     }
   };
@@ -976,13 +847,19 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     unsubs.push(
       subscribeToCollection<AppAccount>('users', (cloudUsers) => {
-        if (cloudUsers && cloudUsers.length > 0) {
-          setAccounts((prev) => {
-            const map = new Map(prev.map((a) => [a.id, a]));
-            cloudUsers.forEach((u) => map.set(u.id, u));
-            return Array.from(map.values());
-          });
-        }
+        const usersList = cloudUsers || [];
+        setAccounts(usersList);
+        setCurrentAccount((curr) => {
+          if (!curr) return null;
+          const fresh = usersList.find(
+            (u) => u.id === curr.id || u.email?.toLowerCase().trim() === curr.email?.toLowerCase().trim()
+          );
+          if (fresh) {
+            localStorage.setItem('cred_current_account', JSON.stringify(fresh));
+            return fresh;
+          }
+          return curr;
+        });
       })
     );
 
@@ -1032,7 +909,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     unsubs.push(
       subscribeToCollection<Employee>('employees', (cloudEmployees) => {
-        setEmployees((cloudEmployees || []).filter((e) => !isDemoEmployee(e)));
+        setEmployees(cloudEmployees || []);
       })
     );
 
@@ -1154,15 +1031,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [notifications]);
 
   useEffect(() => {
-    const realEmployeesOnly = employees.filter((e) => !isDemoEmployee(e));
-    localStorage.setItem('cred_employees', JSON.stringify(realEmployeesOnly));
+    localStorage.setItem('cred_employees', JSON.stringify(employees));
   }, [employees]);
-
-  useEffect(() => {
-    if (currentAccount?.email?.toLowerCase() === 'admin@example.com') {
-      localStorage.setItem('cred_demo_employees_admin', JSON.stringify(demoEmployees));
-    }
-  }, [demoEmployees, currentAccount]);
 
   useEffect(() => {
     localStorage.setItem('cred_clinical_staff', JSON.stringify(clinicalStaff));
@@ -1179,20 +1049,15 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   // Sync currentUser with currentAccount changes
   useEffect(() => {
     if (currentAccount) {
-      const match = users.find((u) => u.email.toLowerCase() === currentAccount.email.toLowerCase());
-      if (match) {
-        setCurrentUser({ ...match, accessLevel: currentAccount.accessLevel });
-      } else {
-        setCurrentUser({
-          id: currentAccount.id,
-          name: currentAccount.name,
-          email: currentAccount.email,
-          role: currentAccount.accessLevel === 'ADMINISTRATOR' ? 'Admin' : 'Specialist',
-          accessLevel: currentAccount.accessLevel,
-        });
-      }
+      setCurrentUser({
+        id: currentAccount.id,
+        name: currentAccount.name,
+        email: currentAccount.email,
+        role: currentAccount.accessLevel === 'ADMINISTRATOR' || currentAccount.systemRole === 'System Administrator' ? 'Admin' : 'Specialist',
+        accessLevel: currentAccount.accessLevel,
+      });
     }
-  }, [currentAccount, users]);
+  }, [currentAccount]);
 
   // Automated overdue & SLA checker run on mount and records update
   useEffect(() => {
@@ -1665,30 +1530,45 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const updateAccount = (id: string, updates: Partial<AppAccount>) => {
-    setAccounts((prev) =>
-      prev.map((a) => {
+    setAccounts((prev) => {
+      const next = prev.map((a) => {
         if (a.id === id) {
-          const updated = { ...a, ...updates };
-          if (currentAccount && currentAccount.id === id) {
+          const isElevating =
+            updates.accessLevel === 'ADMINISTRATOR' ||
+            updates.systemRole === 'System Administrator' ||
+            updates.isSuperAdmin === true;
+
+          const updated: AppAccount = {
+            ...a,
+            ...updates,
+            ...(isElevating ? { isSuperAdmin: true, accessLevel: 'ADMINISTRATOR' as const } : {}),
+          };
+
+          if (currentAccount && (currentAccount.id === id || currentAccount.email.toLowerCase() === updated.email.toLowerCase())) {
             setCurrentAccount(updated);
+            localStorage.setItem('cred_current_account', JSON.stringify(updated));
           }
           saveDocument('users', id, updated).catch(console.error);
           return updated;
         }
         return a;
-      })
-    );
+      });
+      localStorage.setItem('cred_accounts', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_users', JSON.stringify(next));
+      return next;
+    });
   };
 
   const deleteAccount = (id: string): { success: boolean; error?: string } => {
-    const accToDelete = accounts.find((a) => a.id === id);
-    if (accToDelete?.systemRole === 'System Administrator' || accToDelete?.isSuperAdmin) {
-      return { success: false, error: 'Primary system administrator accounts cannot be deleted.' };
-    }
     if (currentAccount?.id === id) {
       return { success: false, error: 'Cannot delete the account currently logged in.' };
     }
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
+    setAccounts((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      localStorage.setItem('cred_accounts', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_users', JSON.stringify(next));
+      return next;
+    });
     deleteDocument('users', id).catch(console.error);
     return { success: true };
   };
@@ -2181,7 +2061,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteRecord = (id: string): { success: boolean; error?: string } => {
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+    setRecords((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      localStorage.setItem('cred_records', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_records', JSON.stringify(next));
+      return next;
+    });
     deleteDocument('records', id).catch(console.error);
     if (selectedRecordId === id) {
       setSelectedRecordId(null);
@@ -2715,7 +2600,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteProvider = (id: string) => {
-    setProviders((prev) => prev.filter((p) => p.id !== id));
+    setProviders((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      localStorage.setItem('cred_providers', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_providers', JSON.stringify(next));
+      return next;
+    });
     deleteDocument('providers', id).catch(console.error);
   };
 
@@ -3362,29 +3252,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem('cred_accounts');
     localStorage.removeItem('cred_stage_configs');
     localStorage.removeItem('cred_employees');
-    setStageConfigs(DEFAULT_STAGE_CONFIGS);
-    setProviders(INITIAL_PROVIDERS);
-    setPayers(INITIAL_PAYERS);
-    setEntities(INITIAL_LEGAL_ENTITIES);
-    setLocations(INITIAL_LOCATIONS);
-    setRecords(INITIAL_CREDENTIALING_RECORDS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    setAccounts(INITIAL_ACCOUNTS);
-    setCurrentAccount(INITIAL_ACCOUNTS[0]);
-    setEmployees(INITIAL_EMPLOYEES);
-    setDemoEmployees(DEMO_EMPLOYEES);
+    localStorage.removeItem('cred_clinical_staff');
+    localStorage.removeItem('cred_documents');
+    localStorage.removeItem('cred_comments');
+    localStorage.removeItem('pts_supabase_cache_users');
+    localStorage.removeItem('pts_supabase_cache_providers');
+    localStorage.removeItem('pts_supabase_cache_records');
+    localStorage.removeItem('pts_supabase_cache_employees');
+    localStorage.removeItem('pts_supabase_cache_clinical_staff');
 
-    // Reseed Cloud Database
-    saveBatch('providers', INITIAL_PROVIDERS).catch(console.error);
-    saveBatch('payers', INITIAL_PAYERS).catch(console.error);
-    saveBatch('entities', INITIAL_LEGAL_ENTITIES).catch(console.error);
-    saveBatch('locations', INITIAL_LOCATIONS).catch(console.error);
-    saveBatch('records', INITIAL_CREDENTIALING_RECORDS).catch(console.error);
-    saveBatch('notifications', INITIAL_NOTIFICATIONS).catch(console.error);
-    saveBatch('users', INITIAL_ACCOUNTS).catch(console.error);
-    saveBatch('stage_configs', DEFAULT_STAGE_CONFIGS).catch(console.error);
-    saveBatch('employees', INITIAL_EMPLOYEES).catch(console.error);
-    saveBatch('demo_employees', DEMO_EMPLOYEES).catch(console.error);
+    refreshFromCloud().catch(console.error);
   };
 
   const importBulkData = (
@@ -3456,46 +3333,33 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   // Dedicated Database Collections CRUD & Operations (Section 5)
   const addEmployee = (empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Employee => {
     const id = `emp-${Date.now()}`;
-    const isAdmin = currentAccount?.email?.toLowerCase() === 'admin@example.com';
-    const isDemo = isAdmin && (empData.isDemo === true || isDemoEmployee(empData as any));
     const newEmp: Employee = {
       ...empData,
       id,
-      isDemo: isDemo || false,
-      ownerAccountEmail: isDemo ? 'admin@example.com' : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    if (isDemo && isAdmin) {
-      setDemoEmployees((prev) => [newEmp, ...prev]);
-      saveDocument('demo_employees', id, newEmp).catch(console.error);
-    } else {
-      setEmployees((prev) => [newEmp, ...prev]);
-      saveDocument('employees', id, newEmp).catch(console.error);
-    }
+    setEmployees((prev) => {
+      const next = [newEmp, ...prev];
+      localStorage.setItem('cred_employees', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_employees', JSON.stringify(next));
+      return next;
+    });
+    saveDocument('employees', id, newEmp).catch(console.error);
     return newEmp;
   };
 
   const updateEmployee = (id: string, updates: Partial<Employee>) => {
-    const isAdmin = currentAccount?.email?.toLowerCase() === 'admin@example.com';
-    const isDemo = demoEmployees.some((e) => e.id === id);
-
-    if (isDemo && isAdmin) {
-      setDemoEmployees((prev) =>
-        prev.map((emp) =>
-          emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
-        )
+    setEmployees((prev) => {
+      const next = prev.map((emp) =>
+        emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
       );
-      saveDocument('demo_employees', id, updates).catch(console.error);
-    } else {
-      setEmployees((prev) =>
-        prev.map((emp) =>
-          emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
-        )
-      );
-      saveDocument('employees', id, updates).catch(console.error);
-    }
+      localStorage.setItem('cred_employees', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_employees', JSON.stringify(next));
+      return next;
+    });
+    saveDocument('employees', id, updates).catch(console.error);
   };
 
   const addClinicalStaff = (
@@ -3523,14 +3387,23 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteEmployee = (id: string) => {
-    setEmployees((prev) => prev.filter((e) => e.id !== id));
+    setEmployees((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      localStorage.setItem('cred_employees', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_employees', JSON.stringify(next));
+      return next;
+    });
     setDemoEmployees((prev) => prev.filter((e) => e.id !== id));
     deleteDocument('employees', id).catch(console.error);
-    deleteDocument('demo_employees', id).catch(console.error);
   };
 
   const deleteClinicalStaff = (id: string) => {
-    setClinicalStaff((prev) => prev.filter((s) => s.id !== id));
+    setClinicalStaff((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      localStorage.setItem('cred_clinical_staff', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_clinical_staff', JSON.stringify(next));
+      return next;
+    });
     deleteDocument('clinical_staff', id).catch(console.error);
   };
 
@@ -4019,15 +3892,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Enforce Demo Employee Data Separation:
-  // Visible employees for current account: Only admin@example.com has access to demo employees.
-  // All other accounts (and unauthenticated/new users) receive strictly real employees.
   const visibleEmployees = useMemo(() => {
-    const realEmployees = employees.filter((e) => !isDemoEmployee(e));
-    if (currentAccount?.email?.toLowerCase() === 'admin@example.com') {
-      return [...realEmployees, ...demoEmployees];
-    }
-    return realEmployees;
-  }, [employees, demoEmployees, currentAccount]);
+    return employees;
+  }, [employees]);
 
   return (
     <CredentialingContext.Provider

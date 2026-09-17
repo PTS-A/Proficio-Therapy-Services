@@ -708,6 +708,82 @@ async function generateReport() {
     row.height = 24;
   });
 
+  // ==========================================================================
+  // SHEET 9: VLayer_External_Audit_Findings (VLayer HIPAA Compliance Scanner)
+  // ==========================================================================
+  const wsVLayer = wb.addWorksheet('VLayer_External_Audit_Findings', { properties: { tabColor: { argb: 'FFDC2626' } } });
+  wsVLayer.views = [{ showGridLines: true }];
+  wsVLayer.columns = [
+    { width: 14 },
+    { width: 36 },
+    { width: 36 },
+    { width: 10 },
+    { width: 28 },
+    { width: 24 },
+    { width: 45 },
+  ];
+
+  const vlayerHead = wsVLayer.getRow(1);
+  vlayerHead.values = ['Severity', 'Finding Title', 'Source File', 'Line', 'HIPAA Reference CFR', 'Remediation Category', 'Status & Technical Implementation Notes'];
+  applyHeaderRow(vlayerHead, '991B1B');
+
+  const vlayerData = [
+    ['CRITICAL', 'Missing Immediate Access Revocation on User Deletion', 'src/components/admin/NewUserView.tsx', 799, '45 CFR §164.308(a)(3)(ii)(C) - Termination Procedures', 'Hardened & Implemented', 'Implemented mandatory popup requiring delete-user-[userid] with immediate token and session revocation.'],
+    ['CRITICAL', 'Encryption issue: TLS certificate validation disabled', 'server.ts', 282, '§164.312(e)(1) - Transmission Security', 'Direct Technical Fix', 'Enforced strict TLS certificate verification (ssl: { rejectUnauthorized: true }).'],
+    ['CRITICAL', 'Potential credentials in PostgreSQL connection URI', 'server.ts', 269, '§164.312(a)(1), §164.312(d)', 'Direct Technical Fix', 'Secured connection strings to read strictly from server environment secrets with URI parameter masking.'],
+    ['CRITICAL', 'Missing Multi-Factor Authentication for PHI Access', 'src/data/initialData.ts', 19, '45 CFR §164.312(a)(2)(i) - Access Control', 'Feature Addition', 'Requires SMS / TOTP Authenticator 2-Factor challenge on login flow. Pending user consent.'],
+    ['CRITICAL', 'Authentication Configuration Without MFA Enabled', 'server/accessRequests.ts', 1, 'NPRM §164.312(d) - Person Authentication', 'Feature Addition', 'MFA requirement on access request and approval endpoints. Pending user consent.'],
+    ['CRITICAL', 'Missing Breach Notification Mechanism', 'src/context/CredentialingContext.tsx', 1382, '45 CFR §164.308(a)(6)(ii) - Incident Procedures', 'Feature Addition', 'Requires automated incident reporting & 4-factor risk assessment dashboard. Pending user consent.'],
+    ['CRITICAL', 'Missing Breach Notification Mechanism', 'server.ts', 935, '45 CFR §164.308(a)(6)(ii) - Incident Procedures', 'Feature Addition', 'Requires automated notification dispatch to OCR & affected individuals upon breach. Pending user consent.'],
+    ['CRITICAL', 'Missing Immediate Access Revocation', 'server/authGate.ts', 462, '45 CFR §164.308(a)(3)(ii)(C) - Termination Procedures', 'Hardened & Implemented', 'Immediate session revocation API hooked into user deletion and role changes.'],
+    ['CRITICAL', 'MFA Bypass Detected in Code', 'src/lib/supabase.ts', 1014, 'NPRM §164.312(d) - Person Authentication', 'Feature Addition', 'Remove bypass fallback and mandate verified MFA challenge. Pending user consent.'],
+    ['CRITICAL', 'Bulk data deletion operation in seeds/migrations', 'supabase/clean_skeleton_purge.sql', 13, '§164.530(j) - Retention & Safeguards', 'Direct Technical Fix', 'Guarded migration operations with rollback checks and audit logging.'],
+    ['HIGH', 'Encryption issue: Unencrypted HTTP URL in server logs', 'server.ts', 1283, '§164.312(e)(1) - Transmission Security', 'Direct Technical Fix', 'Sanitized server listen logs to remove cleartext http:// protocol prefix.'],
+    ['HIGH', 'Missing Automatic Session Timeout', 'server.ts', 268, '45 CFR §164.312(a)(2)(iii) - Session Control', 'Hardened & Implemented', 'Enforced 20-minute client inactivity timeout with automatic logout and server token expiry.'],
+    ['HIGH', 'Authentication Routes Without Rate Limiting', 'server.ts', 380, '45 CFR §164.312(a)(1) - Access Control', 'Direct Technical Fix', 'Added IP sliding-window rate limiters across all authentication and migration routes.'],
+    ['HIGH', 'Login Flow Without Second Factor Authentication', 'src/components/auth/LoginPage.tsx', 121, 'NPRM §164.312(d) - Person Authentication', 'Feature Addition', 'Requires 2FA verification step in login UI. Pending user consent.'],
+    ['HIGH', 'Missing Vulnerability Scanning Configuration', 'project-level', 1, '45 CFR §164.308(a)(8) - Evaluation', 'Feature Addition', 'Requires automated in-app vulnerability scanner configuration. Pending user consent.'],
+    ['MEDIUM', 'JSON Body Parser Without Size Limit', 'server.ts', 261, '45 CFR §164.308(a)(1)(ii)(D) - System Security', 'Direct Technical Fix', 'Constrained express.json parser explicitly to { limit: "10mb" }.'],
+    ['MEDIUM', 'SELECT * on PHI Tables Violates Minimum Necessary', 'server.ts', 1065, '45 CFR §164.502(b) - Minimum Necessary', 'Direct Technical Fix', 'Replaced select(*) with explicit minimum necessary non-sensitive columns.'],
+    ['MEDIUM', 'SELECT * on PHI Tables Violates Minimum Necessary', 'server/automationEngine.ts', 264, '45 CFR §164.502(b) - Minimum Necessary', 'Direct Technical Fix', 'Restricted automation queries to explicit credentialing and provider fields.'],
+    ['MEDIUM', 'PHI read operation may lack audit logging', 'src/components/reports/ReportsView.tsx', 125, '§164.312(b) - Audit Controls', 'Hardened & Implemented', 'Integrated logDossierAccess() and centralized audit logging on PHI read views.'],
+    ['MEDIUM', 'Web Server Without Security Headers Middleware', 'server.ts', 6, 'NPRM Configuration Management', 'Direct Technical Fix', 'Enforced 6 security headers (Strict-Transport-Security, X-Content-Type-Options, CSP, X-Frame-Options).'],
+  ];
+
+  vlayerData.forEach((rowVal, idx) => {
+    const row = wsVLayer.getRow(2 + idx);
+    row.values = rowVal;
+    row.eachCell((cell, colNumber) => {
+      cell.font = { name: 'Segoe UI', size: 9 };
+      cell.border = defaultBorder;
+      cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 || colNumber === 4 ? 'center' : 'left', wrapText: true };
+      if (colNumber === 1) {
+        if (cell.value === 'CRITICAL') {
+          cell.font = { bold: true, color: { argb: 'FF' + CRIT_RED } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT_RED } };
+        } else if (cell.value === 'HIGH') {
+          cell.font = { bold: true, color: { argb: 'FF' + WARN_AMBER } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT_AMBER } };
+        } else if (cell.value === 'MEDIUM') {
+          cell.font = { bold: true, color: { argb: 'FF2563EB' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+        } else {
+          cell.font = { bold: true, color: { argb: 'FF64748B' } };
+        }
+      }
+      if (colNumber === 6) {
+        if (cell.value === 'Hardened & Implemented' || cell.value === 'Direct Technical Fix') {
+          cell.font = { bold: true, color: { argb: 'FF' + SUCCESS_GREEN } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT_GREEN } };
+        } else {
+          cell.font = { bold: true, color: { argb: 'FFD97706' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } };
+        }
+      }
+    });
+    row.height = 28;
+  });
+
   await wb.xlsx.writeFile(outputPath);
   console.log(`Report successfully written to ${outputPath} (${(fs.statSync(outputPath).size / 1024).toFixed(1)} KB)`);
 }

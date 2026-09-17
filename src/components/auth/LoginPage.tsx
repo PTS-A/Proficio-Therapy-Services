@@ -133,10 +133,10 @@ export const LoginPage: React.FC = () => {
     setShowProviderSetupHelp(false);
 
     try {
-      // Default to Joel Reji if no email is typed, or use typed/provided email
-      const targetEmail = (emailToUse || email.trim() || 'joel.reji@ageslearningsolutions.com').toLowerCase();
+      // Use typed or provided email if specified, otherwise initiate live OAuth flow
+      const targetEmail = (emailToUse || email.trim()).toLowerCase();
       
-      const res = await loginWithGoogle(targetEmail, 'popup');
+      const res = await loginWithGoogle(targetEmail || undefined, 'popup');
       setIsGoogleLoading(false);
 
       if (!res.success) {
@@ -446,36 +446,6 @@ export const LoginPage: React.FC = () => {
           <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400 pt-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>Secure Enterprise Authentication &bull; Supabase Database</span>
-          </div>
-
-          {/* Quick 1-Click Role Access */}
-          <div className="pt-2 border-t border-slate-100 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span className="font-semibold uppercase tracking-wider text-[10px]">Quick Access Testing</span>
-              <span>1-Click Sign In</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                id="quick-login-joel"
-                onClick={() => handleGoogleSignInClick('joel.reji@ageslearningsolutions.com')}
-                disabled={isGoogleLoading || isLoading}
-                className="p-2 text-left bg-slate-50 hover:bg-[#2B4C9D]/5 hover:border-[#2B4C9D]/30 border border-slate-200 rounded-xl transition-all cursor-pointer text-xs"
-              >
-                <div className="font-semibold text-slate-800 truncate">Joel Mathew Reji</div>
-                <div className="text-[10px] text-slate-500 truncate">Credentialing Specialist</div>
-              </button>
-              <button
-                type="button"
-                id="quick-login-superadmin"
-                onClick={() => handleGoogleSignInClick('admin@example.com')}
-                disabled={isGoogleLoading || isLoading}
-                className="p-2 text-left bg-slate-50 hover:bg-purple-50 hover:border-purple-300 border border-slate-200 rounded-xl transition-all cursor-pointer text-xs"
-              >
-                <div className="font-semibold text-purple-900 truncate">Super Administrator</div>
-                <div className="text-[10px] text-purple-600 truncate">Approve / Deny Access</div>
-              </button>
-            </div>
           </div>
 
           {/* Unregistered User Access Request Link */}

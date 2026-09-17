@@ -14,7 +14,8 @@ export type ActiveTabType =
   | 'import' 
   | 'settings'
   | 'automations'
-  | 'access-requests';
+  | 'access-requests'
+  | 'security-center';
 
 /**
  * Checks if the account is a Super Admin.
@@ -98,7 +99,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'import',
       'settings',
       'automations',
-      'access-requests'
+      'access-requests',
+      'security-center'
     ];
   }
 
@@ -180,7 +182,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
  */
 export const canAccessTab = (account: AppAccount | null | undefined, tab: ActiveTabType): boolean => {
   if (!account) return false;
-  if (tab === 'access-requests') return isSuperAdmin(account);
+  if (tab === 'access-requests' || tab === 'security-center') return isSuperAdmin(account);
   const allowed = getAllowedTabs(account);
   // Map synonyms like 'users' -> 'new-user'
   if (tab === 'users' && allowed.includes('new-user')) return true;

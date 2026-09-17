@@ -258,7 +258,7 @@ async function startServer() {
   });
 
   // Execute migration via direct Postgres connection if password or connection string is provided
-  app.post('/api/migration/apply', express.json(), async (req, res) => {
+  app.post('/api/migration/apply', express.json({ limit: '10mb' }), async (req, res) => {
     const { password, connectionString } = req.body || {};
     const dbPassword = password || process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD;
     const projectRef = 'uqaiotacheqjvfbanxtp';
@@ -279,7 +279,7 @@ async function startServer() {
 
     try {
       const { Client } = await import('pg');
-      const client = new Client({ connectionString: connStr, ssl: { rejectUnauthorized: false } });
+      const client = new Client({ connectionString: connStr, ssl: { rejectUnauthorized: true } });
       await client.connect();
 
       const sqlPath = path.join(process.cwd(), 'supabase/full_migration_and_seed.sql');
@@ -1062,7 +1062,7 @@ async function startServer() {
       const client = createClient(url, key);
       const { data, error } = await client
         .from('audit_logs')
-        .select('*')
+        .select('id, user_id, action, table_name, resource_id, changes, ip_address, user_agent, created_at')
         .eq('table_name', 'auth')
         .order('created_at', { ascending: false })
         .limit(25);
@@ -1280,7 +1280,7 @@ async function startServer() {
   }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT} (${isProduction ? 'production' : 'development'})`);
+    console.log(`Server listening securely on port ${PORT} (${isProduction ? 'production' : 'development'})`);
   });
 
   process.on('SIGTERM', () => {

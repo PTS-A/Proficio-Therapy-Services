@@ -140,8 +140,6 @@ export interface AuditLogEntry {
 // Map legacy collection names to Supabase tables and demo filters
 interface TableMapping {
   table: string;
-  isDemo?: boolean;
-  ownerEmail?: string;
 }
 
 const COLLECTION_TO_TABLE: Record<string, TableMapping> = {
@@ -149,14 +147,14 @@ const COLLECTION_TO_TABLE: Record<string, TableMapping> = {
   payers: { table: 'payers' },
   entities: { table: 'entities' },
   locations: { table: 'locations' },
-  employees: { table: 'employees', isDemo: false },
-  demo_employees: { table: 'employees', isDemo: true, ownerEmail: 'admin@example.com' },
-  clinical_staff: { table: 'clinical_staff', isDemo: false },
-  demo_clinical_staff: { table: 'clinical_staff', isDemo: true, ownerEmail: 'admin@example.com' },
-  providers: { table: 'providers', isDemo: false },
-  demo_providers: { table: 'providers', isDemo: true, ownerEmail: 'admin@example.com' },
-  records: { table: 'credentialing_records', isDemo: false },
-  demo_records: { table: 'credentialing_records', isDemo: true, ownerEmail: 'admin@example.com' },
+  employees: { table: 'employees' },
+  demo_employees: { table: 'employees' },
+  clinical_staff: { table: 'clinical_staff' },
+  demo_clinical_staff: { table: 'clinical_staff' },
+  providers: { table: 'providers' },
+  demo_providers: { table: 'providers' },
+  records: { table: 'credentialing_records' },
+  demo_records: { table: 'credentialing_records' },
   applications: { table: 'credentialing_records' },
   documents: { table: 'application_documents' },
   comments: { table: 'application_comments' },
@@ -428,18 +426,36 @@ function toPostgresRow(collectionName: string, item: any): any {
     mapped.id = item.id;
   }
 
-  // Tenant / Demo isolation flags
-  if (mapping.isDemo !== undefined && validCols.has('is_demo')) {
-    mapped.is_demo = mapping.isDemo;
-  }
-  if (mapping.ownerEmail && validCols.has('owner_email')) {
-    mapped.owner_email = mapping.ownerEmail;
-  }
-
-  // User and Employee name fallbacks
+  // User and Employee field mapping
   if (tableName === 'users') {
     if (item.name && !mapped.full_name) mapped.full_name = item.name;
-    if (item.email && !mapped.email) mapped.email = item.email;
+    if (item.name && !mapped.name) mapped.name = item.name;
+    if (item.email) mapped.email = item.email.toLowerCase().trim();
+    if (item.systemRole) {
+      mapped.system_role = item.systemRole;
+      mapped.role = item.systemRole;
+      if (!mapped.role_title) mapped.role_title = item.roleTitle || item.systemRole;
+    }
+    if (item.role && !mapped.system_role) {
+      mapped.system_role = item.role;
+      mapped.role = item.role;
+    }
+    if (item.roleTitle && !mapped.role_title) {
+      mapped.role_title = item.roleTitle;
+    }
+    if (item.accessLevel) {
+      mapped.access_level = item.accessLevel;
+    }
+    if (item.isSuperAdmin !== undefined) {
+      mapped.is_super_admin = item.isSuperAdmin;
+    } else if (item.accessLevel === 'ADMINISTRATOR' || item.systemRole === 'System Administrator') {
+      mapped.is_super_admin = true;
+    }
+    if (item.department) mapped.department = item.department;
+    if (item.assignedDisciplines) mapped.assigned_disciplines = item.assignedDisciplines;
+    if (item.assignedEntities) mapped.assigned_entities = item.assignedEntities;
+    if (item.permissions) mapped.permissions = item.permissions;
+    if (item.status) mapped.status = item.status;
   }
   if (tableName === 'employees' && !mapped.full_name && (item.firstName || item.lastName)) {
     mapped.full_name = [item.firstName, item.lastName].filter(Boolean).join(' ');
@@ -483,10 +499,16 @@ function fromPostgresRow(collectionName: string, row: any): any {
     }
   }
 
-  // HIPAA / Security: sanitize password hashes
+  // User schema normalization and role derivation directly from Supabase
   if (tableName === 'users') {
     delete result.password_hash;
     delete result.passwordHash;
+    result.name = row.full_name || row.name || result.name;
+    result.systemRole = row.system_role || row.role || result.systemRole || 'Credentialing Specialist';
+    result.roleTitle = row.role_title || result.systemRole;
+    result.accessLevel = row.access_level || result.accessLevel || (row.is_super_admin ? 'ADMINISTRATOR' : 'USER');
+    result.isSuperAdmin = Boolean(row.is_super_admin || row.access_level === 'ADMINISTRATOR' || result.systemRole === 'System Administrator');
+    result.email = (row.email || result.email || '').toLowerCase().trim();
   }
 
   return result;
@@ -713,10 +735,7 @@ export async function fetchCollection<T = any>(collectionName: string): Promise<
 
   if (supabase) {
     try {
-      let query = supabase.from(mapping.table).select('*');
-      if (mapping.isDemo !== undefined) {
-        query = query.eq('is_demo', mapping.isDemo);
-      }
+      const query = supabase.from(mapping.table).select('*');
       const { data, error } = await query;
       if (error) throw error;
       if (data !== null && Array.isArray(data)) {

@@ -49,7 +49,8 @@ export type ActiveTabType =
   | 'import'
   | 'settings'
   | 'automations'
-  | 'access-requests';
+  | 'access-requests'
+  | 'security-center';
 
 interface HeaderProps {
   activeTab: ActiveTabType;
@@ -192,6 +193,24 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {/* Superadmin Security & Compliance Center Action */}
+            {isSuperAdmin(currentAccount) && (
+              <button
+                type="button"
+                id="superadmin-security-center-button"
+                onClick={() => setActiveTab('security-center')}
+                className={`relative px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex items-center space-x-1.5 text-xs font-semibold ${
+                  activeTab === 'security-center'
+                    ? 'bg-rose-100 text-rose-900 border-rose-300 shadow-xs'
+                    : 'bg-rose-50/70 hover:bg-rose-100/80 text-rose-800 border-rose-200/80'
+                }`}
+                title="Security & Compliance Governance: Emergency Kill Switch, Telemetry & Incident Response (Super Administrator Only)"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                <span className="hidden xl:inline">Security & Compliance</span>
+              </button>
+            )}
+
             {/* Quick Add Application Button */}
             <button
               onClick={onOpenNewApplication}
@@ -279,6 +298,26 @@ export const Header: React.FC<HeaderProps> = ({
 
                   {/* Subpage Links */}
                   <div className="py-1">
+                    {isSuperAdmin(currentAccount) && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('security-center');
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                          activeTab === 'security-center' ? 'bg-rose-50 text-rose-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <ShieldAlert className="w-4 h-4 text-rose-600" />
+                          <span>Security & Compliance Center</span>
+                        </div>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">
+                          KILL SWITCH
+                        </span>
+                      </button>
+                    )}
+
                     {isSuperAdmin(currentAccount) && (
                       <button
                         onClick={() => {

@@ -210,7 +210,11 @@ let memoryExecutions: AutomationExecutionLog[] = [];
 function getSupabaseClient(): SupabaseClient | null {
   const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';
   const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
-  const cleanKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYWlvdGFjaGVxanZmYmFueHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzA1MzYsImV4cCI6MjEwNDUwNjUzNn0.zrfm1xEZhxmmwkDQ8H87MY1vBwIg5NMZiaIgj-K6urI';
+  const cleanKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+  if (!cleanUrl || !cleanKey) {
+    return null;
+  }
 
   try {
     return createClient(cleanUrl, cleanKey, {

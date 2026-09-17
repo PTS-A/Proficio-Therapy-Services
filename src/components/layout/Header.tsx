@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useSyncExternalStore } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { Discipline } from '../../types';
 import { ProficioLogo } from '../common/ProficioLogo';
-import { subscribeToSyncStatus, triggerGlobalSync } from '../../lib/supabase';
+import { subscribeToSyncStatus, getSyncStatus, triggerGlobalSync } from '../../lib/supabase';
 import { 
   canAccessTab, 
   isSuperAdmin, 
@@ -22,6 +22,7 @@ import {
   Database,
   UserCog,
   UserPlus,
+  UserCheck,
   LogOut,
   ShieldCheck,
   ShieldAlert,
@@ -47,7 +48,8 @@ export type ActiveTabType =
   | 'new-user'
   | 'import'
   | 'settings'
-  | 'automations';
+  | 'automations'
+  | 'access-requests';
 
 interface HeaderProps {
   activeTab: ActiveTabType;
@@ -70,20 +72,15 @@ export const Header: React.FC<HeaderProps> = ({
     logout, 
     notifications, 
     sessionSecondsLeft,
+    pendingAccessRequestsCount,
   } = useCredentialing();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [syncStatus, setSyncStatus] = useState({ isSyncing: false, isOnline: true });
+  const syncStatus = useSyncExternalStore(subscribeToSyncStatus, getSyncStatus, getSyncStatus);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
-
-  useEffect(() => {
-    return subscribeToSyncStatus((status) => {
-      setSyncStatus(status);
-    });
-  }, []);
 
   const handleManualSync = async () => {
     setIsManualSyncing(true);
@@ -172,6 +169,29 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </button>
 
+            {/* Superadmin Access Requests Action */}
+            {isSuperAdmin(currentAccount) && (
+              <button
+                type="button"
+                id="superadmin-access-requests-button"
+                onClick={() => setActiveTab('access-requests')}
+                className={`relative px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex items-center space-x-1.5 text-xs font-semibold ${
+                  activeTab === 'access-requests'
+                    ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-xs'
+                    : 'bg-amber-50/70 hover:bg-amber-100/80 text-amber-800 border-amber-200/80'
+                }`}
+                title="Employee Access Requests (Super Administrator Only)"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-amber-700" />
+                <span className="hidden xl:inline">Access Requests</span>
+                {pendingAccessRequestsCount > 0 && (
+                  <span className="px-1.5 py-0.2 bg-amber-600 text-white rounded-full text-[10px] font-bold">
+                    {pendingAccessRequestsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* Quick Add Application Button */}
             <button
               onClick={onOpenNewApplication}
@@ -259,6 +279,28 @@ export const Header: React.FC<HeaderProps> = ({
 
                   {/* Subpage Links */}
                   <div className="py-1">
+                    {isSuperAdmin(currentAccount) && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('access-requests');
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                          activeTab === 'access-requests' ? 'bg-amber-50 text-amber-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <UserCheck className="w-4 h-4 text-amber-600" />
+                          <span>Employee Access Requests</span>
+                        </div>
+                        {pendingAccessRequestsCount > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                            {pendingAccessRequestsCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
                     {canManageUsers(currentAccount) && (
                       <button
                         onClick={() => {

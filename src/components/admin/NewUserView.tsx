@@ -39,6 +39,7 @@ import {
   Crown,
   KeyRound
 } from 'lucide-react';
+import { AccessRequestsView } from './AccessRequestsView';
 
 interface NewUserViewProps {
   onBackToDashboard: () => void;
@@ -52,10 +53,11 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     createAccount, 
     updateAccount, 
     deleteAccount,
-    entities 
+    entities,
+    pendingAccessRequestsCount
   } = useCredentialing();
 
-  const [activeSubTab, setActiveSubTab] = useState<'create' | 'roster' | 'matrix'>('create');
+  const [activeSubTab, setActiveSubTab] = useState<'create' | 'roster' | 'matrix' | 'requests'>('create');
   
   // Search & Filter in roster
   const [searchQuery, setSearchQuery] = useState('');
@@ -330,6 +332,21 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               <span>Role Permissions Matrix</span>
             </button>
+
+            {isCurrentSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('requests')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                  activeSubTab === 'requests'
+                    ? 'bg-amber-100 text-amber-900 shadow-xs'
+                    : 'text-amber-800 hover:text-amber-950 hover:bg-amber-50'
+                }`}
+              >
+                <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span>Access Requests ({pendingAccessRequestsCount})</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -887,6 +904,16 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
             ))}
           </div>
         </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* SUBTAB 4: SUPER ADMIN ACCESS REQUEST APPROVAL WORKFLOW */}
+      {/* ========================================================= */}
+      {activeSubTab === 'requests' && isCurrentSuperAdmin && (
+        <AccessRequestsView
+          onBackToDashboard={onBackToDashboard}
+          onNavigateToUsers={() => setActiveSubTab('roster')}
+        />
       )}
     </div>
   );

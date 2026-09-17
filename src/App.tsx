@@ -16,6 +16,7 @@ import { NewUserView } from './components/admin/NewUserView';
 import { DataImportView } from './components/admin/DataImportView';
 import { SystemConfigView } from './components/admin/SystemConfigView';
 import { AutomationDashboardView } from './components/automations/AutomationDashboardView';
+import { AccessRequestsView } from './components/admin/AccessRequestsView';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { Discipline } from './types';
@@ -210,6 +211,14 @@ const MainContent: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
             <AutomationDashboardView />
           </div>
+        )}
+
+        {/* Dedicated Subpage: Access Requests (Super Administrator Governance) */}
+        {activeTab === 'access-requests' && (
+          <AccessRequestsView
+            onBackToDashboard={() => setActiveTab('dashboard')}
+            onNavigateToUsers={() => setActiveTab('new-user')}
+          />
         )}
       </main>
 

@@ -11,7 +11,7 @@ export default defineConfig(() => {
         process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co'
       ),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
-        process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYWlvdGFjaGVxanZmYmFueHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzA1MzYsImV4cCI6MjEwNDUwNjUzNn0.zrfm1xEZhxmmwkDQ8H87MY1vBwIg5NMZiaIgj-K6urI'
+        process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || ''
       ),
     },
     resolve: {

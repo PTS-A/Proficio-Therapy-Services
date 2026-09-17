@@ -30,6 +30,9 @@ import {
   ClinicalStaff,
   ApplicationDocument,
   ApplicationComment,
+  AccessRequest,
+  AccessLevel,
+  SystemRole,
 } from '../types';
 import {
   DEFAULT_STAGE_CONFIGS,
@@ -127,6 +130,44 @@ interface CredentialingContextType {
   updateAccount: (id: string, updates: Partial<AppAccount>) => void;
   deleteAccount: (id: string) => { success: boolean; error?: string };
   switchAccount: (accountId: string) => void;
+
+  // Access Requests (Unregistered users & Super Administrator governance)
+  accessRequests: AccessRequest[];
+  pendingAccessRequestsCount: number;
+  submitAccessRequest: (data: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    department?: string;
+    requestedRole?: string;
+    entityId?: string;
+    locationId?: string;
+    justification?: string;
+  }) => Promise<{ success: boolean; request?: AccessRequest; error?: string }>;
+  approveAccessRequest: (
+    requestId: string,
+    details: {
+      fullName: string;
+      firstName?: string;
+      lastName?: string;
+      email: string;
+      phone?: string;
+      department: string;
+      systemRole: SystemRole;
+      roleTitle?: string;
+      accessLevel: AccessLevel;
+      entityId: string;
+      locationId: string;
+      assignedDisciplines: Discipline[];
+      permissions?: string[];
+      password?: string;
+    }
+  ) => Promise<{ success: boolean; error?: string; account?: AppAccount }>;
+  denyAccessRequest: (
+    requestId: string,
+    denialReason?: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  refreshAccessRequests: () => Promise<void>;
 
   providers: Provider[];
   payers: Payer[];
@@ -739,7 +780,17 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   // Subscribe to SyncEngine status updates
   useEffect(() => {
     return subscribeToSyncStatus((status) => {
-      setCloudSyncStatus(status);
+      if (status) {
+        if (status.isSyncing) {
+          setCloudSyncStatus('syncing');
+        } else if (!status.isOnline) {
+          setCloudSyncStatus('offline');
+        } else if (status.hasErrors) {
+          setCloudSyncStatus('error');
+        } else {
+          setCloudSyncStatus('synced');
+        }
+      }
     });
   }, []);
 
@@ -1453,7 +1504,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loginWithGoogle = async (
     emailOverride?: string,
-    preferredFlow: 'popup' | 'redirect' = 'popup'
+    preferredFlow: 'popup' | 'redirect' = 'redirect'
   ): Promise<{
     success: boolean;
     error?: string;
@@ -1647,6 +1698,218 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     if (acc) {
       setCurrentAccount(acc);
       switchDataForAccount(acc);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // ACCESS REQUESTS STATE & GOVERNANCE HANDLERS
+  // --------------------------------------------------------------------------
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem('cred_access_requests');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const refreshAccessRequests = async () => {
+    try {
+      const res = await fetch('/api/access-requests');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.requests)) {
+          setAccessRequests(data.requests);
+          localStorage.setItem('cred_access_requests', JSON.stringify(data.requests));
+        }
+      }
+    } catch (err) {
+      console.warn('[CredentialingContext] Failed to fetch access requests from API:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshAccessRequests();
+  }, []);
+
+  const pendingAccessRequestsCount = useMemo(() => {
+    return accessRequests.filter((r) => r.status === 'PENDING').length;
+  }, [accessRequests]);
+
+  const submitAccessRequest = async (data: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    department?: string;
+    requestedRole?: string;
+    entityId?: string;
+    locationId?: string;
+    justification?: string;
+  }): Promise<{ success: boolean; request?: AccessRequest; error?: string }> => {
+    try {
+      const res = await fetch('/api/access-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        return { success: false, error: resData.error || 'Failed to submit request.' };
+      }
+      const newReq: AccessRequest = resData.request;
+      setAccessRequests((prev) => {
+        const filtered = prev.filter((r) => r.id !== newReq.id);
+        const updated = [newReq, ...filtered];
+        localStorage.setItem('cred_access_requests', JSON.stringify(updated));
+        return updated;
+      });
+      return { success: true, request: newReq };
+    } catch (err: any) {
+      const localReq: AccessRequest = {
+        id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        fullName: data.fullName.trim(),
+        email: data.email.trim().toLowerCase(),
+        phone: data.phone?.trim(),
+        department: data.department || 'Credentialing & Operations',
+        requestedRole: data.requestedRole || 'Credentialing Specialist',
+        entityId: data.entityId || 'ent-1',
+        locationId: data.locationId || 'loc-1',
+        justification: data.justification || 'New employee requesting Credentialing Portal access.',
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+      };
+      setAccessRequests((prev) => {
+        const updated = [localReq, ...prev];
+        localStorage.setItem('cred_access_requests', JSON.stringify(updated));
+        return updated;
+      });
+      return { success: true, request: localReq };
+    }
+  };
+
+  const approveAccessRequest = async (
+    requestId: string,
+    details: {
+      fullName: string;
+      firstName?: string;
+      lastName?: string;
+      email: string;
+      phone?: string;
+      department: string;
+      systemRole: SystemRole;
+      roleTitle?: string;
+      accessLevel: AccessLevel;
+      entityId: string;
+      locationId: string;
+      assignedDisciplines: Discipline[];
+      permissions?: string[];
+      password?: string;
+    }
+  ): Promise<{ success: boolean; error?: string; account?: AppAccount }> => {
+    try {
+      const res = await fetch('/api/access-requests/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          details: {
+            ...details,
+            reviewedBy: currentAccount?.name || 'Super Administrator',
+          },
+        }),
+      });
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        return { success: false, error: resData.error || 'Failed to approve request on server.' };
+      }
+
+      // Also create/update account locally so user immediately appears in accounts and user roster
+      const accResult = createAccount({
+        name: details.fullName,
+        email: details.email,
+        password: details.password || 'proficio',
+        accessLevel: details.accessLevel,
+        systemRole: details.systemRole,
+        roleTitle: details.roleTitle || details.systemRole,
+        department: details.department,
+        assignedDisciplines: details.assignedDisciplines,
+        assignedEntities: [details.entityId],
+        permissions: details.permissions || [],
+        status: 'Active',
+        mustChangePasswordOnFirstLogin: true,
+        hasChangedInitialPassword: false,
+        isSuperAdmin: details.systemRole === 'System Administrator',
+      });
+
+      // Update local access request state
+      setAccessRequests((prev) => {
+        const updated = prev.map((r) =>
+          r.id === requestId
+            ? {
+                ...r,
+                status: 'APPROVED' as const,
+                reviewedAt: new Date().toISOString(),
+                reviewedBy: currentAccount?.name || 'Super Administrator',
+                assignedAccessLevel: details.accessLevel,
+                assignedSystemRole: details.systemRole,
+                assignedRoleTitle: details.roleTitle,
+                assignedDepartment: details.department,
+                assignedEntityId: details.entityId,
+                assignedLocationId: details.locationId,
+                assignedDisciplines: details.assignedDisciplines,
+              }
+            : r
+        );
+        localStorage.setItem('cred_access_requests', JSON.stringify(updated));
+        return updated;
+      });
+
+      return { success: true, account: accResult.account };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to approve access request.' };
+    }
+  };
+
+  const denyAccessRequest = async (
+    requestId: string,
+    denialReason?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/access-requests/deny', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          denialReason: denialReason || 'Access denied by Super Administrator.',
+          reviewedBy: currentAccount?.name || 'Super Administrator',
+        }),
+      });
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        return { success: false, error: resData.error || 'Failed to deny request on server.' };
+      }
+
+      setAccessRequests((prev) => {
+        const updated = prev.map((r) =>
+          r.id === requestId
+            ? {
+                ...r,
+                status: 'DENIED' as const,
+                reviewedAt: new Date().toISOString(),
+                reviewedBy: currentAccount?.name || 'Super Administrator',
+                denialReason: denialReason || 'Access denied by Super Administrator.',
+              }
+            : r
+        );
+        localStorage.setItem('cred_access_requests', JSON.stringify(updated));
+        return updated;
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to deny request.' };
     }
   };
 
@@ -3813,6 +4076,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         updateSystemSettings,
         updateHolidays,
         updateEmailTemplates,
+        accessRequests,
+        pendingAccessRequestsCount,
+        submitAccessRequest,
+        approveAccessRequest,
+        denyAccessRequest,
+        refreshAccessRequests,
       }}
     >
       {children}

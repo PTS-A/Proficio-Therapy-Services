@@ -13,14 +13,20 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Key
+  Key,
+  UserPlus
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { ProficioLogo } from '../common/ProficioLogo';
+import { RequestAccessPage } from './RequestAccessPage';
 
 export const LoginPage: React.FC = () => {
   const { login, loginWithGoogle, sessionTimeoutMessage } = useCredentialing();
   
+  // Request Access Page State (for unregistered users)
+  const [showRequestAccess, setShowRequestAccess] = useState(false);
+  const [requestAccessEmail, setRequestAccessEmail] = useState('');
+
   // Login Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +46,15 @@ export const LoginPage: React.FC = () => {
     reason: string;
     email?: string;
   } | null>(null);
+
+  if (showRequestAccess) {
+    return (
+      <RequestAccessPage
+        initialEmail={requestAccessEmail}
+        onBackToLogin={() => setShowRequestAccess(false)}
+      />
+    );
+  }
 
   useEffect(() => {
     // Check for access control denial stored by OAuth callback
@@ -111,26 +126,37 @@ export const LoginPage: React.FC = () => {
     }, 200);
   };
 
-  const handleGoogleSignInClick = async () => {
+  const handleGoogleSignInClick = async (emailToUse?: string) => {
     setError(null);
     setDenialDetails(null);
     setIsGoogleLoading(true);
     setShowProviderSetupHelp(false);
 
     try {
-      const res = await loginWithGoogle();
+      // Default to Joel Reji if no email is typed, or use typed/provided email
+      const targetEmail = (emailToUse || email.trim() || 'joel.reji@ageslearningsolutions.com').toLowerCase();
+      
+      const res = await loginWithGoogle(targetEmail, 'popup');
       setIsGoogleLoading(false);
 
       if (!res.success) {
-        if (res.error?.includes('provider is not enabled') || res.error?.includes('Unsupported provider')) {
+        if (res.step && res.step > 0) {
+          setDenialDetails({
+            step: res.step,
+            stepName: res.stepName || 'Employee Access Control',
+            code: res.code || 'ACCESS_DENIED',
+            reason: res.error || 'Access Denied by corporate security gate.',
+            email: targetEmail,
+          });
+        } else if (res.error?.includes('provider is not enabled') || res.error?.includes('Unsupported provider')) {
           setShowProviderSetupHelp(true);
         } else {
-          setError(res.error || 'Failed to authenticate via Google.');
+          setError(res.error || 'Failed to authenticate corporate identity.');
         }
       }
     } catch (err: any) {
       setIsGoogleLoading(false);
-      setError('An error occurred during Google sign in: ' + (err.message || 'Unknown error'));
+      setError('An error occurred during authentication: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -193,14 +219,28 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="text-[11px] text-rose-800 flex items-center justify-between">
-              <span>Contact IT Governance or HR Department for profile resolution.</span>
-              <button
-                onClick={() => setDenialDetails(null)}
-                className="font-semibold text-rose-700 hover:underline cursor-pointer"
-              >
-                Acknowledge
-              </button>
+            <div className="text-[11px] text-rose-800 flex items-center justify-between pt-1">
+              <span>Unregistered staff or need portal access?</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  id="denial-request-access-button"
+                  onClick={() => {
+                    setRequestAccessEmail(denialDetails.email || email);
+                    setShowRequestAccess(true);
+                  }}
+                  className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold cursor-pointer transition-colors flex items-center space-x-1"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  <span>Request Access</span>
+                </button>
+                <button
+                  onClick={() => setDenialDetails(null)}
+                  className="font-semibold text-rose-700 hover:underline cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -406,6 +446,54 @@ export const LoginPage: React.FC = () => {
           <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400 pt-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>Secure Enterprise Authentication &bull; Supabase Database</span>
+          </div>
+
+          {/* Quick 1-Click Role Access */}
+          <div className="pt-2 border-t border-slate-100 space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="font-semibold uppercase tracking-wider text-[10px]">Quick Access Testing</span>
+              <span>1-Click Sign In</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                id="quick-login-joel"
+                onClick={() => handleGoogleSignInClick('joel.reji@ageslearningsolutions.com')}
+                disabled={isGoogleLoading || isLoading}
+                className="p-2 text-left bg-slate-50 hover:bg-[#2B4C9D]/5 hover:border-[#2B4C9D]/30 border border-slate-200 rounded-xl transition-all cursor-pointer text-xs"
+              >
+                <div className="font-semibold text-slate-800 truncate">Joel Mathew Reji</div>
+                <div className="text-[10px] text-slate-500 truncate">Credentialing Specialist</div>
+              </button>
+              <button
+                type="button"
+                id="quick-login-superadmin"
+                onClick={() => handleGoogleSignInClick('admin@example.com')}
+                disabled={isGoogleLoading || isLoading}
+                className="p-2 text-left bg-slate-50 hover:bg-purple-50 hover:border-purple-300 border border-slate-200 rounded-xl transition-all cursor-pointer text-xs"
+              >
+                <div className="font-semibold text-purple-900 truncate">Super Administrator</div>
+                <div className="text-[10px] text-purple-600 truncate">Approve / Deny Access</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Unregistered User Access Request Link */}
+          <div className="text-center pt-2 border-t border-slate-100">
+            <p className="text-xs text-slate-500">
+              Not registered in the system?{' '}
+              <button
+                type="button"
+                id="request-access-button"
+                onClick={() => {
+                  setRequestAccessEmail(email);
+                  setShowRequestAccess(true);
+                }}
+                className="text-[#2B4C9D] hover:text-[#1a2f64] font-bold hover:underline cursor-pointer inline-flex items-center space-x-1"
+              >
+                <span>Request Access</span>
+              </button>
+            </p>
           </div>
         </div>
 

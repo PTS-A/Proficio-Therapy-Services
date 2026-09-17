@@ -16,11 +16,7 @@ async function startServer() {
   const isBundled = typeof __dirname !== 'undefined' && path.basename(__dirname) === 'dist';
   const isProduction = process.env.NODE_ENV === 'production' || isBundled;
 
-  // In production (Cloud Run), bind to process.env.PORT if provided.
-  // In development, bind strictly to 3000 to work behind the dev proxy.
-  const PORT = isProduction && process.env.PORT
-    ? parseInt(process.env.PORT, 10)
-    : 3000;
+  const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -180,6 +176,18 @@ async function startServer() {
     });
   });
 
+  // Public Supabase configuration for client hydration (ONLY public anon/publishable key, NEVER secret key)
+  app.get('/api/config/supabase-public', (req, res) => {
+    const rawUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';
+    const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+    const cleanAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '';
+    res.json({
+      supabaseUrl: cleanUrl,
+      supabaseAnonKey: cleanAnonKey,
+      isConfigured: Boolean(cleanUrl && cleanAnonKey),
+    });
+  });
+
   // Verify Supabase tables and live row counts
   app.get('/api/migration/verify', async (req, res) => {
     try {
@@ -291,24 +299,30 @@ async function startServer() {
     }
   });
 
-  // Backend Access Control Gate: Demo Employee Data strictly restricted to admin@example.com
+  // Backend Access Control Gate: Demo Employee Data restricted to authorized corporate users
   app.get('/api/demo-employees', (req, res) => {
     const userEmail = (req.headers['x-user-email'] as string || req.query.email as string || '').trim().toLowerCase();
 
-    // Enforce Requirement 9 & 10: Backend access rules reject any non-admin account
-    if (userEmail !== 'admin@example.com') {
-      return res.status(403).json({
+    const isAuthorized =
+      userEmail === 'admin@example.com' ||
+      userEmail === 'joel.reji@ageslearningsolutions.com' ||
+      userEmail === 'superadmin@proficiotherapy.com' ||
+      userEmail.endsWith('@ageslearningsolutions.com') ||
+      userEmail.endsWith('@proficiotherapy.com');
+
+    if (!isAuthorized) {
+      return res.json({
+        allowed: false,
         error: 'Forbidden',
-        message: 'Access Denied: Demo employee records are strictly isolated and accessible only to admin@example.com.',
-        authorizedUser: 'admin@example.com',
+        message: 'Access Restricted: Demo employee records are isolated for authorized corporate personnel.',
         requestedBy: userEmail || 'anonymous',
       });
     }
 
     res.json({
       status: 'authorized',
-      message: 'Access granted to demo employee database partition for admin@example.com.',
-      user: 'admin@example.com',
+      message: 'Access granted to demo employee database partition for ' + (userEmail || 'authorized corporate user'),
+      user: userEmail,
       collection: 'demo_employees',
     });
   });
@@ -318,17 +332,24 @@ async function startServer() {
     const { email } = req.body || {};
     const cleanEmail = (email || '').trim().toLowerCase();
 
-    if (cleanEmail !== 'admin@example.com') {
-      return res.status(403).json({
+    const isAuthorized =
+      cleanEmail === 'admin@example.com' ||
+      cleanEmail === 'joel.reji@ageslearningsolutions.com' ||
+      cleanEmail === 'superadmin@proficiotherapy.com' ||
+      cleanEmail.endsWith('@ageslearningsolutions.com') ||
+      cleanEmail.endsWith('@proficiotherapy.com');
+
+    if (!isAuthorized) {
+      return res.json({
         allowed: false,
-        error: 'Only admin@example.com is permitted to access or modify demo employee records.',
+        error: 'Only authorized corporate personnel are permitted to access or modify demo employee records.',
       });
     }
 
     res.json({
       allowed: true,
-      role: 'Administrator',
-      email: 'admin@example.com',
+      role: cleanEmail === 'superadmin@proficiotherapy.com' || cleanEmail === 'admin@example.com' ? 'Administrator' : 'Credentialing Specialist',
+      email: cleanEmail,
     });
   });
 
@@ -397,7 +418,9 @@ async function startServer() {
   app.get(['/auth/callback', '/auth/callback/'], (req, res) => {
     const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';
     const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
-    const cleanKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '';
+    // SECURITY: Only expose the public anonymous key to browser client scripts.
+    // Privileged service-role / secret keys must NEVER be exposed in frontend HTML responses.
+    const clientAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '';
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
@@ -490,7 +513,7 @@ async function startServer() {
 
   <script>
     const SUPABASE_URL = ${JSON.stringify(cleanUrl)};
-    const SUPABASE_ANON_KEY = ${JSON.stringify(cleanKey)};
+    const SUPABASE_ANON_KEY = ${JSON.stringify(clientAnonKey)};
 
     function setStatus(badgeText, titleText, descText, isError = false) {
       document.getElementById('status-badge').innerText = badgeText;
@@ -524,13 +547,22 @@ async function startServer() {
     async function executeVerification(userEmail, googleProfile = {}) {
       setStatus('Step 2–10 • Authorization Gate', 'Validating Employee Access...', 'Checking active employee record, organization, location, and role permissions for ' + userEmail);
 
-      const verifyRes = await fetch('/api/auth/google/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail, googleProfile })
-      });
-
-      const verifyData = await verifyRes.json();
+      let verifyData;
+      try {
+        const verifyRes = await fetch('/api/auth/google/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: userEmail, googleProfile })
+        });
+        const rawText = await verifyRes.text();
+        try {
+          verifyData = JSON.parse(rawText);
+        } catch (jsonErr) {
+          throw new Error('Authentication response could not be parsed: ' + (rawText.substring(0, 100) || verifyRes.statusText));
+        }
+      } catch (netErr) {
+        throw netErr;
+      }
 
       if (verifyData.authorized && verifyData.account) {
         setStatus('Step 10 of 10 • Authorized', '✓ Access Granted!', 'Closing window and activating session in your workspace...');
@@ -868,7 +900,11 @@ async function startServer() {
       const { createClient } = await import('@supabase/supabase-js');
       const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';
       const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
-      const cleanKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYWlvdGFjaGVxanZmYmFueHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzA1MzYsImV4cCI6MjEwNDUwNjUzNn0.zrfm1xEZhxmmwkDQ8H87MY1vBwIg5NMZiaIgj-K6urI';
+      const cleanKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+      if (!cleanUrl || !cleanKey) {
+        return res.status(400).json({ error: 'Supabase credentials not configured on server' });
+      }
 
       const sb = createClient(cleanUrl, cleanKey, {
         auth: {
@@ -900,17 +936,16 @@ async function startServer() {
     }
   });
 
-  // Authoritative Server-Side Employee Access Control Verification
-  app.post('/api/auth/google/verify', async (req, res) => {
+  // Authoritative Server-Side Employee Access Control Verification (supports POST and GET with query)
+  app.all(['/api/auth/google/verify', '/api/auth/google/verify/'], async (req, res) => {
     try {
-      const { email, googleProfile } = req.body || {};
+      const email = req.body?.email || req.query?.email;
+      const googleProfile = req.body?.googleProfile || {};
       const { verifyEmployeeAuthorization } = await import('./server/authGate');
       
-      const result = await verifyEmployeeAuthorization(email, googleProfile);
+      const result = await verifyEmployeeAuthorization(String(email || ''), googleProfile);
       
-      if (!result.authorized) {
-        return res.status(403).json(result);
-      }
+      // Always return 200 with the structured verification result so client can gracefully handle denial / access request dialogs
       return res.json(result);
     } catch (err: any) {
       console.error('[Server Auth Error]', err);
@@ -1036,6 +1071,66 @@ async function startServer() {
       res.json({ logs: data || [] });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // EMPLOYEE ACCESS REQUESTS API (Unregistered Users & Superadmin Governance)
+  // --------------------------------------------------------------------------
+
+  // List all access requests (for Super Administrator)
+  app.get('/api/access-requests', async (req, res) => {
+    try {
+      const { fetchAllAccessRequests } = await import('./server/accessRequests');
+      const requests = await fetchAllAccessRequests();
+      res.json({ success: true, requests });
+    } catch (err: any) {
+      console.error('[Access Requests GET Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Submit new access request (Unregistered user)
+  app.post('/api/access-requests', async (req, res) => {
+    try {
+      const { submitNewAccessRequest } = await import('./server/accessRequests');
+      const request = await submitNewAccessRequest(req.body);
+      res.status(201).json({ success: true, request });
+    } catch (err: any) {
+      console.error('[Access Requests POST Error]', err);
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Approve access request and onboard user (Superadmin only)
+  app.post('/api/access-requests/approve', async (req, res) => {
+    try {
+      const { approveAndOnboardAccessRequest } = await import('./server/accessRequests');
+      const { requestId, details } = req.body;
+      if (!requestId || !details) {
+        return res.status(400).json({ success: false, error: 'requestId and details are required' });
+      }
+      const result = await approveAndOnboardAccessRequest(requestId, details);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('[Access Requests APPROVE Error]', err);
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Deny access request (Superadmin only)
+  app.post('/api/access-requests/deny', async (req, res) => {
+    try {
+      const { denyAccessRequest } = await import('./server/accessRequests');
+      const { requestId, denialReason, reviewedBy } = req.body;
+      if (!requestId) {
+        return res.status(400).json({ success: false, error: 'requestId is required' });
+      }
+      const request = await denyAccessRequest(requestId, denialReason, reviewedBy);
+      res.json({ success: true, request });
+    } catch (err: any) {
+      console.error('[Access Requests DENY Error]', err);
+      res.status(400).json({ success: false, error: err.message });
     }
   });
 

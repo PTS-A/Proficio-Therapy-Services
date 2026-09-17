@@ -895,3 +895,29 @@ export interface DeadlineEvaluationReport {
   failures: number;
   executions: AutomationExecutionLog[];
 }
+
+export type AccessRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED';
+
+export interface AccessRequest {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  department?: string;
+  requestedRole?: string;
+  entityId?: string;
+  locationId?: string;
+  justification?: string;
+  status: AccessRequestStatus;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  denialReason?: string;
+  assignedAccessLevel?: AccessLevel;
+  assignedSystemRole?: SystemRole;
+  assignedRoleTitle?: string;
+  assignedDepartment?: string;
+  assignedEntityId?: string;
+  assignedLocationId?: string;
+  assignedDisciplines?: Discipline[];
+}

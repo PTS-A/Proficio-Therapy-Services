@@ -318,9 +318,8 @@ function generatePDF() {
   drawTable(doc, [
     ['Phase / Sprint', 'Core Deliverables', 'Target System', 'Current Status'],
     ['Phase 1 (Current)', 'Complete 4-Step Intake, Linking Matrix, Dashboard, 5.11 Suite, Rules', 'React 19 / Firestore', '100% Operational'],
-    ['Phase 2 (Q3 2026)', 'Automated AI Document OCR for License & Insurance Extraction', 'Cloud Functions / Vision', 'Sprint Backlog'],
-    ['Phase 3 (Q4 2026)', 'Direct CAQH ProView B2B Gateway & Outbound Payer Email Bots', 'CAQH B2B API / SMTP', 'Architecture Staged'],
-    ['Phase 4 (2027)', 'Automated Medi-Cal PAVE RPA Submission Bot', 'Headless RPA Worker', 'Long-term Roadmap']
+    ['Phase 2 (Q3 2026)', 'Direct CAQH ProView B2B Gateway & Outbound Payer Email Bots', 'CAQH B2B API / SMTP', 'Architecture Staged'],
+    ['Phase 3 (2027)', 'Automated Medi-Cal PAVE RPA Submission Bot', 'Headless RPA Worker', 'Long-term Roadmap']
   ], [90, 180, 135, 100]);
 
   drawSectionBanner(doc, '12.0', 'MASTER VERIFICATION TRACEABILITY MATRIX');
@@ -1050,18 +1049,12 @@ match /applications/{appId} {
       </tr>
       <tr>
         <td>Phase 2</td>
-        <td>Automated AI/OCR Document Parsing for License & Expiration Extraction</td>
-        <td>Q3 2026</td>
-        <td><span class="badge badge-warning">IN DEVELOPMENT</span></td>
-      </tr>
-      <tr>
-        <td>Phase 3</td>
         <td>Direct CAQH ProView B2B Gateway & Outbound Automated Payer Follow-up Bots</td>
         <td>Q4 2026</td>
         <td><span class="badge badge-warning">ROADMAP STAGED</span></td>
       </tr>
       <tr>
-        <td>Phase 4</td>
+        <td>Phase 3</td>
         <td>Medi-Cal PAVE Headless RPA Bot for Auto-Form Pre-Filling</td>
         <td>2027</td>
         <td><span class="badge badge-warning">LONG-TERM ROADMAP</span></td>
@@ -1423,9 +1416,8 @@ All document reads and writes validate document identifier paths using regex: \`
 
 ## 11.0 Implementation Roadmap & Integration Blueprint
 - **Phase 1 (Current):** 100% complete coverage for all daily credentialing, 4-step intake, facility group linking, executive dashboards, and 5.11 compliance reports.
-- **Phase 2 (Q3 2026):** Automated AI Document OCR for License & Insurance Extraction.
-- **Phase 3 (Q4 2026):** Direct CAQH ProView B2B Gateway & Outbound Automated Payer Follow-up Bots.
-- **Phase 4 (2027):** Headless Medi-Cal PAVE RPA Submission Bot.
+- **Phase 2 (Q4 2026):** Direct CAQH ProView B2B Gateway & Outbound Automated Payer Follow-up Bots.
+- **Phase 3 (2027):** Headless Medi-Cal PAVE RPA Submission Bot.
 
 ---
 

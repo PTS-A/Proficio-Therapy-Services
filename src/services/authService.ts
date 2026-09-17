@@ -8,7 +8,7 @@
  * -> Supabase RLS -> Application Access
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase, ensureSupabaseClient } from '../lib/supabase';
 import { AppAccount } from '../types';
 
 export interface VerificationResponse {
@@ -229,8 +229,9 @@ export async function checkForPendingOAuth(): Promise<{
   if (codeParam) {
     try {
       window.history.replaceState({}, document.title, window.location.pathname);
-      if (supabase) {
-        const { data: exchangeData } = await supabase.auth.exchangeCodeForSession(codeParam);
+      const client = supabase || await ensureSupabaseClient();
+      if (client) {
+        const { data: exchangeData } = await client.auth.exchangeCodeForSession(codeParam);
         if (exchangeData?.user?.email) {
           const verifyResult = await verifyEmployeeWithServer(exchangeData.user.email);
           if (verifyResult.authorized && verifyResult.account) {
@@ -271,13 +272,14 @@ export async function checkForPendingOAuth(): Promise<{
 export async function initiateGoogleSignIn(options?: {
   preferPopup?: boolean;
 }): Promise<{ success: boolean; url?: string; popupOpened?: boolean; error?: string }> {
-  if (!supabase) {
+  const client = supabase || await ensureSupabaseClient();
+  if (!client) {
     return { success: false, error: 'Database and authentication service is not connected.' };
   }
 
   try {
     const redirectUrl = `${window.location.origin}/auth/callback`;
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
@@ -318,7 +320,7 @@ export async function initiateGoogleSignIn(options?: {
  */
 export async function authenticateCorporateGoogleUser(
   email: string = 'joel.reji@ageslearningsolutions.com'
-): Promise<{ success: boolean; account?: AppAccount; error?: string; step?: number; stepName?: string }> {
+): Promise<{ success: boolean; account?: AppAccount; error?: string; step?: number; stepName?: string; code?: string; denial?: VerificationResponse }> {
   const result = await verifyEmployeeWithServer(email);
   if (!result.authorized || !result.account) {
     return {
@@ -326,11 +328,16 @@ export async function authenticateCorporateGoogleUser(
       error: result.reason || 'Access Denied: Employee Access Control validation failed.',
       step: result.step,
       stepName: result.stepName,
+      code: result.code,
+      denial: result,
     };
   }
   return {
     success: true,
     account: result.account,
+    step: result.step,
+    stepName: result.stepName,
+    code: result.code,
   };
 }
 

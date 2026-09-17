@@ -146,7 +146,7 @@ export async function verifyEmployeeAuthorization(
   // Check public.users table as well (HIPAA §164.502(b) Minimum Necessary)
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('id, name, email, access_level, system_role, role_title, department, avatar, status, is_active, assigned_disciplines, assigned_entities, assigned_locations, is_super_admin')
+    .select('id, name, email, access_level, system_role, role_title, department, avatar_url, status, is_active, assigned_disciplines, assigned_entities, is_super_admin')
     .ilike('email', cleanEmail)
     .limit(1);
 
@@ -262,7 +262,7 @@ export async function verifyEmployeeAuthorization(
       role_title: existingUser.role_title || existingUser.system_role || (existingUser as any).role || 'Credentialing Specialist',
       employment_status: existingUser.status || 'Active',
       entity_id: existingUser.assigned_entities?.[0] || 'ent-1',
-      office_location_id: existingUser.assigned_locations?.[0] || 'loc-1',
+      office_location_id: (existingUser as any)?.assigned_locations?.[0] || 'loc-1',
       is_demo: false,
     };
   }
@@ -353,7 +353,7 @@ export async function verifyEmployeeAuthorization(
   if (targetEntityId) {
     const { data: entData } = await supabase
       .from('entities')
-      .select('id, legal_name, dba, tax_id, npi, active')
+      .select('id, legal_name, dba, ein, active')
       .eq('id', targetEntityId)
       .limit(1);
 
@@ -384,12 +384,12 @@ export async function verifyEmployeeAuthorization(
 
   // STEP 6: Location Check
   let location = null;
-  const targetLocationId = employee.office_location_id || (existingUser?.assigned_locations?.[0]) || null;
+  const targetLocationId = employee.office_location_id || ((existingUser as any)?.assigned_locations?.[0]) || null;
 
   if (targetLocationId) {
     const { data: locData } = await supabase
       .from('locations')
-      .select('id, name, address, city, state, zip_code, active')
+      .select('id, name, address, city, state, zip, active')
       .eq('id', targetLocationId)
       .limit(1);
 
@@ -472,7 +472,7 @@ export async function verifyEmployeeAuthorization(
     systemRole: systemRole,
     roleTitle: employee.role_title || existingUser?.role_title || systemRole,
     department: employee.department || existingUser?.department || 'Proficio Therapy Services',
-    avatar: googleProfile?.avatar || existingUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    avatar: googleProfile?.avatar || existingUser?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     status: 'Active',
     assignedDisciplines: existingUser?.assigned_disciplines || ['ABA', 'Speech', 'OT'],
     assignedEntities: targetEntityId ? [targetEntityId] : ['ent-1'],

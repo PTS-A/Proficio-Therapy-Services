@@ -161,8 +161,7 @@ drawSectionHeading('5.1', 'Features Yet to be Fully Coded / In-Progress Backlog'
 
 drawStatusBadge('Direct CAQH ProView API', 'FUTURE ROADMAP', 'Currently operates via structured file import/export and JSON attestation sync. Direct REST API integration with CAQH direct partner gateway pending enterprise CAQH B2B licensing.');
 drawStatusBadge('State PAVE Portal RPA Bot', 'FUTURE ROADMAP', 'Medi-Cal PAVE submissions are tracked with stage milestones and requirement checklists; automated headless browser RPA filing bot is scheduled for Phase 3.');
-drawStatusBadge('AI/OCR Document Parsing', 'FUTURE ROADMAP', 'Document upload supports file attachment and manual audit; automated AI OCR for extracting license numbers and expiration dates from PDF/JPEG uploads is in development.');
-drawStatusBadge('Automated Payer Email Bot', 'FUTURE ROADMAP', 'Specialists currently execute scheduled follow-up cadences with pre-filled email templates; automated SMTP/Twilio webhook triggers for outbound payer inquiries are designed.');
+drawStatusBadge('Automated Payer Email Bot', 'FUTURE ROADMAP', 'Specialists currently execute scheduled follow-up cadences with pre-filled email templates; automated SMTP/Resend triggers for outbound payer inquiries are designed.');
 drawStatusBadge('Cloud SQL / Spanner Backend', 'FUTURE ROADMAP', 'Frontend state is managed reactively in-memory with local storage persistence and full Excel/CSV backup; permanent Cloud SQL / Firestore persistent database sync is configured for production rollout.');
 drawStatusBadge('Enterprise SAML/SSO Login', 'FUTURE ROADMAP', 'Application includes multi-role RBAC switcher (Admin, Specialist, Manager, Read-Only); Okta / Azure AD SAML 2.0 Single Sign-On connector is staged for enterprise identity integration.');
 
@@ -187,7 +186,6 @@ const rows = [
   ['Power BI Star-Schema DirectQuery', '100% Implemented', 'Production Ready'],
   ['Excel/CSV Bulk Importer & Validator', '100% Implemented', 'Production Ready'],
   ['Direct CAQH B2B API Connector', 'Simulated via CSV/JSON', 'Backlog (Requires B2B SLA)'],
-  ['AI Document OCR License Extractor', 'Designed / Staged', 'Phase 2 Sprint Backlog'],
   ['Outbound SMTP Payer Follow-up Bot', 'Template-driven', 'Phase 2 Sprint Backlog'],
   ['Cloud SQL / Firestore Live DB Sync', 'Client persistence + export', 'Phase 2 Deployment'],
 ];
@@ -208,7 +206,7 @@ rows.forEach((r, idx) => {
 doc.y = currentY + 15;
 drawSectionHeading('6', 'Summary & Conclusion');
 drawParagraph(
-  'The credentialing system provides 100% complete coverage for all daily operational credentialing, application tracking, multi-discipline management, facility group linking, executive dashboards, and 5.11 weekly/monthly compliance reporting. The roadmap items represent external enterprise connectivity (B2B APIs, direct SMTP bots, OCR pipelines, and cloud database provisioning) which can be layered onto the fully functional core application.'
+  'The credentialing system provides 100% complete coverage for all daily operational credentialing, application tracking, multi-discipline management, facility group linking, executive dashboards, and 5.11 weekly/monthly compliance reporting. The roadmap items represent external enterprise connectivity (B2B APIs, direct SMTP bots, and cloud database provisioning) which can be layered onto the fully functional core application.'
 );
 
 doc.end();

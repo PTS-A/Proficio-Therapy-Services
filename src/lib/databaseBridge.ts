@@ -105,6 +105,10 @@ export function subscribeToSyncStatus(listener: (status: any) => void): () => vo
   return supabaseLib.subscribeToSyncStatus(listener);
 }
 
+export function getSyncStatus(): any {
+  return supabaseLib.getSyncStatus();
+}
+
 export async function triggerGlobalSync(): Promise<void> {
   return supabaseLib.triggerGlobalSync();
 }

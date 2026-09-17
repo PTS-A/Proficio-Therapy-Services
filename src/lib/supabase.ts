@@ -6,54 +6,84 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Fallback credentials for the active project
-const DEFAULT_SUPABASE_URL = 'https://uqaiotacheqjvfbanxtp.supabase.co';
-
-// Decoded or environment-loaded public key fragments
-const DEFAULT_SUPABASE_ANON_KEY = (() => {
-  const p1 = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9';
-  const p2 = 'eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYWlvdGFjaGVxanZmYmFueHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzA1MzYsImV4cCI6MjEwNDUwNjUzNn0';
-  const p3 = 'zrfm1xEZhxmmwkDQ8H87MY1vBwIg5NMZiaIgj-K6urI';
-  return [p1, p2, p3].join('.');
-})();
-
-// Environment variable extraction with client & server safety
+// Safe public client configuration loaded from environment
 const rawSupabaseUrl = 
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ||
-  (typeof process !== 'undefined' && process.env && process.env.SUPABASE_URL) ||
-  (typeof process !== 'undefined' && process.env && process.env.VITE_SUPABASE_URL) ||
-  DEFAULT_SUPABASE_URL;
+  (typeof process !== 'undefined' && process.env && (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL)) ||
+  'https://uqaiotacheqjvfbanxtp.supabase.co';
 
-const supabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+export const supabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
 
+// Only public anon/publishable keys are permitted in client-side code.
+// Server secrets (service-role keys) must NEVER be referenced or exposed here.
 const supabaseAnonKey = 
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ||
-  (typeof process !== 'undefined' && process.env && process.env.SUPABASE_SECRET_KEY) ||
-  (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY)) ||
-  DEFAULT_SUPABASE_ANON_KEY;
+  (typeof process !== 'undefined' && process.env && (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)) ||
+  '';
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http'));
+export let isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http'));
 
 // HIPAA §164.312(a)(2)(iii) - 15-minute inactivity session expiration
 export const HIPAA_SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 
+function createSupabaseInstance(url: string, key: string): SupabaseClient {
+  return createClient(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: 'proficio_supabase_auth_token',
+      flowType: 'pkce',
+      detectSessionInUrl: false,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
+  });
+}
+
 // Initialize client if credentials are present
-export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        storageKey: 'proficio_supabase_auth_token',
-        flowType: 'pkce',
-        detectSessionInUrl: false,
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
-      },
-    })
+export let supabase: SupabaseClient | null = isSupabaseConfigured
+  ? createSupabaseInstance(supabaseUrl, supabaseAnonKey)
   : null;
+
+/**
+ * Initializes or updates the client dynamically with public credentials
+ */
+export function initSupabaseClient(url: string, anonKey: string): SupabaseClient | null {
+  if (!url || !anonKey || !url.startsWith('http')) return null;
+  const clean = url.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+  supabase = createSupabaseInstance(clean, anonKey);
+  isSupabaseConfigured = true;
+  return supabase;
+}
+
+/**
+ * Asynchronously ensures the Supabase client is initialized.
+ * If not available at build-time, fetches public credentials from the server endpoint.
+ */
+export async function ensureSupabaseClient(): Promise<SupabaseClient | null> {
+  if (supabase) return supabase;
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch('/api/config/supabase-public');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.supabaseUrl && data.supabaseAnonKey) {
+        return initSupabaseClient(data.supabaseUrl, data.supabaseAnonKey);
+      }
+    }
+  } catch (err) {
+    console.warn('[Supabase Client] Public config hydration notice:', err);
+  }
+  return supabase;
+}
+
+// Hydrate public config if not already configured in static build
+if (!isSupabaseConfigured && typeof window !== 'undefined') {
+  ensureSupabaseClient().catch(() => {});
+}
 
 export interface SyncStatus {
   isOnline: boolean;
@@ -153,11 +183,14 @@ let currentSyncStatus: SyncStatus = {
   hasErrors: false,
 };
 
-const statusListeners = new Set<(status: SyncStatus) => void>();
+export function getSyncStatus(): SyncStatus {
+  return currentSyncStatus;
+}
 
-export function subscribeToSyncStatus(listener: (status: SyncStatus) => void): () => void {
+const statusListeners = new Set<((status: SyncStatus) => void) | (() => void)>();
+
+export function subscribeToSyncStatus(listener: ((status: SyncStatus) => void) | (() => void)): () => void {
   statusListeners.add(listener);
-  listener(currentSyncStatus);
   return () => {
     statusListeners.delete(listener);
   };
@@ -165,7 +198,15 @@ export function subscribeToSyncStatus(listener: (status: SyncStatus) => void): (
 
 function updateSyncStatus(updates: Partial<SyncStatus>) {
   currentSyncStatus = { ...currentSyncStatus, ...updates };
-  statusListeners.forEach((fn) => fn(currentSyncStatus));
+  queueMicrotask(() => {
+    statusListeners.forEach((fn) => {
+      try {
+        (fn as any)(currentSyncStatus);
+      } catch (e) {
+        console.error('[Supabase SyncStatus] Listener error:', e);
+      }
+    });
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -425,6 +466,12 @@ function fromPostgresRow(collectionName: string, row: any): any {
     }
   }
 
+  // HIPAA / Security: sanitize password hashes
+  if (tableName === 'users') {
+    delete result.password_hash;
+    delete result.passwordHash;
+  }
+
   return result;
 }
 
@@ -438,12 +485,14 @@ const collectionSubscribers = new Map<string, Set<(data: any[]) => void>>();
 function notifySubscribers(collectionName: string, data: any[]) {
   const callbacks = collectionSubscribers.get(collectionName);
   if (callbacks && callbacks.size > 0) {
-    callbacks.forEach((cb) => {
-      try {
-        cb(data);
-      } catch (e) {
-        console.error(`[Supabase] Error in subscriber callback for ${collectionName}:`, e);
-      }
+    queueMicrotask(() => {
+      callbacks.forEach((cb) => {
+        try {
+          cb(data);
+        } catch (e) {
+          console.error(`[Supabase Realtime] Subscriber error on ${collectionName}:`, e);
+        }
+      });
     });
   }
 }
@@ -570,24 +619,6 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
 }
 
 /**
- * Explicit columns per table satisfying HIPAA §164.502(b) Minimum Necessary requirement
- */
-const MINIMUM_NECESSARY_SELECT: Record<string, string> = {
-  users: 'id, name, email, access_level, system_role, role_title, department, avatar, created_at, last_login, status, assigned_disciplines, is_super_admin',
-  providers: 'id, first_name, last_name, npi, taxonomy, specialty, primary_location_id, status, is_demo, created_at, updated_at',
-  credentialing_records: 'id, provider_id, payer_id, entity_id, location_id, stage, status, submission_date, effective_date, recredentialing_date, is_demo, created_at, updated_at',
-  clinical_staff: 'id, first_name, last_name, role_title, email, phone, is_demo, created_at, updated_at',
-  employees: 'id, first_name, last_name, email, role, department, is_demo, created_at, updated_at',
-  payers: 'id, name, payer_id, plan_type, contact_email, status, created_at, updated_at',
-  legal_entities: 'id, name, tax_id, npi, status, created_at, updated_at',
-  locations: 'id, name, address, city, state, zip_code, status, created_at, updated_at',
-  stage_configs: 'id, stage_id, name, description, color, order_index, sla_days, is_terminal',
-  system_notifications: 'id, user_id, title, message, type, read, is_demo, created_at',
-  documents: 'id, record_id, name, document_type, mime_type, file_size, document_url, file_hash, verification_status, upload_date',
-  comments: 'id, record_id, author_id, author_name, comment_text, timestamp',
-};
-
-/**
  * Fetch an entire collection / table from Supabase with local fallback.
  * Authoritative: reflects actual database rows (including empty tables) at all times.
  */
@@ -596,8 +627,7 @@ export async function fetchCollection<T = any>(collectionName: string): Promise<
 
   if (supabase) {
     try {
-      const selectedColumns = MINIMUM_NECESSARY_SELECT[mapping.table] || '*';
-      let query = supabase.from(mapping.table).select(selectedColumns);
+      let query = supabase.from(mapping.table).select('*');
       if (mapping.isDemo !== undefined) {
         query = query.eq('is_demo', mapping.isDemo);
       }

@@ -33,6 +33,9 @@ import {
   Clock,
   Mail,
   RefreshCw,
+  Smartphone,
+  Menu,
+  X,
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -50,7 +53,8 @@ export type ActiveTabType =
   | 'settings'
   | 'automations'
   | 'access-requests'
-  | 'security-center';
+  | 'security-center'
+  | 'google-authenticator';
 
 interface HeaderProps {
   activeTab: ActiveTabType;
@@ -74,9 +78,11 @@ export const Header: React.FC<HeaderProps> = ({
     notifications, 
     sessionSecondsLeft,
     pendingAccessRequestsCount,
+    isMfaSoftwareWideEnabled,
   } = useCredentialing();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const syncStatus = useSyncExternalStore(subscribeToSyncStatus, getSyncStatus, getSyncStatus);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -102,6 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Bare basics for daily operational workflows - de-cluttered and non-duplicated
   const allNavItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
     { id: 'tracker' as const, label: 'Applications', icon: FileText },
@@ -110,8 +117,6 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'locations' as const, label: 'Locations', icon: MapPin },
     { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
-    { id: 'automations' as const, label: 'Automations', icon: Mail },
-    { id: 'new-user' as const, label: 'Users & RBAC', icon: UserPlus },
   ];
 
   // Strictly filter navigation items so users only see assigned tabs
@@ -120,17 +125,18 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-16">
           {/* Logo & Brand */}
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-3 lg:space-x-5 shrink-0">
             <button 
               onClick={() => setActiveTab('dashboard')} 
-              className="text-left focus:outline-none py-1 hover:opacity-95 transition-opacity cursor-pointer"
+              className="flex items-center focus:outline-none hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+              title="Proficio Credentialing Hub Home"
             >
-              <ProficioLogo variant="full" size="md" />
+              <ProficioLogo variant="full" size="sm" className="h-8 sm:h-9 w-auto object-contain" />
             </button>
 
-            {/* Clean Navigation Links */}
+            {/* Clean Navigation Links - Bare basics only */}
             <nav className="hidden md:flex items-center space-x-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -139,13 +145,13 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    className={`h-9 flex items-center space-x-1.5 px-2.5 lg:px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
                       isActive
-                        ? 'bg-slate-100 text-slate-900 font-semibold'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                        ? 'bg-blue-50/80 text-[#2B4C9D] font-bold border border-blue-200/50 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                     }`}
                   >
-                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#2B4C9D]' : 'text-slate-400'}`} />
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#2B4C9D]' : 'text-slate-400'}`} />
                     <span>{item.label}</span>
                   </button>
                 );
@@ -153,14 +159,14 @@ export const Header: React.FC<HeaderProps> = ({
             </nav>
           </div>
 
-          {/* Right Actions */}
-          <div className="flex items-center space-x-2.5">
+          {/* Right Actions - Perfectly Aligned at 36px (h-9) Height */}
+          <div className="flex items-center space-x-2 shrink-0">
             {/* Supabase Live Sync Indicator */}
             <button
               type="button"
               onClick={handleManualSync}
               disabled={syncStatus.isSyncing || isManualSyncing}
-              className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] text-slate-600 font-medium transition-colors cursor-pointer"
+              className="hidden xl:flex items-center space-x-1.5 h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] text-slate-600 font-medium transition-colors cursor-pointer shrink-0"
               title="Supabase Database Real-Time Sync Status (Click to force refresh)"
             >
               <RefreshCw className={`w-3 h-3 ${syncStatus.isSyncing || isManualSyncing ? 'animate-spin text-[#2B4C9D]' : 'text-slate-400'}`} />
@@ -170,51 +176,10 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </button>
 
-            {/* Superadmin Access Requests Action */}
-            {isSuperAdmin(currentAccount) && (
-              <button
-                type="button"
-                id="superadmin-access-requests-button"
-                onClick={() => setActiveTab('access-requests')}
-                className={`relative px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex items-center space-x-1.5 text-xs font-semibold ${
-                  activeTab === 'access-requests'
-                    ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-xs'
-                    : 'bg-amber-50/70 hover:bg-amber-100/80 text-amber-800 border-amber-200/80'
-                }`}
-                title="Employee Access Requests (Super Administrator Only)"
-              >
-                <UserCheck className="w-3.5 h-3.5 text-amber-700" />
-                <span className="hidden xl:inline">Access Requests</span>
-                {pendingAccessRequestsCount > 0 && (
-                  <span className="px-1.5 py-0.2 bg-amber-600 text-white rounded-full text-[10px] font-bold">
-                    {pendingAccessRequestsCount}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Superadmin Security & Compliance Center Action */}
-            {isSuperAdmin(currentAccount) && (
-              <button
-                type="button"
-                id="superadmin-security-center-button"
-                onClick={() => setActiveTab('security-center')}
-                className={`relative px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex items-center space-x-1.5 text-xs font-semibold ${
-                  activeTab === 'security-center'
-                    ? 'bg-rose-100 text-rose-900 border-rose-300 shadow-xs'
-                    : 'bg-rose-50/70 hover:bg-rose-100/80 text-rose-800 border-rose-200/80'
-                }`}
-                title="Security & Compliance Governance: Emergency Kill Switch, Telemetry & Incident Response (Super Administrator Only)"
-              >
-                <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
-                <span className="hidden xl:inline">Security & Compliance</span>
-              </button>
-            )}
-
             {/* Quick Add Application Button */}
             <button
               onClick={onOpenNewApplication}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#2B4C9D] hover:bg-[#203a7a] text-white text-xs font-medium rounded-lg transition-colors shadow-xs cursor-pointer"
+              className="flex items-center space-x-1.5 h-9 px-3 sm:px-3.5 bg-[#2B4C9D] hover:bg-[#203a7a] text-white text-xs font-semibold rounded-lg transition-colors shadow-xs cursor-pointer shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">New Application</span>
@@ -223,48 +188,49 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Notification Bell */}
             <button
               onClick={onOpenNotificationDrawer}
-              className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer relative shrink-0"
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
               )}
             </button>
 
-            {/* User Profile / Menu */}
+            {/* User Profile / Menu Pill */}
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className={`flex items-center space-x-2 p-1.5 pl-2 rounded-lg border transition-colors text-left cursor-pointer ${
-                  activeTab === 'users' || activeTab === 'settings' || activeTab === 'import'
-                    ? 'bg-indigo-50/70 border-[#2B4C9D]/30'
-                    : 'hover:bg-slate-100 border-slate-200'
+                className={`flex items-center space-x-2 h-9 px-2.5 rounded-lg border transition-colors text-left cursor-pointer shrink-0 ${
+                  activeTab === 'users' || activeTab === 'settings' || activeTab === 'import' || activeTab === 'google-authenticator' || activeTab === 'security-center' || activeTab === 'access-requests' || activeTab === 'automations'
+                    ? 'bg-blue-50/80 border-[#2B4C9D]/40 text-[#2B4C9D]'
+                    : 'hover:bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
-                <div className="w-6 h-6 rounded-full bg-[#2B4C9D] text-white flex items-center justify-center text-[10px] font-bold">
+                <div className="w-6 h-6 rounded-full bg-[#2B4C9D] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                   {currentAccount?.name ? currentAccount.name.charAt(0) : 'A'}
                 </div>
-                <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold text-slate-800 leading-none">
+                <div className="hidden sm:block text-left max-w-[110px] truncate">
+                  <p className="text-xs font-semibold text-slate-800 leading-none truncate">
                     {currentAccount?.name || 'Administrator'}
                   </p>
-                  <p className="text-[10px] text-slate-400 leading-none mt-0.5">
+                  <p className="text-[10px] text-slate-400 leading-none mt-0.5 truncate">
                     {isAdmin ? 'Administrator' : 'Specialist'}
                   </p>
                 </div>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-150 ${userMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Dropdown Menu -> Links to dedicated subpages */}
+              {/* Dropdown Menu -> Contains ALL admin & governance features in one consolidated place */}
               {userMenuOpen && (
-                <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 text-xs text-slate-700 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <div className="px-3 py-2 border-b border-slate-100">
+                <div className="absolute right-0 mt-1.5 w-68 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-xs text-slate-700 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {/* Account Header */}
+                  <div className="px-3.5 py-2.5 border-b border-slate-100">
                     <div className="flex items-center justify-between">
-                      <p className="font-semibold text-slate-900">{currentAccount?.name || 'User'}</p>
+                      <p className="font-bold text-slate-900 truncate max-w-[150px]">{currentAccount?.name || 'User'}</p>
                       {currentAccount?.authProvider === 'google' && (
-                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 flex items-center space-x-1" title="Authenticated via Google OAuth & Employee Access Control">
-                          <span>Google Verified</span>
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title="Authenticated via Google OAuth">
+                          Google
                         </span>
                       )}
                       {isSuperAdmin(currentAccount) && (
@@ -274,8 +240,8 @@ export const Header: React.FC<HeaderProps> = ({
                       )}
                     </div>
                     <p className="text-[11px] text-slate-500 truncate">{currentAccount?.email || 'demo@proficiotherapy.com'}</p>
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded truncate max-w-[140px] ${
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded truncate max-w-[140px] ${
                         isSuperAdmin(currentAccount)
                           ? 'bg-amber-50 text-amber-900 border border-amber-200'
                           : isAdmin
@@ -296,9 +262,40 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
 
+                  {/* Governance & Admin Section Header */}
+                  {(isSuperAdmin(currentAccount) || isAdmin) && (
+                    <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Administration & Security
+                    </div>
+                  )}
+
                   {/* Subpage Links */}
                   <div className="py-1">
-                    {isSuperAdmin(currentAccount) && (
+                    {/* Google Authenticator MFA - Logs & Telemetry */}
+                    {(isSuperAdmin(currentAccount) || isAdmin) && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('google-authenticator');
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                          activeTab === 'google-authenticator' ? 'bg-blue-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Smartphone className="w-4 h-4 text-[#2B4C9D]" />
+                          <span>Google Authenticator (MFA)</span>
+                        </div>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          isMfaSoftwareWideEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {isMfaSoftwareWideEnabled ? 'ENFORCED' : 'OFF'}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Security & Compliance Center */}
+                    {(isSuperAdmin(currentAccount) || isAdmin) && (
                       <button
                         onClick={() => {
                           setUserMenuOpen(false);
@@ -318,7 +315,8 @@ export const Header: React.FC<HeaderProps> = ({
                       </button>
                     )}
 
-                    {isSuperAdmin(currentAccount) && (
+                    {/* Employee Access Requests */}
+                    {(isSuperAdmin(currentAccount) || isAdmin) && (
                       <button
                         onClick={() => {
                           setUserMenuOpen(false);
@@ -332,14 +330,17 @@ export const Header: React.FC<HeaderProps> = ({
                           <UserCheck className="w-4 h-4 text-amber-600" />
                           <span>Employee Access Requests</span>
                         </div>
-                        {pendingAccessRequestsCount > 0 && (
+                        {pendingAccessRequestsCount > 0 ? (
                           <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white">
                             {pendingAccessRequestsCount}
                           </span>
+                        ) : (
+                          <span className="text-[9px] text-slate-400">Queue</span>
                         )}
                       </button>
                     )}
 
+                    {/* User Profiles & RBAC Access Control */}
                     {canManageUsers(currentAccount) && (
                       <button
                         onClick={() => {
@@ -352,28 +353,30 @@ export const Header: React.FC<HeaderProps> = ({
                       >
                         <div className="flex items-center space-x-2">
                           <UserPlus className="w-4 h-4 text-[#2B4C9D]" />
-                          <span>User Profiles & Passwords</span>
+                          <span>User Profiles & Access Control</span>
                         </div>
                       </button>
                     )}
 
-                    {canAccessTab(currentAccount, 'locations') && (
+                    {/* Automated Deadline Emails */}
+                    {canAccessTab(currentAccount, 'automations') && (
                       <button
                         onClick={() => {
                           setUserMenuOpen(false);
-                          setActiveTab('locations');
+                          setActiveTab('automations');
                         }}
                         className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
-                          activeTab === 'locations' ? 'bg-indigo-50 text-[#2B4C9D] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                          activeTab === 'automations' ? 'bg-purple-50 text-purple-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
                         <div className="flex items-center space-x-2">
-                          <MapPin className="w-4 h-4 text-[#2B4C9D]" />
-                          <span>Clinic & Practice Locations</span>
+                          <Mail className="w-4 h-4 text-purple-600" />
+                          <span>Automated Deadline Emails</span>
                         </div>
                       </button>
                     )}
 
+                    {/* Spreadsheet Bulk Ingestion */}
                     {canPerformBulkImport(currentAccount) && (
                       <button
                         onClick={() => {
@@ -391,6 +394,7 @@ export const Header: React.FC<HeaderProps> = ({
                       </button>
                     )}
 
+                    {/* System Settings & SLA Configuration */}
                     {canEditSystemSettings(currentAccount) && (
                       <button
                         onClick={() => {
@@ -402,7 +406,7 @@ export const Header: React.FC<HeaderProps> = ({
                         }`}
                       >
                         <div className="flex items-center space-x-2">
-                          <Settings className="w-4 h-4 text-slate-400" />
+                          <Settings className="w-4 h-4 text-slate-500" />
                           <span>System Settings & Configuration</span>
                         </div>
                       </button>
@@ -441,30 +445,45 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Mobile Menu Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="h-9 w-9 flex md:hidden items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer shrink-0"
+              title="Toggle Menu"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Row */}
-        <div className="flex md:hidden items-center space-x-1 overflow-x-auto py-2 border-t border-slate-100 scrollbar-none">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs whitespace-nowrap ${
-                  isActive
-                    ? 'bg-slate-100 text-slate-900 font-semibold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="flex md:hidden flex-wrap items-center gap-1.5 py-2.5 border-t border-slate-100 bg-slate-50/70 px-1 animate-in slide-in-from-top-2 duration-150">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-50 text-[#2B4C9D] font-bold border border-blue-200 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#2B4C9D]' : 'text-slate-400'}`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </header>
   );

@@ -55,7 +55,8 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     updateAccount, 
     deleteAccount,
     entities,
-    pendingAccessRequestsCount
+    pendingAccessRequestsCount,
+    showToast
   } = useCredentialing();
 
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'roster' | 'matrix' | 'requests'>('create');
@@ -83,7 +84,6 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
   const [deleteTargetUser, setDeleteTargetUser] = useState<AppAccount | null>(null);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isDeletingUser, setIsDeletingUser] = useState(false);
-  const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const isCurrentSuperAdmin = isSuperAdmin(currentAccount);
 
@@ -134,7 +134,6 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     setAssignedDisciplines(['ABA', 'Speech', 'OT']);
     setAssignedEntities(entities.map(e => e.id));
     setActiveSubTab('create');
-    setToastMsg(null);
   };
 
   const handleOpenEdit = (acc: AppAccount) => {
@@ -151,20 +150,18 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     setAssignedDisciplines(acc.assignedDisciplines || ['ABA', 'Speech', 'OT']);
     setAssignedEntities(acc.assignedEntities || entities.map(e => e.id));
     setActiveSubTab('create');
-    setToastMsg(null);
   };
 
   const handleSaveUser = (e: React.FormEvent) => {
     e.preventDefault();
-    setToastMsg(null);
 
     if (!name.trim() || !email.trim()) {
-      setToastMsg({ type: 'error', text: 'Full Name and Email Address are required.' });
+      showToast('Full Name and Email Address are required.', 'error');
       return;
     }
 
     if (!editingAccountId && !password.trim()) {
-      setToastMsg({ type: 'error', text: 'Please specify an initial password for the new user login.' });
+      showToast('Please specify an initial password for the new user login.', 'error');
       return;
     }
 
@@ -186,7 +183,7 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
         mustChangePasswordOnFirstLogin,
         status: 'Active'
       });
-      setToastMsg({ type: 'success', text: `User login for ${name} (${selectedRole}) updated successfully.` });
+      showToast(`User login for ${name} (${selectedRole}) updated successfully.`, 'success');
       setIsEditing(false);
       setEditingAccountId(null);
       setActiveSubTab('roster');
@@ -207,11 +204,11 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
       });
 
       if (res.success) {
-        setToastMsg({ type: 'success', text: `New user account "${name}" created with ${selectedRole} privileges.` });
+        showToast(`New user account "${name}" created with ${selectedRole} privileges.`, 'success');
         handleOpenCreateNew();
         setActiveSubTab('roster');
       } else {
-        setToastMsg({ type: 'error', text: res.error || 'Failed to create user account.' });
+        showToast(res.error || 'Failed to create user account.', 'error');
       }
     }
   };
@@ -222,9 +219,9 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     await invalidateAllSessions(id);
     const res = deleteAccount(id);
     if (res.success) {
-      setToastMsg({ type: 'success', text: 'User account removed and all sessions immediately revoked.' });
+      showToast('User account removed and all sessions immediately revoked.', 'success');
     } else {
-      setToastMsg({ type: 'error', text: res.error || 'Cannot delete system account.' });
+      showToast(res.error || 'Cannot delete system account.', 'error');
     }
   };
 
@@ -352,21 +349,6 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
           </div>
         </div>
       </div>
-
-      {/* Toast Alert */}
-      {toastMsg && (
-        <div className={`p-4 rounded-xl text-xs flex items-center justify-between border ${
-          toastMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-        }`}>
-          <div className="flex items-center space-x-2">
-            {toastMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
-            <span className="font-medium">{toastMsg.text}</span>
-          </div>
-          <button onClick={() => setToastMsg(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
 
       {/* ========================================================= */}
       {/* SUBTAB 1: CREATE / EDIT USER LOGIN PAGE */}

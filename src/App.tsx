@@ -17,8 +17,11 @@ import { DataImportView } from './components/admin/DataImportView';
 import { SystemConfigView } from './components/admin/SystemConfigView';
 import { AutomationDashboardView } from './components/automations/AutomationDashboardView';
 import { AccessRequestsView } from './components/admin/AccessRequestsView';
+import { SecurityCenterView } from './components/admin/SecurityCenterView';
+import { GoogleAuthenticatorView } from './components/admin/GoogleAuthenticatorView';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
+import { ToastContainer } from './components/common/ToastContainer';
 import { Discipline } from './types';
 import { canAccessTab, getAllowedTabs } from './utils/rbac';
 
@@ -220,6 +223,18 @@ const MainContent: React.FC = () => {
             onNavigateToUsers={() => setActiveTab('new-user')}
           />
         )}
+
+        {/* Dedicated Subpage: Security & Compliance Governance Center (Super Administrator Only) */}
+        {activeTab === 'security-center' && (
+          <SecurityCenterView />
+        )}
+
+        {/* Dedicated Subpage: Google Authenticator MFA Governance, Telemetry & Logs */}
+        {activeTab === 'google-authenticator' && (
+          <GoogleAuthenticatorView
+            onBackToDashboard={() => setActiveTab('dashboard')}
+          />
+        )}
       </main>
 
       {/* Record Detail Workspace Modal */}
@@ -264,6 +279,7 @@ export const App: React.FC = () => {
   return (
     <CredentialingProvider>
       <MainContent />
+      <ToastContainer />
     </CredentialingProvider>
   );
 };

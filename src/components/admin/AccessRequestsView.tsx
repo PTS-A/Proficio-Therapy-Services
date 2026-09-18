@@ -47,7 +47,8 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
     denyAccessRequest, 
     refreshAccessRequests,
     entities, 
-    locations 
+    locations,
+    showToast
   } = useCredentialing();
 
   // Filter & Search
@@ -85,8 +86,6 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
   const [denyingRequestId, setDenyingRequestId] = useState<string | null>(null);
   const [denialReasonInput, setDenialReasonInput] = useState('');
   const [isDenying, setIsDenying] = useState(false);
-
-  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const isCurrentSuperAdmin = isSuperAdmin(currentAccount);
 
@@ -161,7 +160,6 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
     setOnboardingDisciplines(draft.assignedDisciplines);
     setOnboardingPassword('proficio');
     setOnboardingPermissions([...roleDef.responsibilities]);
-    setToastMessage(null);
   };
 
   // Finalize Approval & Save User Details
@@ -170,12 +168,11 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
     if (!pushedRequest) return;
 
     if (!onboardingFullName.trim() || !onboardingEmail.trim()) {
-      setToastMessage({ type: 'error', text: 'Full Name and Email Address are required.' });
+      showToast('Full Name and Email Address are required.', 'error');
       return;
     }
 
     setIsSavingOnboarding(true);
-    setToastMessage(null);
 
     try {
       const res = await approveAccessRequest(pushedRequest.id, {
@@ -198,24 +195,18 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
       setIsSavingOnboarding(false);
 
       if (res.success) {
-        setToastMessage({
-          type: 'success',
-          text: `Access approved! ${onboardingFullName} is now registered with ${onboardingRole} (${onboardingAccessLevel}) privileges.`,
-        });
+        showToast(
+          `Access approved! ${onboardingFullName} is now registered with ${onboardingRole} (${onboardingAccessLevel}) privileges.`,
+          'success'
+        );
         setPushedRequest(null);
         refreshAccessRequests();
       } else {
-        setToastMessage({
-          type: 'error',
-          text: res.error || 'Failed to complete user approval.',
-        });
+        showToast(res.error || 'Failed to complete user approval.', 'error');
       }
     } catch (err: any) {
       setIsSavingOnboarding(false);
-      setToastMessage({
-        type: 'error',
-        text: err.message || 'An error occurred during user approval.',
-      });
+      showToast(err.message || 'An error occurred during user approval.', 'error');
     }
   };
 
@@ -235,23 +226,14 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
       setDenialReasonInput('');
 
       if (res.success) {
-        setToastMessage({
-          type: 'success',
-          text: 'Access request has been marked as Denied.',
-        });
+        showToast('Access request has been marked as Denied.', 'success');
         refreshAccessRequests();
       } else {
-        setToastMessage({
-          type: 'error',
-          text: res.error || 'Failed to deny access request.',
-        });
+        showToast(res.error || 'Failed to deny access request.', 'error');
       }
     } catch (err: any) {
       setIsDenying(false);
-      setToastMessage({
-        type: 'error',
-        text: err.message || 'An error occurred while denying the request.',
-      });
+      showToast(err.message || 'An error occurred while denying the request.', 'error');
     }
   };
 
@@ -302,23 +284,6 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16 space-y-6">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className={`p-4 rounded-xl border flex items-center justify-between text-xs font-semibold shadow-xs animate-in fade-in duration-150 ${
-          toastMessage.type === 'success' 
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-            : 'bg-rose-50 border-rose-200 text-rose-800'
-        }`}>
-          <div className="flex items-center space-x-2">
-            {toastMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-rose-600" />}
-            <span>{toastMessage.text}</span>
-          </div>
-          <button onClick={() => setToastMessage(null)} className="p-1 hover:opacity-75 cursor-pointer">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       {/* PUSHED PAGE: "if i approve just push a page to add all basic deetails" */}
       {pushedRequest ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-200">

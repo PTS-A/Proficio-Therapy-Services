@@ -54,7 +54,8 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
     toggleLocationStatus,
     isAdmin,
     currentUser,
-    setFilters
+    setFilters,
+    showToast
   } = useCredentialing();
 
   // Search & Filter State
@@ -70,7 +71,6 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [deleteConfirmLocation, setDeleteConfirmLocation] = useState<Location | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -321,13 +321,12 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
 
     if (editingLocation) {
       updateLocation(editingLocation.id, payload);
-      setSuccessToast(`Successfully updated location "${formData.name}".`);
+      showToast(`Successfully updated location "${formData.name}".`, 'success');
     } else {
       addLocation(payload);
-      setSuccessToast(`Successfully added new location "${formData.name}" to supported clinics & locations.`);
+      showToast(`Successfully added new location "${formData.name}" to supported clinics & locations.`, 'success');
     }
 
-    setTimeout(() => setSuccessToast(null), 4000);
     setIsModalOpen(false);
   };
 
@@ -340,8 +339,7 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
       setDeleteConfirmLocation(null);
       return;
     }
-    setSuccessToast(`Location "${deleteConfirmLocation.name}" was removed.`);
-    setTimeout(() => setSuccessToast(null), 4000);
+    showToast(`Location "${deleteConfirmLocation.name}" was removed.`, 'success');
     setDeleteConfirmLocation(null);
   };
 
@@ -353,17 +351,6 @@ export const LocationsMaster: React.FC<LocationsMasterProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16">
-      {/* Toast Notification */}
-      {successToast && (
-        <div className="fixed top-24 right-6 z-50 bg-emerald-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 border border-emerald-700 animate-in fade-in slide-in-from-top-2 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span className="text-xs font-semibold">{successToast}</span>
-          <button onClick={() => setSuccessToast(null)} className="text-emerald-300 hover:text-white ml-2">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       {/* Global Error Banner */}
       {actionError && (
         <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl flex items-center justify-between text-xs">

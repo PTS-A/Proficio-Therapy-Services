@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import PDFDocument from 'pdfkit';
 
 async function startServer() {
   const app = express();
@@ -125,6 +126,92 @@ async function startServer() {
       exclusionsFound: results.filter((r: any) => r.oigLeieStatus === 'EXCLUDED').length,
       results,
     });
+  });
+
+  // ----------------------------------------------------------------------------
+  // HIPAA §164.312(a)(2)(i) & NIST SP 800-63B MFA Recovery PDF Generator
+  // Generates a cryptographically password-protected PDF containing single-use backup keys.
+  // ----------------------------------------------------------------------------
+  app.post('/api/mfa/generate-recovery-pdf', authRateLimiter, (req, res) => {
+    try {
+      const { email, backupCodes, password } = req.body;
+      if (!password || !backupCodes || !Array.isArray(backupCodes) || backupCodes.length === 0) {
+        return res.status(400).json({ error: 'Password and backup codes are required to generate recovery document.' });
+      }
+
+      const doc = new PDFDocument({
+        userPassword: String(password),
+        ownerPassword: String(password) + '_proficio_admin',
+        permissions: {
+          printing: 'highResolution',
+          modifying: false,
+          copying: false,
+          annotating: false,
+          fillingForms: false,
+          contentAccessibility: true,
+          documentAssembly: false,
+        },
+        info: {
+          Title: 'Proficio Therapy Services - MFA Recovery Keys',
+          Author: 'Proficio Credentialing Hub Security Governance',
+          Subject: 'HIPAA Two-Factor Emergency Recovery Codes',
+        },
+        margin: 50,
+      });
+
+      const safeFilename = `Proficio_MFA_Recovery_Keys_${String(email || 'User').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+      doc.pipe(res);
+
+      // Render official HIPAA compliant layout
+      doc.rect(40, 40, doc.page.width - 80, doc.page.height - 80).lineWidth(1).strokeColor('#cbd5e1').stroke();
+
+      doc.moveDown(0.5);
+      doc.fontSize(16).fillColor('#1e3a8a').font('Helvetica-Bold').text('PROFICIO THERAPY SERVICES', { align: 'center' });
+      doc.fontSize(10).fillColor('#475569').font('Helvetica').text('CLINICAL CREDENTIALING & COMPLIANCE HUB', { align: 'center' });
+      doc.moveDown(0.5);
+
+      doc.fontSize(13).fillColor('#0f172a').font('Helvetica-Bold').text('CONFIDENTIAL: EMERGENCY MFA RECOVERY KEYS', { align: 'center' });
+      doc.fontSize(9).fillColor('#64748b').font('Helvetica').text('Password-Protected & Encrypted per HIPAA Security Rule § 164.312(a)(2)(i)', { align: 'center' });
+
+      doc.moveDown(1);
+      doc.fontSize(10).fillColor('#334155').font('Helvetica-Bold').text('Account Identity: ', { continued: true }).font('Helvetica').text(String(email || 'Authorized Account'));
+      doc.font('Helvetica-Bold').text('Date Generated: ', { continued: true }).font('Helvetica').text(new Date().toUTCString());
+      doc.font('Helvetica-Bold').text('Access Level: ', { continued: true }).font('Helvetica').text('Clinical Staff / Administrative Provider');
+      doc.font('Helvetica-Bold').text('Protection Status: ', { continued: true }).font('Helvetica').text('Standard RC4/AES Password Encrypted (Restricted Access)');
+
+      doc.moveDown(1);
+      doc.fontSize(9).fillColor('#b91c1c').font('Helvetica-Bold').text('CRITICAL INSTRUCTIONS:');
+      doc.fontSize(9).fillColor('#475569').font('Helvetica').text(
+        'These single-use emergency recovery codes can be used to bypass two-factor authentication if you lose access to your Google Authenticator mobile device. Each code can only be used ONCE. Store this document in an encrypted password manager or secure vault.'
+      );
+
+      doc.moveDown(1.5);
+      doc.fontSize(11).fillColor('#0f172a').font('Helvetica-Bold').text('SINGLE-USE RECOVERY CODES:', { align: 'left' });
+      doc.moveDown(0.5);
+
+      backupCodes.forEach((code: string, idx: number) => {
+        doc.fontSize(11).font('Courier-Bold').fillColor('#1e293b').text(`  [ Code ${idx + 1} ]   ${code}`, {
+          characterSpacing: 2,
+        });
+        doc.moveDown(0.2);
+      });
+
+      doc.moveDown(1.5);
+      doc.fontSize(8).fillColor('#94a3b8').font('Helvetica').text(
+        'Proficio Therapy Services LLC • 45 CFR § 164.312 Technical Safeguards • Zero-Knowledge Security Policy',
+        { align: 'center' }
+      );
+
+      doc.end();
+    } catch (err: any) {
+      console.error('[PDF Generation Error]', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to generate encrypted recovery PDF: ' + err.message });
+      }
+    }
   });
 
   // Health check routes for Cloud Run / load balancer probes

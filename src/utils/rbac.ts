@@ -15,7 +15,8 @@ export type ActiveTabType =
   | 'settings'
   | 'automations'
   | 'access-requests'
-  | 'security-center';
+  | 'security-center'
+  | 'google-authenticator';
 
 /**
  * Checks if the account is a Super Admin.
@@ -33,6 +34,17 @@ export const isSuperAdmin = (account: AppAccount | null | undefined): boolean =>
   ) {
     return true;
   }
+  return false;
+};
+
+/**
+ * Checks if the account has administrator privileges.
+ */
+export const isAdminAccount = (account: AppAccount | null | undefined): boolean => {
+  if (!account) return false;
+  if (isSuperAdmin(account)) return true;
+  if (account.accessLevel === 'ADMINISTRATOR') return true;
+  if (account.systemRole === 'System Administrator') return true;
   return false;
 };
 
@@ -84,7 +96,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
   if (!account) return [];
 
   // Super Admin / System Administrator has complete access
-  if (isSuperAdmin(account)) {
+  if (isSuperAdmin(account) || isAdminAccount(account)) {
     return [
       'dashboard',
       'tracker',
@@ -100,7 +112,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'settings',
       'automations',
       'access-requests',
-      'security-center'
+      'security-center',
+      'google-authenticator'
     ];
   }
 
@@ -182,7 +195,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
  */
 export const canAccessTab = (account: AppAccount | null | undefined, tab: ActiveTabType): boolean => {
   if (!account) return false;
-  if (tab === 'access-requests' || tab === 'security-center') return isSuperAdmin(account);
+  if (tab === 'access-requests' || tab === 'security-center' || tab === 'google-authenticator') {
+    return isSuperAdmin(account) || isAdminAccount(account);
+  }
   const allowed = getAllowedTabs(account);
   // Map synonyms like 'users' -> 'new-user'
   if (tab === 'users' && allowed.includes('new-user')) return true;

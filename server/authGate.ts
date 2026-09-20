@@ -152,16 +152,49 @@ export async function verifyEmployeeAuthorization(
 
   const existingUser = userData && userData.length > 0 ? userData[0] : null;
 
+  // Check public.providers table for clinical staff roster
+  const { data: providerData } = await supabase
+    .from('providers')
+    .select('id, first_name, last_name, email, rendering_provider_name, primary_entity_id, active, status, employment_type, caqh_id, npi, provider_type')
+    .ilike('email', cleanEmail)
+    .limit(1);
+
+  const matchedProvider = providerData && providerData.length > 0 ? providerData[0] : null;
+
   // Role-based administrative verification
   const isSuperAdminEmail =
     existingUser?.is_super_admin === true ||
     existingUser?.system_role === 'System Administrator' ||
     existingUser?.access_level === 'SUPER_ADMIN';
 
-  // Approved corporate organization domains for automatic enterprise roster enrollment
+  // Approved corporate organization domains across the three clinical entities
+  // (AGES Learning Solutions, Proficio Therapy Services, and Child's Play Therapy Services)
   const isApprovedOrgDomain =
     cleanEmail.endsWith('@ageslearningsolutions.com') ||
-    cleanEmail.endsWith('@proficiotherapy.com');
+    cleanEmail.endsWith('@ageslearning.com') ||
+    cleanEmail.endsWith('@proficiotherapy.com') ||
+    cleanEmail.endsWith('@childsplaytherapy.com') ||
+    cleanEmail.endsWith('@childsplaytherapyservices.com');
+
+  // If provider found in clinical roster, synthesize/link employee record
+  if (!employee && matchedProvider) {
+    const provFirst = matchedProvider.first_name || 'Clinical';
+    const provLast = matchedProvider.last_name || 'Staff';
+    const provFull = `${provFirst} ${provLast}`.trim();
+    employee = {
+      id: matchedProvider.id || `emp-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '-')}`,
+      first_name: provFirst,
+      last_name: provLast,
+      full_name: provFull,
+      email: cleanEmail,
+      department: 'Clinical Services',
+      role_title: matchedProvider.provider_type ? `Clinical Staff (${matchedProvider.provider_type})` : 'Clinical Staff',
+      employment_status: matchedProvider.active === false ? 'Terminated' : 'Active',
+      entity_id: matchedProvider.primary_entity_id || 'ent-1',
+      office_location_id: 'loc-1',
+      is_demo: false,
+    };
+  }
 
   if (!employee && !existingUser && !isSuperAdminEmail && isApprovedOrgDomain) {
     const rawName = googleProfile?.name || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
@@ -244,7 +277,7 @@ export async function verifyEmployeeAuthorization(
       step: 2,
       stepName: 'Existing Employee Lookup',
       code: 'DENIED_NO_EMPLOYEE',
-      reason: `Access Denied: No enrolled employee record was found for ${cleanEmail}. Contact your HR administrator or IT Governance to enroll in the system.`,
+      reason: `Access Denied: No enrolled employee record was found for ${cleanEmail} in the AGES Learning Solutions, Proficio Therapy Services, or Child's Play Therapy Services employee roster. Please submit an Access Request or contact your Credentialing Administrator.`,
     };
   }
 
@@ -666,7 +699,7 @@ function computeAllowedTabs(account: any): string[] {
         'reports',
       ];
     case 'Provider':
-      return ['dashboard', 'tracker', 'providers'];
+      return ['clinical-portal', 'dashboard', 'tracker', 'providers'];
     case 'HR/Operations':
       return ['dashboard', 'tracker', 'providers', 'locations', 'reports'];
     case 'Billing and Claims':

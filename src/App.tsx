@@ -19,6 +19,10 @@ import { AutomationDashboardView } from './components/automations/AutomationDash
 import { AccessRequestsView } from './components/admin/AccessRequestsView';
 import { SecurityCenterView } from './components/admin/SecurityCenterView';
 import { GoogleAuthenticatorView } from './components/admin/GoogleAuthenticatorView';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { StaffApprovalsView } from './components/admin/StaffApprovalsView';
+import { ClinicalStaffHub } from './components/clinical/ClinicalStaffHub';
+import { ClinicalStaffPortal } from './components/clinical/ClinicalStaffPortal';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -128,13 +132,40 @@ const MainContent: React.FC = () => {
         )}
 
         {activeTab === 'providers' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-            <ProviderMaster
-              onSelectRecord={handleSelectRecord}
-              selectedProviderId={selectedProviderId}
-              onClearSelectedProvider={() => setSelectedProviderId(null)}
-              onNavigateToLinking={() => setActiveTab('linking')}
+          <div className="pt-2">
+            <ClinicalStaffHub
+              onSelectProviderId={(pId) => handleSelectProvider(pId)}
+              onOpenNewApplication={() => setIsNewAppModalOpen(true)}
+            />
+          </div>
+        )}
+
+        {/* Dedicated Subpage: Clinical Staff Self-Service Profile Portal */}
+        {activeTab === 'clinical-portal' && (
+          <div className="pt-2">
+            <ClinicalStaffPortal onBackToApp={() => setActiveTab('dashboard')} />
+          </div>
+        )}
+
+        {/* Dedicated Subpage: Consolidated Admin Dashboard */}
+        {activeTab === 'admin-dashboard' && (
+          <div className="pt-2">
+            <AdminDashboard
+              onBackToApp={() => setActiveTab('dashboard')}
               onNavigateToTracker={() => setActiveTab('tracker')}
+              onNavigateToProviders={() => setActiveTab('providers')}
+            />
+          </div>
+        )}
+
+        {/* Dedicated Subpage: Clinical Staff Approvals Queue */}
+        {activeTab === 'staff-approvals' && (
+          <div className="pt-2">
+            <AdminDashboard
+              initialSection="approvals"
+              onBackToApp={() => setActiveTab('dashboard')}
+              onNavigateToTracker={() => setActiveTab('tracker')}
+              onNavigateToProviders={() => setActiveTab('providers')}
             />
           </div>
         )}

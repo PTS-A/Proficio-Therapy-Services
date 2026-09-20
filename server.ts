@@ -1222,6 +1222,119 @@ async function startServer() {
   });
 
   // --------------------------------------------------------------------------
+  // CLINICAL STAFF PORTAL & APPROVALS WORKFLOW API
+  // --------------------------------------------------------------------------
+
+  // Fetch all staff change requests
+  app.get('/api/clinical-staff/change-requests', async (req, res) => {
+    try {
+      const { fetchAllChangeRequests } = await import('./server/clinicalStaff');
+      const requests = await fetchAllChangeRequests();
+      res.json({ success: true, requests });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Submit a new profile update request from Clinical Staff
+  app.post('/api/clinical-staff/change-requests', async (req, res) => {
+    try {
+      const { fetchAllChangeRequests, persistChangeRequests } = await import('./server/clinicalStaff');
+      const requests = await fetchAllChangeRequests();
+      const body = req.body;
+
+      const newRequest = {
+        id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        providerId: body.providerId || '',
+        employeeEmail: (body.employeeEmail || '').toLowerCase().trim(),
+        employeeName: body.employeeName || '',
+        entityId: body.entityId || 'ent-1',
+        requestedAt: new Date().toISOString(),
+        status: 'PENDING' as const,
+        changes: body.changes || {},
+        previousValues: body.previousValues || {},
+      };
+
+      const updatedList = [newRequest, ...requests];
+      await persistChangeRequests(updatedList);
+
+      res.status(201).json({ success: true, request: newRequest });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Review (Approve / Deny) a clinical staff change request
+  app.post('/api/clinical-staff/change-requests/review', async (req, res) => {
+    try {
+      const { fetchAllChangeRequests, persistChangeRequests } = await import('./server/clinicalStaff');
+      const { requestId, action, reviewNotes, reviewedBy } = req.body;
+
+      if (!requestId || !action) {
+        return res.status(400).json({ success: false, error: 'requestId and action are required' });
+      }
+
+      const requests = await fetchAllChangeRequests();
+      const target = requests.find((r) => r.id === requestId);
+      if (!target) {
+        return res.status(404).json({ success: false, error: 'Change request not found' });
+      }
+
+      target.status = action === 'APPROVE' ? 'APPROVED' : 'DENIED';
+      target.reviewedAt = new Date().toISOString();
+      target.reviewedBy = reviewedBy || 'Credentialing Specialist';
+      target.reviewNotes = reviewNotes || '';
+
+      await persistChangeRequests(requests);
+
+      res.json({ success: true, request: target });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Fetch comments for entities
+  app.get('/api/clinical-staff/comments', async (req, res) => {
+    try {
+      const { fetchAllComments } = await import('./server/clinicalStaff');
+      const comments = await fetchAllComments();
+      const entityId = req.query.entityId as string;
+      const filtered = entityId ? comments.filter((c) => c.entityId === entityId) : comments;
+      res.json({ success: true, comments: filtered });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Add comment for an entity
+  app.post('/api/clinical-staff/comments', async (req, res) => {
+    try {
+      const { fetchAllComments, persistComments } = await import('./server/clinicalStaff');
+      const comments = await fetchAllComments();
+      const body = req.body;
+
+      const newComment = {
+        id: `comm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        entityId: body.entityId || 'ent-1',
+        providerId: body.providerId,
+        authorId: body.authorId || 'system',
+        authorName: body.authorName || 'Credentialing Staff',
+        authorRole: body.authorRole || 'Credentialing Specialist',
+        authorEmail: body.authorEmail || '',
+        content: body.content || '',
+        createdAt: new Date().toISOString(),
+      };
+
+      const updated = [newComment, ...comments];
+      await persistComments(updated);
+
+      res.status(201).json({ success: true, comment: newComment });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // --------------------------------------------------------------------------
   // SCRIPT: AUTOMATED CREDENTIAL DEADLINE REMINDER ENGINE API
   // --------------------------------------------------------------------------
 

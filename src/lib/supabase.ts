@@ -422,6 +422,12 @@ function toPostgresRow(collectionName: string, item: any): any {
       taxonomy: item.taxonomy || '',
       specialty: item.specialty || '',
       notes: item.notes || '',
+      region: item.region || '',
+      bcbaCertificationNumber: item.bcbaCertificationNumber || '',
+      bcbaEffectiveDate: item.bcbaEffectiveDate || '',
+      bcbaExpiryDate: item.bcbaExpiryDate || '',
+      utStateLicense: item.utStateLicense || '',
+      primaryEntityId: item.primaryEntityId || 'ent-1',
     };
   }
 
@@ -506,11 +512,20 @@ function fromPostgresRow(collectionName: string, row: any): any {
     result[key] = val;
   }
 
-  // Provider additional location ids unpack
+  // Provider additional location ids and custom fields unpack
   if (tableName === 'providers' && row.contract_info && typeof row.contract_info === 'object') {
     if (row.contract_info.additionalLocationIds) {
       result.additionalLocationIds = row.contract_info.additionalLocationIds;
     }
+    if (row.contract_info.region) result.region = row.contract_info.region;
+    if (row.contract_info.bcbaCertificationNumber) result.bcbaCertificationNumber = row.contract_info.bcbaCertificationNumber;
+    if (row.contract_info.bcbaEffectiveDate) result.bcbaEffectiveDate = row.contract_info.bcbaEffectiveDate;
+    if (row.contract_info.bcbaExpiryDate) result.bcbaExpiryDate = row.contract_info.bcbaExpiryDate;
+    if (row.contract_info.utStateLicense) result.utStateLicense = row.contract_info.utStateLicense;
+    if (row.contract_info.primaryEntityId) result.primaryEntityId = row.contract_info.primaryEntityId;
+    if (row.contract_info.taxonomy && !result.taxonomy) result.taxonomy = row.contract_info.taxonomy;
+    if (row.contract_info.specialty && !result.specialty) result.specialty = row.contract_info.specialty;
+    if (row.contract_info.notes && !result.notes) result.notes = row.contract_info.notes;
   }
 
   // User schema normalization and role derivation directly from Supabase

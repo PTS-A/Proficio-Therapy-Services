@@ -16,7 +16,10 @@ export type ActiveTabType =
   | 'automations'
   | 'access-requests'
   | 'security-center'
-  | 'google-authenticator';
+  | 'google-authenticator'
+  | 'admin-dashboard'
+  | 'clinical-portal'
+  | 'staff-approvals';
 
 /**
  * Checks if the account is a Super Admin.
@@ -113,7 +116,10 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'automations',
       'access-requests',
       'security-center',
-      'google-authenticator'
+      'google-authenticator',
+      'admin-dashboard',
+      'clinical-portal',
+      'staff-approvals'
     ];
   }
 
@@ -130,7 +136,10 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'payers',
         'entities',
         'reports',
-        'automations'
+        'automations',
+        'admin-dashboard',
+        'staff-approvals',
+        'clinical-portal'
       ];
 
     case 'Credentialing Specialist':
@@ -140,7 +149,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'linking',
         'providers',
         'locations',
-        'payers'
+        'payers',
+        'staff-approvals',
+        'clinical-portal'
       ];
 
     case 'Billing and Claims':
@@ -149,7 +160,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'linking',
         'tracker',
         'payers',
-        'reports'
+        'reports',
+        'clinical-portal'
       ];
 
     case 'HR/Operations':
@@ -158,7 +170,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'providers',
         'locations',
         'entities',
-        'tracker'
+        'tracker',
+        'clinical-portal'
       ];
 
     case 'Clinical Team':
@@ -166,7 +179,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'dashboard',
         'providers',
         'tracker',
-        'reports'
+        'reports',
+        'clinical-portal'
       ];
 
     case 'Leadership / Management':
@@ -175,18 +189,20 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'reports',
         'tracker',
         'linking',
-        'payers'
+        'payers',
+        'clinical-portal'
       ];
 
     case 'Provider':
       return [
         'dashboard',
         'providers',
-        'tracker'
+        'tracker',
+        'clinical-portal'
       ];
 
     default:
-      return ['dashboard', 'tracker', 'providers'];
+      return ['dashboard', 'tracker', 'providers', 'clinical-portal'];
   }
 };
 
@@ -197,6 +213,15 @@ export const canAccessTab = (account: AppAccount | null | undefined, tab: Active
   if (!account) return false;
   if (tab === 'access-requests' || tab === 'security-center' || tab === 'google-authenticator') {
     return isSuperAdmin(account) || isAdminAccount(account);
+  }
+  if (tab === 'admin-dashboard') {
+    return isSuperAdmin(account) || isAdminAccount(account) || account.systemRole === 'Credentialing Lead / Manager';
+  }
+  if (tab === 'staff-approvals') {
+    return isSuperAdmin(account) || isAdminAccount(account) || account.systemRole === 'Credentialing Lead / Manager' || account.systemRole === 'Credentialing Specialist';
+  }
+  if (tab === 'clinical-portal') {
+    return true;
   }
   const allowed = getAllowedTabs(account);
   // Map synonyms like 'users' -> 'new-user'

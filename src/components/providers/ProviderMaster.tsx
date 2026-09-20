@@ -121,6 +121,11 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
     licenseExpiration: string;
     taxonomy: string;
     specialty: string;
+    region: string;
+    bcbaCertificationNumber: string;
+    bcbaEffectiveDate: string;
+    bcbaExpiryDate: string;
+    utStateLicense: string;
     email: string;
     phone: string;
     altPhone: string;
@@ -168,6 +173,11 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
     licenseExpiration: '',
     taxonomy: '103K00000X (Behavior Analyst)',
     specialty: 'Pediatric Applied Behavior Analysis',
+    region: '',
+    bcbaCertificationNumber: '',
+    bcbaEffectiveDate: '',
+    bcbaExpiryDate: '',
+    utStateLicense: '',
     email: '',
     phone: '',
     altPhone: '',
@@ -304,6 +314,11 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
       licenseExpiration: p.licenseExpiration || '',
       taxonomy: p.taxonomy || '103K00000X',
       specialty: p.specialty || '',
+      region: p.region || '',
+      bcbaCertificationNumber: p.bcbaCertificationNumber || '',
+      bcbaEffectiveDate: p.bcbaEffectiveDate || '',
+      bcbaExpiryDate: p.bcbaExpiryDate || '',
+      utStateLicense: p.utStateLicense || '',
       email: p.email || '',
       phone: p.phone || '',
       altPhone: p.altPhone || '',
@@ -644,10 +659,18 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-500 mt-1 flex items-center space-x-2">
-                      <span className="font-mono font-semibold">NPI: {p.npi}</span>
+                    <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="font-mono font-semibold">NPI: {p.npi || 'Pending'}</span>
                       <span>•</span>
-                      <span>{p.licenseState} Lic: {p.licenseNumber}</span>
+                      <span>{p.licenseState || 'CA'} Lic: {p.bcbaCertificationNumber || p.licenseNumber}</span>
+                      {(p.licenseState === 'UT' || p.region?.toLowerCase() === 'utah' || Boolean(p.utStateLicense)) && p.utStateLicense && (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-800 font-bold bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded text-[10px]">
+                            UT: {p.utStateLicense}
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
@@ -690,6 +713,22 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                       <span className="font-semibold text-slate-700">{activeProvider.providerType}</span>
                       <span>•</span>
                       <span className="text-sky-700 font-medium">{activeProvider.specialty}</span>
+                      {activeProvider.region && (
+                        <>
+                          <span>•</span>
+                          <span className="text-indigo-700 font-semibold bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md text-[10px]">
+                            {activeProvider.region}
+                          </span>
+                        </>
+                      )}
+                      {(activeProvider.licenseState === 'UT' || activeProvider.region?.toLowerCase() === 'utah' || Boolean(activeProvider.utStateLicense)) && (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-800 font-bold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md text-[10px]">
+                            UT DOPL License
+                          </span>
+                        </>
+                      )}
                       <span>•</span>
                       <span className="text-slate-600 font-semibold">{activeProvider.employmentStatus} ({activeProvider.contractStatus || 'W-2'})</span>
                     </div>
@@ -935,12 +974,29 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">License Number</span>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                          {activeProvider.bcbaCertificationNumber ? 'BCBA Certification #' : 'License Number'}
+                        </span>
                         <div className="font-bold text-slate-800 mt-0.5">
-                          {activeProvider.licenseNumber} ({activeProvider.licenseState})
+                          {activeProvider.bcbaCertificationNumber || activeProvider.licenseNumber} ({activeProvider.licenseState || 'CA'})
                         </div>
-                        <span className="text-[10px] text-slate-500">State: {activeProvider.licenseState}</span>
+                        <span className="text-[10px] text-slate-500">
+                          {activeProvider.bcbaEffectiveDate ? `Effective: ${activeProvider.bcbaEffectiveDate}` : `State: ${activeProvider.licenseState || 'CA'}`}
+                        </span>
                       </div>
+
+                      {/* CONDITIONAL UTAH FIELD: If they are Utah, show the Utah field otherwise don't show it */}
+                      {(activeProvider.licenseState === 'UT' || activeProvider.region?.toLowerCase() === 'utah' || Boolean(activeProvider.utStateLicense)) && (
+                        <div className="p-2.5 bg-amber-50/90 rounded-xl border border-amber-200">
+                          <span className="text-amber-800 block text-[10px] uppercase font-bold flex items-center space-x-1">
+                            <span>Utah State License # (DOPL)</span>
+                          </span>
+                          <div className="font-mono font-bold text-amber-950 mt-0.5 text-xs">
+                            {activeProvider.utStateLicense || 'Not on file'}
+                          </div>
+                          <span className="text-[10px] text-amber-700">Utah DOPL State Licensure</span>
+                        </div>
+                      )}
 
                       <div>
                         <span className="text-slate-400 block text-[10px] uppercase font-bold">License Expiration</span>
@@ -1769,6 +1825,49 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
+                      <label className="font-semibold text-slate-700">Practice Region</label>
+                      <input
+                        type="text"
+                        value={formData.region}
+                        onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                        className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        placeholder="e.g. San Jose, Livermore, Brentwood, Vacaville, Utah"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-semibold text-slate-700">BCBA Certification #</label>
+                      <input
+                        type="text"
+                        value={formData.bcbaCertificationNumber}
+                        onChange={(e) => setFormData({ ...formData, bcbaCertificationNumber: e.target.value })}
+                        className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                        placeholder="e.g. 1-17-26800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* CONDITIONAL UTAH FIELD: If they are Utah, show the Utah field otherwise don't show it */}
+                  {(formData.licenseState === 'UT' || formData.region?.toLowerCase() === 'utah') && (
+                    <div className="p-3 bg-amber-50/90 rounded-xl border border-amber-200">
+                      <label className="font-bold text-amber-900 text-xs flex items-center justify-between">
+                        <span>Utah State License # (DOPL) *</span>
+                        <span className="text-[10px] text-amber-700 font-medium">Utah Region Licensure</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.utStateLicense}
+                        onChange={(e) => setFormData({ ...formData, utStateLicense: e.target.value })}
+                        className="w-full mt-1.5 p-2 bg-white border border-amber-300 rounded-lg text-xs font-mono text-amber-950 focus:ring-amber-500"
+                        placeholder="e.g. 11123646-2506"
+                      />
+                      <p className="text-[10px] text-amber-700 mt-1">
+                        Active Utah DOPL License. Field automatically visible for Utah clinicians.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
                       <label className="font-semibold text-slate-700">Taxonomy Code & Title</label>
                       <input
                         type="text"
@@ -1927,7 +2026,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                 <div className="space-y-3.5">
                   <div>
                     <label className="font-semibold text-slate-700 block mb-1">
-                      Primary Practice Location *
+                      Primary Practice Location
                     </label>
                     <select
                       value={formData.primaryLocationId}
@@ -1942,12 +2041,12 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                           ...formData,
                           primaryLocationId: newPrim,
                           serviceTypes: updatedServices,
-                          locationIds: Array.from(new Set([newPrim, ...formData.locationIds]))
+                          locationIds: newPrim ? Array.from(new Set([newPrim, ...formData.locationIds])) : formData.locationIds
                         });
                       }}
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
-                      required
                     >
+                      <option value="">-- None / Unassigned (No Primary Location) --</option>
                       {locations.map(loc => {
                         const isInHome = loc.locationType === 'In-Home / Mobile' || loc.serviceTypes?.includes('In-Home');
                         return (

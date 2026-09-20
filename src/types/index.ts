@@ -182,6 +182,11 @@ export interface ClinicalStaff {
   ownerAccountEmail?: string;
   taxonomy?: string;
   specialty?: string;
+  region?: string;
+  bcbaCertificationNumber?: string;
+  bcbaEffectiveDate?: string;
+  bcbaExpiryDate?: string;
+  utStateLicense?: string;
   primaryLocationId?: string;
   locationIds: string[];
   entityIds: string[];
@@ -338,6 +343,11 @@ export interface Provider {
   licenseExpiration: string;
   taxonomy: string;
   specialty: string;
+  region?: string;
+  bcbaCertificationNumber?: string;
+  bcbaEffectiveDate?: string;
+  bcbaExpiryDate?: string;
+  utStateLicense?: string;
 
   // 2. Employment / Group Information
   entityIds: string[]; // Legal entities provider works under
@@ -989,4 +999,44 @@ export interface AccessRequest {
   assignedEntityId?: string;
   assignedLocationId?: string;
   assignedDisciplines?: Discipline[];
+}
+
+export interface StaffChangeRequest {
+  id: string;
+  providerId: string;
+  employeeEmail: string;
+  employeeName: string;
+  entityId: string;
+  requestedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'DENIED';
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
+  changes: {
+    phone?: string;
+    contactAddress?: string;
+    npi?: string;
+    caqhId?: string;
+    taxonomyCode?: string;
+    primaryLicenseNumber?: string;
+    primaryLicenseExpiry?: string;
+    utahLicenseNumber?: string;
+    utahLicenseExpiry?: string;
+    documentLinks?: Array<{ title: string; url: string; category?: string }>;
+    notes?: string;
+  };
+  previousValues: Record<string, any>;
+}
+
+export interface ClinicalStaffComment {
+  id: string;
+  entityId: string;
+  providerId?: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  authorEmail: string;
+  content: string;
+  createdAt: string;
+  updatedAt?: string;
 }

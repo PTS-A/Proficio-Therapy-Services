@@ -1210,13 +1210,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!isMounted) return;
       if (res && res.handled) {
         if (res.authorized && res.account) {
-          setCurrentAccount(res.account);
-          switchDataForAccount(res.account);
-          localStorage.setItem('cred_current_account', JSON.stringify(res.account));
-          localStorage.setItem('cred_last_activity', String(Date.now()));
+          // Every login must proceed through Google Authenticator MFA
+          setPendingMfaAccount(res.account);
           localStorage.removeItem('cred_timeout_reason');
           localStorage.removeItem('cred_oauth_denial');
-          setSessionSecondsLeft(20 * 60);
         } else if (res.denial || res.error) {
           localStorage.setItem('cred_oauth_denial', JSON.stringify(res.denial || { reason: res.error }));
         }
@@ -1536,26 +1533,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           };
         }
 
-        // If Google Authenticator MFA is toggled OFF software-wide, bypass MFA and log in immediately
-        if (!isMfaSoftwareWideEnabled) {
-          finalizeLogin(verifiedAcc);
-          return {
-            success: true,
-            account: verifiedAcc,
-            step: 10,
-            stepName: 'Authentication Complete',
-            code: 'AUTH_SUCCESS',
-          };
-        }
-
-        // Intercept with Google Authenticator TOTP Multi-Factor Authentication (45 CFR §164.312(a)(2)(i))
+        // Google Workspace identity authentication (Google OAuth / Enterprise IdP)
+        // Every login must strictly proceed through Google Authenticator MFA verification
         setPendingMfaAccount(verifiedAcc);
-
         return {
           success: true,
           account: verifiedAcc,
           step: 10,
-          stepName: 'MFA Authentication',
+          stepName: 'Google Authenticator MFA',
           code: 'REQUIRES_MFA',
         };
       }
@@ -2075,6 +2060,29 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setAccounts((prev) => [...prev, newAcc]);
     saveDocument('users', newAcc.id, newAcc).catch(console.error);
+
+    // Also sync to employee roster table so access control and roster view are immediately aligned
+    const nameParts = newAcc.name.trim().split(' ');
+    const empRecord: any = {
+      id: `emp-${newAcc.id.replace('acc-', '')}`,
+      userId: newAcc.id,
+      firstName: nameParts[0] || 'Team',
+      lastName: nameParts.slice(1).join(' ') || 'Member',
+      fullName: newAcc.name,
+      email: cleanEmail,
+      department: newAcc.department,
+      roleTitle: newAcc.roleTitle,
+      employmentStatus: newAcc.status,
+      entityId: newAcc.assignedEntities?.[0] || 'ent-1',
+      officeLocationId: 'loc-1',
+      isDemo: false,
+    };
+    saveDocument('employees', empRecord.id, empRecord).catch(console.error);
+    setEmployees((prev) => {
+      if (prev.some(e => e.email?.toLowerCase() === cleanEmail)) return prev;
+      return [...prev, empRecord];
+    });
+
     return { success: true, account: newAcc };
   };
 

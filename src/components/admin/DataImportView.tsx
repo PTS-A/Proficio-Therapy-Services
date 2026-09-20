@@ -187,9 +187,18 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
     try {
       if (category === 'providers') {
         const importedProviders: Provider[] = parsedRows.map((row, idx) => {
-          const firstName = row['First Name'] || row['firstName'] || row['First'] || row['Provider First Name'] || `Clinician`;
-          const lastName = row['Last Name'] || row['lastName'] || row['Last'] || row['Provider Last Name'] || `${idx + 1}`;
-          const npi = String(row['NPI'] || row['npi'] || row['National Provider ID'] || `100000000${idx}`).trim();
+          let firstName = row['First Name'] || row['firstName'] || row['First'] || row['Provider First Name'] || '';
+          let lastName = row['Last Name'] || row['lastName'] || row['Last'] || row['Provider Last Name'] || '';
+          const staffName = row['Staff Name'] || row['Staff'] || row['Staff name'] || row['Provider Name'] || row['Name'];
+          if ((!firstName || !lastName) && staffName) {
+            const parts = String(staffName).trim().split(/\s+/);
+            firstName = parts[0] || 'Clinician';
+            lastName = parts.slice(1).join(' ') || `${idx + 1}`;
+          }
+          if (!firstName) firstName = 'Clinician';
+          if (!lastName) lastName = `${idx + 1}`;
+
+          const npi = String(row['NPI'] || row['npi'] || row['National Provider ID'] || '').trim();
           const providerType: ProviderType = row['Provider Type'] || row['Type'] || row['providerType'] || 'BCBA';
           
           // Disciplines (supports comma-separated multi-select)
@@ -199,25 +208,38 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
           if (disciplineRaw.toLowerCase().includes('ot') || disciplineRaw.toLowerCase().includes('occupational')) disciplines.push('OT');
           if (disciplineRaw.toLowerCase().includes('aba') || disciplines.length === 0) disciplines.push('ABA');
 
-          // Entity Resolution
+          // Region and BCBA fields
+          const region = String(row['Region'] || row['region'] || '').trim();
+          const bcbaCertificationNumber = String(row['BCBA Certification #'] || row['BCBA Certification Number'] || row['BCBA #'] || row['bcbaCertificationNumber'] || '').trim();
+          const bcbaEffectiveDate = String(row['Effective date'] || row['Effective Date'] || row['bcbaEffectiveDate'] || '').trim();
+          const bcbaExpiryDate = String(row['Expiry date'] || row['Expiration date'] || row['Expiration Date'] || row['bcbaExpiryDate'] || '').trim();
+
+          // Conditional Utah logic: if they are Utah, show/save the Utah field, otherwise don't
+          const isUtah = region.toLowerCase() === 'utah' || 
+            String(row['State'] || '').toUpperCase() === 'UT' || 
+            String(row['License State'] || '').toUpperCase() === 'UT' || 
+            Boolean(row['UT State License']) || 
+            Boolean(row['Utah State License']) || 
+            Boolean(row['Utah DOPL License']);
+          
+          const utStateLicense = isUtah ? String(row['UT State License'] || row['Utah State License'] || row['Utah DOPL License'] || row['utStateLicense'] || '').trim() : undefined;
+          const licenseState = isUtah ? 'UT' : String(row['License State'] || row['State'] || 'CA').toUpperCase();
+
+          // Entity Resolution: default to ENT-1 (AGES Learning Solutions) as requested
           const primaryEntName = String(row['Primary Legal Entity'] || row['Legal Entity'] || row['Entity'] || '').toLowerCase();
           const matchedEntity = entities.find(e => 
+            e.id === 'ent-1' ||
             e.legalName.toLowerCase().includes(primaryEntName) || 
             (e.dba && e.dba.toLowerCase().includes(primaryEntName)) ||
             e.id === primaryEntName
-          ) || entities[0];
+          ) || entities.find(e => e.id === 'ent-1') || entities[0];
           
-          const entityAffilRaw = String(row['Entity Affiliations'] || row['Affiliations'] || '');
-          const entityIds: string[] = [matchedEntity?.id || 'ent-1'];
-          if (entityAffilRaw) {
-            entities.forEach(ent => {
-              if (entityAffilRaw.toLowerCase().includes(ent.legalName.toLowerCase()) || (ent.dba && entityAffilRaw.toLowerCase().includes(ent.dba.toLowerCase()))) {
-                if (!entityIds.includes(ent.id)) entityIds.push(ent.id);
-              }
-            });
+          const entityIds: string[] = ['ent-1'];
+          if (matchedEntity?.id && !entityIds.includes(matchedEntity.id)) {
+            entityIds.push(matchedEntity.id);
           }
 
-          // Service Location Resolution (Multi-location support)
+          // Service Location Resolution: do NOT put primary location per user instruction ("do not put primary locaton but map them to ENT-1")
           const locationsRaw = String(row['Service Locations'] || row['Locations'] || row['Location'] || '');
           const matchedLocationIds: string[] = [];
           if (locationsRaw) {
@@ -227,7 +249,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
               }
             });
           }
-          const finalLocationIds = matchedLocationIds.length > 0 ? matchedLocationIds : [locations[0]?.id || 'loc-1'];
+          const finalLocationIds = matchedLocationIds;
 
           // Service Delivery Types
           const serviceTypesRaw = String(row['Service Delivery Types'] || row['Service Types'] || 'In-Clinic, In-Home');
@@ -282,22 +304,28 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
             phone: row['Phone'] || '(408) 555-0100',
             altPhone: row['Alt Phone'] || '',
             contactAddress: row['Contact Address'] || '',
-            licenseNumber: row['License Number'] || row['License'] || `CA-${Math.floor(10000 + Math.random() * 90000)}`,
-            licenseState: row['License State'] || row['State'] || 'CA',
-            licenseExpiration: row['License Expiration'] || '2027-12-31',
-            taxonomy: row['Taxonomy'] || '103K00000X',
-            specialty: row['Specialty'] || 'Behavior Analysis',
+            licenseNumber: bcbaCertificationNumber || row['License Number'] || row['License'] || (npi ? `LIC-${npi.slice(-5)}` : 'Pending'),
+            licenseState,
+            licenseExpiration: bcbaExpiryDate || row['License Expiration'] || '2027-12-31',
+            taxonomy: row['Taxonomy'] || '103K00000X (Behavior Analyst)',
+            specialty: row['Specialty'] || 'Applied Behavior Analysis',
+            region: region || undefined,
+            bcbaCertificationNumber: bcbaCertificationNumber || undefined,
+            bcbaEffectiveDate: bcbaEffectiveDate || undefined,
+            bcbaExpiryDate: bcbaExpiryDate || undefined,
+            utStateLicense: utStateLicense || undefined,
             
-            // Employment & Group
+            // Employment & Group: Mapped to ENT-1 without primary location as requested
             entityIds,
-            primaryEntityId: matchedEntity?.id || 'ent-1',
-            dba: row['DBA'] || matchedEntity?.dba || '',
+            primaryEntityId: 'ent-1',
+            dba: matchedEntity?.dba || 'AGES Learning Solutions',
             employmentStatus,
             contractStatus: row['Contract Classification'] || 'W-2 Full-Time',
-            startDate: row['Hire Date'] || row['Start Date'] || '2026-01-15',
-            groupAffiliation: row['Group Affiliation Name'] || 'Ages Pediatric Health Partners',
+            startDate: row['Hire Date'] || row['Start Date'] || bcbaEffectiveDate || '2026-01-15',
+            groupAffiliation: 'AGES Learning Solutions',
             
-            // Location Assignment
+            // Location Assignment: No primary location per user instruction
+            primaryLocationId: undefined,
             locationIds: finalLocationIds,
             serviceTypes,
             locationEffectiveDate: row['Location Effective Date'] || row['Hire Date'] || '2026-01-15',

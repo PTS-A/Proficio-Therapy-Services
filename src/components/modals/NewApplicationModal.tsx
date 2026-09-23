@@ -127,9 +127,27 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
   const [linkNotes, setLinkNotes] = useState<string>('');
   const [linkSuccessMessage, setLinkSuccessMessage] = useState<string | null>(null);
 
-  // Requirement 2 & 3: Ensure every new application modal opens with a completely clean, pristine form
+  const prevIsOpenRef = React.useRef(isOpen);
+
+  // Handlers for step progression
+  const handleNextFromStep1 = () => {
+    if (!field1Name.trim()) {
+      setSubmissionError('Please enter the clinician full name and credentials to continue.');
+      return;
+    }
+    setSubmissionError(null);
+    setCurrentStep(2);
+  };
+
+  const handleNextFromStep2 = () => {
+    setSubmissionError(null);
+    setCurrentStep(3);
+  };
+
+  // Requirement 2 & 3: Ensure every new application modal opens with a completely clean, pristine form on initial open only
   useEffect(() => {
-    if (isOpen) {
+    // Only reset state when transitioning strictly from closed to open
+    if (!prevIsOpenRef.current && isOpen) {
       setCurrentStep(1);
       setField1Name('');
       setField2Contact('');
@@ -156,6 +174,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
       setIsCommentInputOpen(false);
       setNewCommentText('');
     }
+    prevIsOpenRef.current = isOpen;
   }, [isOpen, locations, entities]);
 
   if (!isOpen) return null;
@@ -315,6 +334,8 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
           </div>
 
           <button
+            type="button"
+            tabIndex={-1}
             onClick={onClose}
             className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
             title="Close modal"
@@ -328,8 +349,10 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
           <div className="flex items-center gap-2 sm:gap-4 w-full justify-between">
             {/* Step 1 Indicator */}
             <button
+              type="button"
+              tabIndex={-1}
               onClick={() => setCurrentStep(1)}
-              className={`flex items-center gap-2 transition-all ${
+              className={`flex items-center gap-2 transition-all cursor-pointer ${
                 currentStep === 1
                   ? 'text-[#2B4C9D] font-bold'
                   : currentStep > 1
@@ -355,8 +378,17 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
 
             {/* Step 2 Indicator */}
             <button
-              onClick={() => setCurrentStep(2)}
-              className={`flex items-center gap-2 transition-all ${
+              type="button"
+              tabIndex={-1}
+              onClick={() => {
+                if (field1Name.trim()) {
+                  setSubmissionError(null);
+                  setCurrentStep(2);
+                } else {
+                  setSubmissionError('Please enter the clinician full name before proceeding.');
+                }
+              }}
+              className={`flex items-center gap-2 transition-all cursor-pointer ${
                 currentStep === 2
                   ? 'text-[#2B4C9D] font-bold'
                   : currentStep > 2
@@ -382,10 +414,15 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
 
             {/* Step 3 Indicator */}
             <button
+              type="button"
+              tabIndex={-1}
               onClick={() => {
-                if (currentStep > 2 || field1Name) setCurrentStep(3);
+                if (currentStep > 2 || field1Name.trim()) {
+                  setSubmissionError(null);
+                  setCurrentStep(3);
+                }
               }}
-              className={`flex items-center gap-2 transition-all ${
+              className={`flex items-center gap-2 transition-all cursor-pointer ${
                 currentStep === 3
                   ? 'text-[#2B4C9D] font-bold'
                   : currentStep > 3
@@ -446,6 +483,12 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field1Name}
                       onChange={(e) => setField1Name(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleNextFromStep1();
+                        }
+                      }}
                       placeholder="Enter clinician full name and credentials (e.g. Jane Doe, MS, BCBA)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
@@ -467,6 +510,12 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field2Contact}
                       onChange={(e) => setField2Contact(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleNextFromStep1();
+                        }
+                      }}
                       placeholder="Enter contact phone and work email (e.g. (408) 555-0100 | jane.doe@clinic.com)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
@@ -536,6 +585,13 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {submissionError && currentStep === 1 && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{submissionError}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -587,6 +643,12 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field3NpiLicense}
                       onChange={(e) => setField3NpiLicense(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleNextFromStep2();
+                        }
+                      }}
                       placeholder="Enter Type 1 NPI and License (e.g. NPI: 1234567890 | License: LBA-CA-12345 Exp: 2028-12-31)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
@@ -608,6 +670,12 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                       type="text"
                       value={field6CaqhSpecialty}
                       onChange={(e) => setField6CaqhSpecialty(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleNextFromStep2();
+                        }
+                      }}
                       placeholder="Enter CAQH provider ID and Specialty (e.g. CAQH: 12345678 | Specialty: Behavior Analysis)"
                       className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
                       required
@@ -1195,8 +1263,8 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
             {currentStep === 1 && (
               <button
                 type="button"
-                onClick={() => setCurrentStep(2)}
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#2B4C9D] hover:bg-[#203a78] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all"
+                onClick={handleNextFromStep1}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#2B4C9D] hover:bg-[#203a78] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
               >
                 <span>Next: Provider & Licensure</span>
                 <ChevronRight className="w-4 h-4" />
@@ -1206,8 +1274,8 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
             {currentStep === 2 && (
               <button
                 type="button"
-                onClick={() => setCurrentStep(3)}
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#2B4C9D] hover:bg-[#203a78] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all"
+                onClick={handleNextFromStep2}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#2B4C9D] hover:bg-[#203a78] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
               >
                 <span>Next: Payers & Notes</span>
                 <ChevronRight className="w-4 h-4" />

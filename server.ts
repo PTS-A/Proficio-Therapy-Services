@@ -1437,6 +1437,162 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // AESAS (AUTOMATED EMAIL SENDING ALERT SYSTEM) API ROUTES
+  // =========================================================================
+  
+  // Get AESAS config and Resend status
+  app.get('/api/aesas/config', async (req, res) => {
+    try {
+      const { getAesasConfig } = await import('./server/aesasEngine');
+      res.json(getAesasConfig());
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get AESAS system status and Resend telemetry
+  app.get('/api/aesas/status', async (req, res) => {
+    try {
+      const { getAesasStatus } = await import('./server/aesasEngine');
+      res.json(getAesasStatus());
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Process entire AESAS queue now
+  app.post('/api/aesas/process', async (req, res) => {
+    try {
+      const { processAesasQueue } = await import('./server/aesasEngine');
+      const result = await processAesasQueue();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Trigger test email send via Resend API
+  app.post('/api/aesas/test-send', async (req, res) => {
+    try {
+      const { sendAesasTest } = await import('./server/aesasEngine');
+      const result = await sendAesasTest(req.body || {});
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Update AESAS config
+  app.put('/api/aesas/config', async (req, res) => {
+    try {
+      const { updateAesasConfig } = await import('./server/aesasEngine');
+      const updated = updateAesasConfig(req.body || {});
+      res.json({ success: true, config: updated });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get all AESAS templates
+  app.get('/api/aesas/templates', async (req, res) => {
+    try {
+      const { getAesasTemplates } = await import('./server/aesasEngine');
+      res.json({ templates: getAesasTemplates() });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update an AESAS template
+  app.put('/api/aesas/templates/:id', async (req, res) => {
+    try {
+      const { updateAesasTemplate } = await import('./server/aesasEngine');
+      const updated = updateAesasTemplate(req.params.id, req.body || {});
+      if (!updated) return res.status(404).json({ error: 'Template not found' });
+      res.json({ success: true, template: updated });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get AESAS reminder queue and logs
+  app.get('/api/aesas/queue', async (req, res) => {
+    try {
+      const { getAesasQueue, getAesasLogs } = await import('./server/aesasEngine');
+      res.json({ queue: getAesasQueue(), logs: getAesasLogs() });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Schedule a new AESAS reminder
+  app.post('/api/aesas/queue', async (req, res) => {
+    try {
+      const { addAesasReminder } = await import('./server/aesasEngine');
+      const item = addAesasReminder(req.body || {});
+      res.json({ success: true, reminder: item });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update or log explanation on a reminder
+  app.put('/api/aesas/queue/:id', async (req, res) => {
+    try {
+      const { updateAesasReminder } = await import('./server/aesasEngine');
+      const item = updateAesasReminder(req.params.id, req.body || {});
+      if (!item) return res.status(404).json({ error: 'Reminder not found' });
+      res.json({ success: true, reminder: item });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Clear entire AESAS queue
+  app.delete('/api/aesas/queue', async (req, res) => {
+    try {
+      const { clearAesasQueue } = await import('./server/aesasEngine');
+      clearAesasQueue();
+      res.json({ success: true, message: 'All scheduled emails cleared from AESAS queue.' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Delete / cancel an AESAS reminder
+  app.delete('/api/aesas/queue/:id', async (req, res) => {
+    try {
+      const { deleteAesasReminder } = await import('./server/aesasEngine');
+      const removed = deleteAesasReminder(req.params.id);
+      res.json({ success: removed });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Trigger an AESAS reminder immediately
+  app.post('/api/aesas/queue/:id/trigger', async (req, res) => {
+    try {
+      const { triggerAesasReminderNow } = await import('./server/aesasEngine');
+      const result = await triggerAesasReminderNow(req.params.id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Directly send email through AESAS Resend engine
+  app.post('/api/aesas/send', async (req, res) => {
+    try {
+      const { sendAesasEmail } = await import('./server/aesasEngine');
+      const result = await sendAesasEmail(req.body || {});
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Scheduled background runner for deadline checks
   // Runs 30s after server startup, then every 6 hours automatically
   setTimeout(async () => {

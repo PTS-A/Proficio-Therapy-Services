@@ -646,7 +646,7 @@ export const ClinicalStaffReviewPage: React.FC<ClinicalStaffReviewPageProps> = (
               </div>
 
               <div>
-                <span className="text-slate-400 block text-[10px]">Start Date</span>
+                <span className="text-slate-400 block text-[10px]">Effective Date</span>
                 <span className="font-semibold text-slate-800">
                   {provider.startDate || 'Current'}
                 </span>

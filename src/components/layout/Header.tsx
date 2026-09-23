@@ -35,6 +35,8 @@ import {
   X,
   ChevronRight,
   CheckCircle2,
+  MessageSquare,
+  BellRing,
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -43,20 +45,22 @@ export type ActiveTabType =
   | 'linking' 
   | 'providers' 
   | 'payers' 
-  | 'locations'
+  | 'locations' 
   | 'entities' 
-  | 'reports'
-  | 'users'
-  | 'new-user'
-  | 'import'
-  | 'settings'
-  | 'automations'
-  | 'access-requests'
-  | 'security-center'
-  | 'google-authenticator'
-  | 'admin-dashboard'
-  | 'clinical-portal'
-  | 'staff-approvals';
+  | 'reports' 
+  | 'users' 
+  | 'new-user' 
+  | 'import' 
+  | 'settings' 
+  | 'automations' 
+  | 'access-requests' 
+  | 'security-center' 
+  | 'google-authenticator' 
+  | 'admin-dashboard' 
+  | 'clinical-portal' 
+  | 'staff-approvals'
+  | 'aesas'
+  | 'comments-roster';
 
 interface HeaderProps {
   activeTab: ActiveTabType;
@@ -108,7 +112,6 @@ export const Header: React.FC<HeaderProps> = ({
   // Primary operational tabs
   const coreNavItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
-    { id: 'tracker' as const, label: 'Applications', icon: FileText },
     { id: 'linking' as const, label: 'Staff Linking', icon: Building2 },
     { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
   ];
@@ -117,6 +120,8 @@ export const Header: React.FC<HeaderProps> = ({
   const secondaryNavItems = [
     { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
     { id: 'locations' as const, label: 'Locations', icon: MapPin },
+    { id: 'comments-roster' as const, label: 'Comments Roster', icon: MessageSquare },
+    { id: 'aesas' as const, label: 'AESAS Alerts', icon: BellRing },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
   ];
 

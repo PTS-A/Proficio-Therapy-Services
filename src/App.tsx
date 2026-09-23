@@ -23,6 +23,8 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { StaffApprovalsView } from './components/admin/StaffApprovalsView';
 import { ClinicalStaffHub } from './components/clinical/ClinicalStaffHub';
 import { ClinicalStaffPortal } from './components/clinical/ClinicalStaffPortal';
+import { CommentsRosterView } from './components/clinical/CommentsRosterView';
+import { AesasAlertsView } from './components/automations/AesasAlertsView';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -214,6 +216,20 @@ const MainContent: React.FC = () => {
         {activeTab === 'reports' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
             <ReportsView />
+          </div>
+        )}
+
+        {/* Dedicated Tab: Unified Comments & Notes Roster */}
+        {activeTab === 'comments-roster' && (
+          <div className="pt-2">
+            <CommentsRosterView />
+          </div>
+        )}
+
+        {/* Dedicated Tab: AESAS (Automated Email Sending Alert System) */}
+        {activeTab === 'aesas' && (
+          <div className="pt-2">
+            <AesasAlertsView />
           </div>
         )}
 

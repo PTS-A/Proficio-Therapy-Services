@@ -20,8 +20,113 @@ import {
   Calendar,
   Search,
   ExternalLink,
+  PieChart as PieChartIcon,
+  Activity,
+  Sparkles,
 } from 'lucide-react';
 import { Discipline, CredentialingStage } from '../../types';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  CartesianGrid,
+} from 'recharts';
+
+// Motion transition variants
+const containerAnimation = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.06,
+      delayChildren: 0.04,
+    },
+  },
+};
+
+const itemAnimation = {
+  hidden: { opacity: 0, y: 14 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+// Custom Chart Tooltip Components
+const CustomBarTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const total = payload.reduce((sum: number, item: any) => sum + (Number(item.value) || 0), 0);
+    return (
+      <div className="bg-slate-900/95 text-white p-3 rounded-xl shadow-xl border border-slate-700/80 text-xs backdrop-blur-xs min-w-[170px]">
+        <p className="font-bold text-slate-100 border-b border-slate-700/80 pb-1.5 mb-2 flex items-center justify-between">
+          <span>{label}</span>
+          <span className="text-[10px] text-slate-400 font-normal">{total} total</span>
+        </p>
+        <div className="space-y-1.5">
+          {payload.map((entry: any, index: number) => (
+            <div key={`item-${index}`} className="flex items-center justify-between gap-3 text-[11px]">
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
+                {entry.name}:
+              </span>
+              <span className="font-bold text-white">{entry.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomDonutTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div className="bg-slate-900/95 text-white p-2.5 rounded-xl shadow-xl border border-slate-700/80 text-xs backdrop-blur-xs">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.payload.color }} />
+          <span className="font-semibold text-slate-200">{data.name}:</span>
+          <span className="font-bold text-white ml-1">{data.value} credentialing ({data.payload.pct}%)</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomAreaTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/95 text-white p-3 rounded-xl shadow-xl border border-slate-700/80 text-xs backdrop-blur-xs min-w-[160px]">
+        <p className="font-bold text-slate-200 border-b border-slate-700 pb-1 mb-2">{label} 2026</p>
+        <div className="space-y-1.5">
+          {payload.map((entry: any, index: number) => (
+            <div key={`item-${index}`} className="flex items-center justify-between gap-3 text-[11px]">
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                {entry.name}:
+              </span>
+              <span className="font-bold text-white">{entry.value} credentialing</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 interface ManagementDashboardProps {
   onSelectRecord?: (recordId: string) => void;
@@ -100,6 +205,98 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       stageCounts[r.stage]++;
     }
   });
+
+  // -------------------------------------------------------------
+  // OVERALL DASHBOARD CHART COMPUTATIONS
+  // -------------------------------------------------------------
+  // 1. Payer Breakdown Data for Stacked BarChart
+  const payerChartData = payers
+    .map((p) => {
+      const pRecords = activeRecords.filter((r) => r.payerId === p.id);
+      if (pRecords.length === 0) return null;
+      const approved = pRecords.filter((r) => ['Approved', 'Linked', 'Effective'].includes(r.stage)).length;
+      const submitted = pRecords.filter((r) => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage)).length;
+      const pending = pRecords.filter((r) => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending'].includes(r.stage)).length;
+      const actionNeeded = pRecords.filter((r) => ['Action Required', 'Additional Documents Requested', 'Correction Required', 'Overdue'].includes(r.stage) || r.isOverdue).length;
+      return {
+        id: p.id,
+        name: p.name.length > 15 ? p.name.substring(0, 14) + '…' : p.name,
+        fullName: p.name,
+        Approved: approved,
+        'In Review': submitted,
+        'Pending Prep': pending,
+        'Action Required': actionNeeded,
+        total: pRecords.length,
+      };
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
+  // 2. Status Distribution Donut Chart Data
+  const approvedCount = activeRecords.filter(r => ['Approved', 'Linked', 'Effective'].includes(r.stage)).length;
+  const inReviewCount = activeRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage)).length;
+  const pendingCount = activeRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending'].includes(r.stage)).length;
+  const actionCount = activeRecords.filter(r => ['Action Required', 'Additional Documents Requested', 'Correction Required', 'Overdue'].includes(r.stage) || r.isOverdue).length;
+  const totalApps = activeRecords.length || 1;
+  const networkAttainmentRate = Math.round((approvedCount / totalApps) * 100);
+
+  const statusDonutData = [
+    { name: 'Approved & Active', value: approvedCount, color: '#10B981', pct: Math.round((approvedCount / totalApps) * 100) },
+    { name: 'In Payer Review', value: inReviewCount, color: '#2B4C9D', pct: Math.round((inReviewCount / totalApps) * 100) },
+    { name: 'Intake & Prep', value: pendingCount, color: '#F59E0B', pct: Math.round((pendingCount / totalApps) * 100) },
+    { name: 'Action Required', value: actionCount, color: '#F43F5E', pct: Math.round((actionCount / totalApps) * 100) },
+  ].filter(d => d.value > 0);
+
+  // 3. Stage Funnel Data for Horizontal Progress Breakdown
+  const stageFunnelData = [
+    { 
+      stage: 'Intake & Verification', 
+      count: stageCounts['Intake'] + stageCounts['Documents Pending'] + stageCounts['Documents Complete'], 
+      color: '#64748B',
+      pct: activeRecords.length > 0 ? Math.round(((stageCounts['Intake'] + stageCounts['Documents Pending'] + stageCounts['Documents Complete']) / activeRecords.length) * 100) : 0
+    },
+    { 
+      stage: 'CAQH / PAVE Prep', 
+      count: stageCounts['Application Preparation'] + stageCounts['CAQH Pending'] + stageCounts['PAVE Pending'], 
+      color: '#3B82F6',
+      pct: activeRecords.length > 0 ? Math.round(((stageCounts['Application Preparation'] + stageCounts['CAQH Pending'] + stageCounts['PAVE Pending']) / activeRecords.length) * 100) : 0
+    },
+    { 
+      stage: 'Submitted to Portals', 
+      count: stageCounts['Application Submitted'] + stageCounts['Resubmitted'], 
+      color: '#2B4C9D',
+      pct: activeRecords.length > 0 ? Math.round(((stageCounts['Application Submitted'] + stageCounts['Resubmitted']) / activeRecords.length) * 100) : 0
+    },
+    { 
+      stage: 'Payer Review Committee', 
+      count: stageCounts['Payer Review'] + stageCounts['Additional Documents Requested'] + stageCounts['Correction Required'], 
+      color: '#8B5CF6',
+      pct: activeRecords.length > 0 ? Math.round(((stageCounts['Payer Review'] + stageCounts['Additional Documents Requested'] + stageCounts['Correction Required']) / activeRecords.length) * 100) : 0
+    },
+    { 
+      stage: 'Approved / In-Network', 
+      count: stageCounts['Approved'], 
+      color: '#10B981',
+      pct: activeRecords.length > 0 ? Math.round((stageCounts['Approved'] / activeRecords.length) * 100) : 0
+    },
+    { 
+      stage: 'Facility Linking Effective', 
+      count: stageCounts['Linked'] + stageCounts['Effective'] + stageCounts['Linking Pending'], 
+      color: '#0D9488',
+      pct: activeRecords.length > 0 ? Math.round(((stageCounts['Linked'] + stageCounts['Effective'] + stageCounts['Linking Pending']) / activeRecords.length) * 100) : 0
+    },
+  ];
+
+  // 4. 6-Month Application Velocity & Approvals Trend (AreaChart)
+  const monthlyTrendData = [
+    { month: 'Mar', submitted: 48, approved: 38 },
+    { month: 'Apr', submitted: 62, approved: 51 },
+    { month: 'May', submitted: 78, approved: 64 },
+    { month: 'Jun', submitted: 94, approved: 80 },
+    { month: 'Jul', submitted: 112, approved: 96 },
+    { month: 'Aug', submitted: Math.max(128, activeRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review', 'Approved', 'Linked', 'Effective'].includes(r.stage)).length), approved: approvedCount },
+  ];
 
   const getStageBadgeColor = (stage: CredentialingStage) => {
     switch (stage) {
@@ -382,7 +579,12 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
               Overall Credentialing Pipeline Metrics
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            <motion.div
+              variants={containerAnimation}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5"
+            >
               {/* 1. Total Providers */}
               <div 
                 onClick={() => onSelectProvider('')} 
@@ -404,13 +606,13 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 2. Total Applications */}
+              {/* 2. Total Credentialing */}
               <div 
                 onClick={() => onNavigateToTracker()} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Total Applications</span>
+                  <span className="text-[11px] font-medium text-slate-500">Total Credentialing</span>
                   <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                     <FileText className="w-3.5 h-3.5" />
                   </div>
@@ -423,51 +625,32 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 3. Applications Submitted */}
+              {/* 3. Credentialing Pending */}
               <div 
                 onClick={() => onNavigateToTracker()} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Applications Submitted</span>
-                  <div className="p-1.5 bg-sky-50 text-sky-600 rounded-lg group-hover:bg-sky-600 group-hover:text-white transition-colors">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-bold text-sky-700 tracking-tight">
-                    {activeRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage)).length}
-                  </span>
-                  <p className="text-[10.5px] text-sky-600/80 mt-0.5">In payer portals</p>
-                </div>
-              </div>
-
-              {/* 4. Applications Pending */}
-              <div 
-                onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Applications Pending</span>
+                  <span className="text-[11px] font-medium text-slate-500">Credentialing Pending</span>
                   <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
                     <Clock className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div className="mt-2">
                   <span className="text-2xl font-bold text-amber-700 tracking-tight">
-                    {activeRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending'].includes(r.stage)).length}
+                    {activeRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending', 'Payer Review', 'Application Submitted'].includes(r.stage)).length}
                   </span>
                   <p className="text-[10.5px] text-amber-600/80 mt-0.5">Pre-submission & linking</p>
                 </div>
               </div>
 
-              {/* 5. Applications Approved */}
+              {/* 4. Credentialing Approved */}
               <div 
                 onClick={() => onNavigateToTracker()} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Applications Approved</span>
+                  <span className="text-[11px] font-medium text-slate-500">Credentialing Approved</span>
                   <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                   </div>
@@ -480,7 +663,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 6. Applications Requiring Action */}
+              {/* 5. Credentialing Requiring Action */}
               <div 
                 onClick={() => onNavigateToTracker()} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-amber-300 transition-all shadow-xs cursor-pointer group"
@@ -499,13 +682,13 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 7. Applications Overdue */}
+              {/* 6. Credentialing Overdue */}
               <div 
                 onClick={() => onNavigateToTracker()} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-rose-300 transition-all shadow-xs cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Applications Overdue</span>
+                  <span className="text-[11px] font-medium text-slate-500">Credentialing Overdue</span>
                   <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg group-hover:bg-rose-600 group-hover:text-white transition-colors">
                     <AlertCircle className="w-3.5 h-3.5" />
                   </div>
@@ -517,382 +700,281 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   <p className="text-[10.5px] text-rose-600/80 mt-0.5">Lapsed follow-up date</p>
                 </div>
               </div>
-
-              {/* 8. Applications Rejected */}
-              <div 
-                onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Applications Rejected</span>
-                  <div className="p-1.5 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-slate-600 group-hover:text-white transition-colors">
-                    <XCircle className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-bold text-slate-700 tracking-tight">
-                    {activeRecords.filter(r => r.stage === 'Closed / Not Contracted').length}
-                  </span>
-                  <p className="text-[10.5px] text-slate-400 mt-0.5">Closed / not contracted</p>
-                </div>
-              </div>
-
-              {/* 9. Average Credentialing Cycle */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Average Credentialing Cycle</span>
-                  <div className="p-1.5 bg-teal-50 text-teal-600 rounded-lg">
-                    <Clock className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-bold text-teal-700 tracking-tight">
-                    {kpis.averageCredentialingCycleDays || 58} <span className="text-xs font-normal text-slate-500">Days</span>
-                  </span>
-                  <p className="text-[10.5px] text-teal-600/80 mt-0.5">Submission to approval</p>
-                </div>
-              </div>
-
-              {/* 10. Provider Linking Rate */}
-              <div 
-                onClick={onNavigateToLinking} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Facility Group Linking</span>
-                  <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                    <Building2 className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-bold text-purple-700 tracking-tight">
-                    {kpis.providersLinked} <span className="text-xs font-normal text-slate-500">Linked</span>
-                  </span>
-                  <p className="text-[10.5px] text-purple-600/80 mt-0.5">{kpis.providersLinkingPending} pending link</p>
-                </div>
-              </div>
-            </div>
+            </motion.div>
           </div>
 
-          {/* Section 1.1: Aging Analysis (30 / 60 / 90 / 120+ days) (Exact specification) */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-                  <Clock className="w-4 h-4 text-[#2B4C9D]" />
-                  <span>Aging Analysis (30 / 60 / 90 / 120+ Days)</span>
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Turnaround tracking and queue distribution across standard payer processing windows.
-                </p>
-              </div>
-
-              {selectedAgingFilter && (
-                <button
-                  onClick={() => setSelectedAgingFilter(null)}
-                  className="text-xs text-[#2B4C9D] hover:underline font-semibold"
-                >
-                  Clear Aging Filter
-                </button>
-              )}
-            </div>
-
-            {/* Aging Bucket Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {[
-                { 
-                  id: '0-30', 
-                  label: '0–30 Days', 
-                  subtext: 'Fresh Submissions', 
-                  count: kpis.agingBuckets.under30, 
-                  color: 'text-emerald-700 bg-emerald-50/70 border-emerald-200 hover:border-emerald-400',
-                  badge: 'bg-emerald-100 text-emerald-800'
-                },
-                { 
-                  id: '31-60', 
-                  label: '31–60 Days', 
-                  subtext: 'Standard Review', 
-                  count: kpis.agingBuckets.days31to60, 
-                  color: 'text-sky-700 bg-sky-50/70 border-sky-200 hover:border-sky-400',
-                  badge: 'bg-sky-100 text-sky-800'
-                },
-                { 
-                  id: '61-90', 
-                  label: '61–90 Days', 
-                  subtext: 'Approaching SLA', 
-                  count: kpis.agingBuckets.days61to90, 
-                  color: 'text-amber-700 bg-amber-50/70 border-amber-200 hover:border-amber-400',
-                  badge: 'bg-amber-100 text-amber-800'
-                },
-                { 
-                  id: '91-120', 
-                  label: '91–120 Days', 
-                  subtext: 'Critical Aging', 
-                  count: kpis.agingBuckets.days91to120, 
-                  color: 'text-orange-700 bg-orange-50/70 border-orange-200 hover:border-orange-400',
-                  badge: 'bg-orange-100 text-orange-800'
-                },
-                { 
-                  id: '120+', 
-                  label: '120+ Days', 
-                  subtext: 'Urgent Escalation', 
-                  count: kpis.agingBuckets.over120, 
-                  color: 'text-rose-700 bg-rose-50/70 border-rose-200 hover:border-rose-400',
-                  badge: 'bg-rose-100 text-rose-800'
-                },
-              ].map((bucket) => {
-                const pct = activeRecords.length > 0 ? Math.round((bucket.count / activeRecords.length) * 100) : 0;
-                const isSelected = selectedAgingFilter === bucket.id;
-
-                return (
-                  <div
-                    key={bucket.id}
-                    onClick={() => setSelectedAgingFilter(isSelected ? null : bucket.id)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer ${bucket.color} ${
-                      isSelected ? 'ring-2 ring-offset-1 ring-[#2B4C9D] shadow-xs' : ''
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold">{bucket.label}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${bucket.badge}`}>{pct}%</span>
-                    </div>
-                    <div className="text-2xl font-bold tracking-tight mt-1">{bucket.count}</div>
-                    <p className="text-[10.5px] opacity-80 mt-0.5">{bucket.subtext}</p>
-                    
-                    {/* Visual bar inside each card */}
-                    <div className="w-full bg-slate-200/60 h-1 rounded-full mt-2 overflow-hidden">
-                      <div 
-                        className="h-1 rounded-full bg-current" 
-                        style={{ width: `${Math.max(8, pct)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Pipeline Stage Breakdown Flow */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <Layers className="w-4 h-4 text-[#2B4C9D]" />
-                <h2 className="text-sm font-bold text-slate-900">
-                  Application Lifecycle Pipeline
-                </h2>
-              </div>
-              <span className="text-xs text-slate-500">
-                {activeRecords.length} active applications in workspace
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {[
-                { label: 'Intake & Docs', count: stageCounts['Intake'] + stageCounts['Documents Pending'] + stageCounts['Documents Complete'], color: 'text-slate-700 bg-slate-50 border-slate-200' },
-                { label: 'Preparation', count: stageCounts['Application Preparation'] + stageCounts['CAQH Pending'] + stageCounts['PAVE Pending'], color: 'text-blue-700 bg-blue-50/60 border-blue-200' },
-                { label: 'Submitted', count: stageCounts['Application Submitted'] + stageCounts['Resubmitted'], color: 'text-indigo-700 bg-indigo-50/60 border-indigo-200' },
-                { label: 'Payer Review', count: stageCounts['Payer Review'] + stageCounts['Additional Documents Requested'] + stageCounts['Correction Required'], color: 'text-purple-700 bg-purple-50/60 border-purple-200' },
-                { label: 'Approved', count: stageCounts['Approved'], color: 'text-emerald-700 bg-emerald-50/60 border-emerald-200' },
-                { label: 'Linked / Effective', count: stageCounts['Linked'] + stageCounts['Effective'] + stageCounts['Linking Pending'], color: 'text-teal-700 bg-teal-50/60 border-teal-200' },
-              ].map((st, i) => (
-                <div 
-                  key={i} 
-                  onClick={() => onNavigateToTracker()} 
-                  className={`p-3 rounded-xl border text-center cursor-pointer hover:shadow-xs transition-all ${st.color}`}
-                >
-                  <p className="text-lg font-bold tracking-tight">{st.count}</p>
-                  <p className="text-[11px] font-medium mt-0.5 truncate">{st.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Action Required & Recent Activity Two-Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2 Cols: Action Required & Follow-up Due */}
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-4 h-4 text-[#E86424]" />
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Applications Requiring Action & Follow-ups Due
+          {/* ========================================================================= */}
+          {/* SECTION 2: CHARTS & VISUAL ANALYTICS                                      */}
+          {/* ========================================================================= */}
+          <motion.div
+            variants={containerAnimation}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
+            {/* Row 1: Payer Portfolio Breakdown (Full Width) */}
+            <motion.div
+              variants={itemAnimation}
+              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                    <BarChart3 className="w-4 h-4 text-[#2B4C9D]" />
+                    <span>Payer Portfolio & Review Status</span>
                   </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Enrollment and review stages across participating insurance networks.
+                  </p>
                 </div>
                 <button
-                  onClick={() => onNavigateToTracker()}
-                  className="text-xs text-[#2B4C9D] font-medium hover:underline flex items-center space-x-1"
+                  onClick={() => setActiveTab('payer')}
+                  className="text-xs font-semibold text-[#2B4C9D] hover:underline flex items-center space-x-1 cursor-pointer"
                 >
-                  <span>View in tracker</span>
+                  <span>View all payers</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {urgentRecords.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
-                  <p className="font-medium text-slate-600">All follow-ups are up to date</p>
-                  <p className="text-[11px] mt-0.5">No overdue actions in the current filter selection.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {urgentRecords.map((rec) => {
-                    const prov = providers.find(p => p.id === rec.providerId);
-                    const pay = payers.find(p => p.id === rec.payerId);
-                    return (
-                      <div 
-                        key={rec.id} 
-                        onClick={() => onNavigateToTracker()}
-                        className="py-3 flex items-center justify-between hover:bg-slate-50 px-2 rounded-xl transition-colors cursor-pointer"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs font-semibold text-slate-900">
-                              {prov?.fullName || 'Unknown Provider'}
-                            </span>
-                            {getDisciplinePill(rec.discipline)}
-                            <span className="text-[11px] text-slate-500">
-                              • {pay?.name || 'Payer'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500">
-                            {rec.nextAction || 'Pending payer status verification'}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center space-x-3">
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${getStageBadgeColor(rec.stage)}`}>
-                            {rec.stage}
-                          </span>
-                          <ChevronRight className="w-4 h-4 text-slate-400" />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Right Col: Entity & Discipline Breakdown */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-              <div className="flex items-center space-x-2">
-                <Building2 className="w-4 h-4 text-[#2B4C9D]" />
-                <h2 className="text-sm font-bold text-slate-900">
-                  Entity Breakdown
-                </h2>
+              <div className="h-[300px] w-full pt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={payerChartData}
+                    margin={{ top: 10, right: 10, left: -15, bottom: 25 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, fill: '#64748B' }}
+                      axisLine={{ stroke: '#e2e8f0' }}
+                      tickLine={false}
+                      angle={-15}
+                      textAnchor="end"
+                      interval={0}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#64748B' }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<CustomBarTooltip />} />
+                    <Legend
+                      wrapperStyle={{ fontSize: '11px', paddingTop: '16px' }}
+                      iconType="circle"
+                      iconSize={8}
+                    />
+                    <Bar
+                      dataKey="Approved"
+                      name="Approved / Active"
+                      stackId="a"
+                      fill="#10B981"
+                      isAnimationActive={true}
+                      animationDuration={900}
+                      animationEasing="ease-out"
+                    />
+                    <Bar
+                      dataKey="In Review"
+                      name="Payer Review"
+                      stackId="a"
+                      fill="#2B4C9D"
+                      isAnimationActive={true}
+                      animationDuration={900}
+                      animationEasing="ease-out"
+                    />
+                    <Bar
+                      dataKey="Pending Prep"
+                      name="Pending Prep"
+                      stackId="a"
+                      fill="#F59E0B"
+                      isAnimationActive={true}
+                      animationDuration={900}
+                      animationEasing="ease-out"
+                    />
+                    <Bar
+                      dataKey="Action Required"
+                      name="Action Required"
+                      stackId="a"
+                      fill="#F43F5E"
+                      radius={[4, 4, 0, 0]}
+                      isAnimationActive={true}
+                      animationDuration={900}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
+            </motion.div>
 
-              {/* Legal Entities List */}
-              <div className="space-y-3 pt-1">
-                {(entities || []).map((entity) => {
-                  const entityRecs = (records || []).filter(r => r.entityId === entity.id);
-                  const pct = (records || []).length > 0 ? Math.round((entityRecs.length / records.length) * 100) : 0;
-
-                  return (
-                    <div key={entity.id} className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="font-medium text-slate-700 truncate">{entity.legalName || entity.dba || entity.id}</span>
-                        <span className="text-slate-500 font-semibold">{entityRecs.length} apps</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-[#2B4C9D] h-1.5 rounded-full" 
-                          style={{ width: `${Math.max(5, pct)}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="border-t border-slate-100 pt-3 text-xs text-slate-500 space-y-1">
-                <p className="font-semibold text-slate-700">Discipline Distribution</p>
-                <div className="flex items-center justify-between text-[11px] pt-1">
-                  <span className="text-[#E86424] font-medium">ABA: {records.filter(r => r.discipline === 'ABA').length}</span>
-                  <span className="text-[#2B4C9D] font-medium">Speech: {records.filter(r => r.discipline === 'Speech').length}</span>
-                  <span className="text-[#00A651] font-medium">OT: {records.filter(r => r.discipline === 'OT').length}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Activity Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Recent Application Updates
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Latest provider enrollment and payer status changes across all entities.
-                </p>
-              </div>
-
-              <button
-                onClick={() => onNavigateToTracker()}
-                className="text-xs font-semibold text-[#2B4C9D] hover:underline flex items-center space-x-1"
+            {/* Row 2: Action Required & Staff by Legal Entity Table */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Urgent Action List */}
+              <motion.div
+                variants={itemAnimation}
+                className="lg:col-span-6 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4"
               >
-                <span>View all tracker records</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-[#E86424]" />
+                    <h2 className="text-sm font-bold text-slate-900">
+                      Credentialing Requiring Action & Follow-ups Due
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => onNavigateToTracker()}
+                    className="text-xs text-[#2B4C9D] font-medium hover:underline flex items-center space-x-1 cursor-pointer"
+                  >
+                    <span>View all</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-100 font-semibold">
-                  <tr>
-                    <th className="py-3 px-4">Clinical Staff</th>
-                    <th className="py-3 px-4">Discipline</th>
-                    <th className="py-3 px-4">Payer</th>
-                    <th className="py-3 px-4">Entity</th>
-                    <th className="py-3 px-4">Current Stage</th>
-                    <th className="py-3 px-4">Aging</th>
-                    <th className="py-3 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {recentRecords.map((rec) => {
-                    const prov = providers.find(p => p.id === rec.providerId);
-                    const pay = payers.find(p => p.id === rec.payerId);
-                    const ent = entities.find(e => e.id === rec.entityId);
+                {urgentRecords.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
+                    <p className="font-medium text-slate-600">All follow-ups are up to date</p>
+                    <p className="text-[11px] mt-0.5">No overdue actions in the current filter selection.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 max-h-[320px] overflow-y-auto pr-1">
+                    {urgentRecords.map((rec) => {
+                      const prov = providers.find((p) => p.id === rec.providerId);
+                      const pay = payers.find((p) => p.id === rec.payerId);
+                      return (
+                        <div
+                          key={rec.id}
+                          onClick={() => onNavigateToTracker()}
+                          className="py-2.5 flex items-center justify-between hover:bg-slate-50 px-2 rounded-xl transition-colors cursor-pointer"
+                        >
+                          <div className="space-y-0.5 min-w-0 pr-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-semibold text-slate-900 truncate">
+                                {prov?.fullName || 'Unknown Provider'}
+                              </span>
+                              {getDisciplinePill(rec.discipline)}
+                              <span className="text-[11px] text-slate-500 truncate">
+                                &bull; {pay?.name || 'Payer'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {rec.nextAction || 'Pending payer status verification'}
+                            </p>
+                          </div>
 
-                    return (
-                      <tr 
-                        key={rec.id} 
-                        onClick={() => onNavigateToTracker()}
-                        className="hover:bg-slate-50/80 transition-colors cursor-pointer"
-                      >
-                        <td className="py-3 px-4 font-semibold text-slate-900">
-                          {prov?.fullName || 'Unknown Provider'}
-                        </td>
-                        <td className="py-3 px-4">
-                          {getDisciplinePill(rec.discipline)}
-                        </td>
-                        <td className="py-3 px-4">
-                          {pay?.name || 'Payer'}
-                        </td>
-                        <td className="py-3 px-4 text-slate-500 truncate max-w-[150px]">
-                          {ent?.shortName || ent?.name || 'Entity'}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${getStageBadgeColor(rec.stage)}`}>
-                            {rec.stage}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-500">
-                          {rec.daysInCurrentStage || 0}d
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button className="text-[#2B4C9D] hover:underline font-semibold text-xs">
-                            Open
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${getStageBadgeColor(
+                                rec.stage
+                              )}`}
+                            >
+                              {rec.stage}
+                            </span>
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+
+              {/* Entity Clinical Staff Table (Replacing applications breakdown) */}
+              <motion.div
+                variants={itemAnimation}
+                className="lg:col-span-6 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-[#2B4C9D]" />
+                      <h2 className="text-sm font-bold text-slate-900">
+                        Clinical Staff by Legal Entity
+                      </h2>
+                    </div>
+                    <span className="text-xs text-slate-400 font-medium">
+                      {providers.length} Total Clinicians
+                    </span>
+                  </div>
+
+                  {/* Clinical Staff Table */}
+                  <div className="overflow-x-auto mt-2">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500 text-[11px] uppercase font-semibold">
+                          <th className="py-2.5 px-2">Legal Entity</th>
+                          <th className="py-2.5 px-2 text-center">Total Staff</th>
+                          <th className="py-2.5 px-2 text-center">ABA</th>
+                          <th className="py-2.5 px-2 text-center">Speech</th>
+                          <th className="py-2.5 px-2 text-center">OT</th>
+                          <th className="py-2.5 px-2 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(entities || []).map((entity) => {
+                          const entityStaff = providers.filter(
+                            (p) =>
+                              p.primaryEntityId === entity.id ||
+                              p.entityIds?.includes(entity.id) ||
+                              (p as any).renderingEntityIds?.includes(entity.id)
+                          );
+                          const abaCount = entityStaff.filter((p) => p.disciplines?.includes('ABA') || (p as any).discipline === 'ABA').length;
+                          const speechCount = entityStaff.filter((p) => p.disciplines?.includes('Speech') || (p as any).discipline === 'Speech').length;
+                          const otCount = entityStaff.filter((p) => p.disciplines?.includes('OT') || (p as any).discipline === 'OT').length;
+
+                          return (
+                            <tr key={entity.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-3 px-2">
+                                <div className="font-bold text-slate-900">{entity.dba || entity.legalName}</div>
+                                <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{entity.legalName}</div>
+                              </td>
+                              <td className="py-3 px-2 text-center">
+                                <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                                  {entityStaff.length}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center">
+                                <span className="text-orange-700 bg-orange-50 font-semibold px-1.5 py-0.5 rounded text-[11px]">
+                                  {abaCount}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center">
+                                <span className="text-blue-700 bg-blue-50 font-semibold px-1.5 py-0.5 rounded text-[11px]">
+                                  {speechCount}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center">
+                                <span className="text-emerald-700 bg-emerald-50 font-semibold px-1.5 py-0.5 rounded text-[11px]">
+                                  {otCount}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-right">
+                                <button
+                                  onClick={() => onSelectProvider('')}
+                                  className="text-xs font-semibold text-[#2B4C9D] hover:underline cursor-pointer"
+                                >
+                                  View Staff &rarr;
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
+                  <span>Cross-entity clinical governance active</span>
+                  <button
+                    onClick={() => onSelectProvider('')}
+                    className="text-xs font-semibold text-[#2B4C9D] hover:underline"
+                  >
+                    Open Clinical Staff &rarr;
+                  </button>
+                </div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
@@ -930,7 +1012,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-slate-500 text-[11px] block">Total Applications</span>
+                    <span className="text-slate-500 text-[11px] block">Total Credentialing</span>
                     <span className="text-lg font-bold text-slate-900">{stat.totalApplications}</span>
                   </div>
                   <div className="p-2.5 bg-sky-50/60 rounded-xl border border-sky-100">
@@ -992,7 +1074,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   <tr>
                     <th className="py-3 px-4">Discipline</th>
                     <th className="py-3 px-4 text-center">Clinicians</th>
-                    <th className="py-3 px-4 text-center">Total Apps</th>
+                    <th className="py-3 px-4 text-center">Total Credentialing</th>
                     <th className="py-3 px-4 text-center">Submitted</th>
                     <th className="py-3 px-4 text-center">Pending</th>
                     <th className="py-3 px-4 text-center">Approved</th>
@@ -1152,7 +1234,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 <span>Credentialing Specialist Workload & Pipeline</span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Specialist accountability &bull; Assigned applications, completed, pending, overdue, and scheduled follow-ups.
+                Specialist accountability &bull; Assigned credentialing records, completed, pending, overdue, and scheduled follow-ups.
               </p>
             </div>
           </div>
@@ -1170,7 +1252,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                     <span className="text-[11px] text-slate-500">{spec.workloadPct}% of total workspace volume</span>
                   </div>
                   <div className="p-2 bg-indigo-50 text-[#2B4C9D] rounded-xl font-bold text-xs">
-                    {spec.assignedCount} Apps
+                    {spec.assignedCount} Credentialing
                   </div>
                 </div>
 
@@ -1217,7 +1299,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold">
                   <tr>
                     <th className="py-3 px-4">Specialist / Owner</th>
-                    <th className="py-3 px-4 text-center">Assigned Applications</th>
+                    <th className="py-3 px-4 text-center">Assigned Credentialing</th>
                     <th className="py-3 px-4 text-center">Completed</th>
                     <th className="py-3 px-4 text-center">Pending</th>
                     <th className="py-3 px-4 text-center">Overdue</th>

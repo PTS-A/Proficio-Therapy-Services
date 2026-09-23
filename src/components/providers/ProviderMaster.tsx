@@ -1231,7 +1231,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                         <span>Employment & Group Affiliation Master</span>
                       </span>
                       <span className="bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-full text-[10px]">
-                        Start Date: {activeProvider.startDate}
+                        Effective Date: {activeProvider.startDate}
                       </span>
                     </div>
 
@@ -1986,7 +1986,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                     </div>
 
                     <div>
-                      <label className="font-semibold text-slate-700">Clinical Start Date *</label>
+                      <label className="font-semibold text-slate-700">Clinical Effective Date *</label>
                       <input
                         type="date"
                         value={formData.startDate}

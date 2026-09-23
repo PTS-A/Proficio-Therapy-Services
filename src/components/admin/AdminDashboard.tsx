@@ -23,12 +23,14 @@ import { AutomationDashboardView } from '../automations/AutomationDashboardView'
 import { DataImportView } from './DataImportView';
 import { SystemConfigView } from './SystemConfigView';
 import { StaffApprovalsView } from './StaffApprovalsView';
+import { AdminInsuranceManager } from './AdminInsuranceManager';
 
 export type AdminSubSection = 
   | 'overview'
   | 'approvals'
   | 'users'
   | 'access-requests'
+  | 'insurances'
   | 'security'
   | 'mfa'
   | 'automations'
@@ -93,6 +95,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       count: pendingRequestsCount,
       badgeColor: 'bg-blue-600 text-white',
       description: 'Prospective & onboarding employee gate requests',
+    },
+    {
+      id: 'insurances' as const,
+      label: 'Insurance & TATs',
+      icon: ShieldCheck,
+      count: null,
+      description: 'Add insurance panels, associate entities & benchmark TAT',
     },
     {
       id: 'security' as const,
@@ -303,6 +312,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             onBackToDashboard={() => setActiveSection('overview')} 
             onNavigateToUsers={() => setActiveSection('users')}
           />
+        )}
+
+        {activeSection === 'insurances' && (
+          <AdminInsuranceManager />
         )}
 
         {activeSection === 'security' && (

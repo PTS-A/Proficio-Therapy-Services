@@ -136,9 +136,12 @@ export type ProviderType =
   | 'SLPA' 
   | 'OTR/L' 
   | 'COTA' 
-  | 'Clinical Director';
+  | 'Clinical Director'
+  | 'Rendering Clinician'
+  | 'Supervising Clinician'
+  | 'Billing Clinician';
 
-export type EmploymentStatus = 'Full-Time' | 'Part-Time' | 'Contractor' | 'Inactive';
+export type EmploymentStatus = 'Full-Time' | 'Part-Time' | 'Contractor' | 'Inactive' | 'Active';
 
 export type CAQHStatus = 'Initial' | 'Complete' | 'Attested' | 'Re-attestation Due' | 'Discrepancy';
 
@@ -296,9 +299,10 @@ export interface ProviderCommentLog {
   authorRole: string;
   statusFrom?: string;
   statusTo?: string;
-  comment: string;
+  comment?: string;
+  notes?: string;
   targetPerson?: string; // Whom the comment or action is directed to / assigned to
-  category?: 'Status Update' | 'Follow-up' | 'Payer Review' | 'Document Missing' | 'Clinical Team' | 'General Note';
+  category?: 'Status Update' | 'Follow-up' | 'Payer Review' | 'Document Missing' | 'Clinical Team' | 'General Note' | 'General' | 'Onboarding' | 'Enrollment' | 'Document Request' | 'Re-credentialing' | 'Compliance' | string;
 }
 
 export interface ProviderContractInfo {
@@ -314,11 +318,24 @@ export interface ProviderPayerEnrollment {
   id?: string;
   payerId: string;
   payerName: string;
-  status: 'In-Network' | 'Application In Progress' | 'In Progress' | 'Linked' | 'Pending Payer Review' | 'Pending Linking' | 'Approved / Active' | 'Re-credentialing' | 'Recredentialing Due' | 'Not Enrolled' | 'Terminated' | string;
+  status: 'In-Network' | 'Application In Progress' | 'In Progress' | 'Linked' | 'Pending Payer Review' | 'Pending Linking' | 'Approved / Active' | 'Re-credentialing' | 'Recredentialing Due' | 'Not Enrolled' | 'Terminated' | 'Submitted' | 'Pending' | 'Approved' | 'Not Applicable' | string;
+  approvalStatus?: 'Submitted' | 'Pending' | 'Approved' | 'Not Applicable';
   enrollmentStatus?: 'In-Network' | 'Application In Progress' | 'In Progress' | 'Linked' | 'Pending Payer Review' | 'Pending Linking' | 'Approved / Active' | 'Re-credentialing' | 'Recredentialing Due' | 'Not Enrolled' | 'Terminated' | string;
   effectiveDate?: string;
+  startDate?: string;
+  expirationDate?: string;
   recredentialingDate?: string;
   recredentialingDueDate?: string;
+  reminderDate?: string;
+  reminderTime?: string;
+  reminderEmail?: string;
+  reminderCreatedBy?: string;
+  reminderCreatedAt?: string;
+  responsiblePerson?: string;
+  overdueReason?: string;
+  overdueLoggedAt?: string;
+  lastReminderSentAt?: string;
+  consecutiveRemindersSent?: number;
   providerIdNumber?: string;
   networkType?: string;
   applicationType?: ApplicationType | string;
@@ -382,6 +399,7 @@ export interface Provider {
   payerEnrollments?: ProviderPayerEnrollment[];
   
   documents: DocumentItem[];
+  documentLinks?: Array<{ id: string; title: string; url: string; category?: string; uploadedAt?: string }>;
   commentLogs?: ProviderCommentLog[];
   currentStatus?: string;
   notes?: string;
@@ -417,12 +435,22 @@ export interface PayerContact {
   portalOrDept?: string;
 }
 
+export type SubmissionMethod = 
+  | 'Online Portal' 
+  | 'Availity' 
+  | 'CAQH ProView' 
+  | 'Email' 
+  | 'Fax' 
+  | 'Paper Mail' 
+  | string;
+
 export interface Payer {
   id: string;
   name: string;
   type: PayerType;
   portalUrl?: string;
   statesServed: string[];
+  entityIds?: string[]; // Scoped entities (e.g. AGES, Proficio, Child's Play)
   contacts: PayerContact[];
   requiredDocuments: string[];
   requiredDocumentTypes?: string[];
@@ -1040,3 +1068,47 @@ export interface ClinicalStaffComment {
   createdAt: string;
   updatedAt?: string;
 }
+
+export interface AesasEmailTemplate {
+  id: string;
+  name: string;
+  code: 'onboarding' | 'pending_reminder' | 'recredentialing' | 'test';
+  to: string;
+  subject: string;
+  cc: string;
+  body: string;
+  description: string;
+  updatedAt: string;
+}
+
+export interface AesasScheduledReminder {
+  id: string;
+  templateCode: 'onboarding' | 'pending_reminder' | 'recredentialing' | 'test' | string;
+  recipientEmail: string;
+  cc?: string;
+  subject: string;
+  scheduledDate: string; // YYYY-MM-DD
+  scheduledTime: string; // HH:mm
+  employeeId?: string;
+  employeeName?: string;
+  payerId?: string;
+  payerName?: string;
+  entityId?: string;
+  status: 'scheduled' | 'sent' | 'failed' | 'overdue';
+  sentAt?: string;
+  resendId?: string;
+  consecutiveDays: number;
+  responsiblePerson?: string;
+  overdueExplanation?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface AesasConfig {
+  globalSentToEmail: string;
+  globalCcRoster: string[];
+  fromEmail: string;
+  resendConfigured: boolean;
+  resendMode: 'LIVE_RESEND' | 'SIMULATED';
+}
+

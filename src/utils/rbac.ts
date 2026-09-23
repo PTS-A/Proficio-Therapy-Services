@@ -19,7 +19,9 @@ export type ActiveTabType =
   | 'google-authenticator'
   | 'admin-dashboard'
   | 'clinical-portal'
-  | 'staff-approvals';
+  | 'staff-approvals'
+  | 'aesas'
+  | 'comments-roster';
 
 /**
  * Checks if the account is a Super Admin.
@@ -119,7 +121,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'google-authenticator',
       'admin-dashboard',
       'clinical-portal',
-      'staff-approvals'
+      'staff-approvals',
+      'aesas',
+      'comments-roster'
     ];
   }
 
@@ -139,7 +143,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'automations',
         'admin-dashboard',
         'staff-approvals',
-        'clinical-portal'
+        'clinical-portal',
+        'aesas',
+        'comments-roster'
       ];
 
     case 'Credentialing Specialist':
@@ -151,7 +157,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'locations',
         'payers',
         'staff-approvals',
-        'clinical-portal'
+        'clinical-portal',
+        'comments-roster'
       ];
 
     case 'Billing and Claims':
@@ -161,7 +168,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'tracker',
         'payers',
         'reports',
-        'clinical-portal'
+        'clinical-portal',
+        'comments-roster'
       ];
 
     case 'HR/Operations':
@@ -171,7 +179,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'locations',
         'entities',
         'tracker',
-        'clinical-portal'
+        'clinical-portal',
+        'comments-roster'
       ];
 
     case 'Clinical Team':
@@ -180,7 +189,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'providers',
         'tracker',
         'reports',
-        'clinical-portal'
+        'clinical-portal',
+        'comments-roster'
       ];
 
     case 'Leadership / Management':
@@ -190,7 +200,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'tracker',
         'linking',
         'payers',
-        'clinical-portal'
+        'clinical-portal',
+        'aesas',
+        'comments-roster'
       ];
 
     case 'Provider':
@@ -202,7 +214,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       ];
 
     default:
-      return ['dashboard', 'tracker', 'providers', 'clinical-portal'];
+      return ['dashboard', 'tracker', 'providers', 'clinical-portal', 'comments-roster'];
   }
 };
 
@@ -219,6 +231,16 @@ export const canAccessTab = (account: AppAccount | null | undefined, tab: Active
   }
   if (tab === 'staff-approvals') {
     return isSuperAdmin(account) || isAdminAccount(account) || account.systemRole === 'Credentialing Lead / Manager' || account.systemRole === 'Credentialing Specialist';
+  }
+  if (tab === 'aesas') {
+    // Accessible and editable by all credentialing employees like head and lead and System administrator only
+    const isHeadOrLead = (account.roleTitle && /head|lead|director|manager/i.test(account.roleTitle)) ||
+      account.systemRole === 'Credentialing Lead / Manager' ||
+      account.systemRole === 'Leadership / Management';
+    return isSuperAdmin(account) || isAdminAccount(account) || Boolean(isHeadOrLead);
+  }
+  if (tab === 'comments-roster') {
+    return true;
   }
   if (tab === 'clinical-portal') {
     return true;

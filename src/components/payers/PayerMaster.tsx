@@ -14,7 +14,10 @@ import {
   Search, 
   ShieldCheck, 
   Trash2, 
-  X 
+  X,
+  Users,
+  CheckCircle2,
+  Check
 } from 'lucide-react';
 
 interface PayerMasterProps {
@@ -22,13 +25,28 @@ interface PayerMasterProps {
 }
 
 export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplications }) => {
-  const { payers, records, addPayer, updatePayer, deletePayer } = useCredentialing();
+  const { 
+    payers, 
+    records, 
+    providers, 
+    entities, 
+    addPayer, 
+    updatePayer, 
+    deletePayer,
+    updateProviderCredentialing,
+    addToast
+  } = useCredentialing();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<PayerType | 'All'>('All');
   const [selectedPayer, setSelectedPayer] = useState<Payer | null>(payers[0] || null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPayer, setEditingPayer] = useState<Payer | null>(null);
+
+  // Employee roster filter per insurance
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<'all' | 'approved' | 'review' | 'not_enrolled'>('all');
+  const [isTogglingEmployee, setIsTogglingEmployee] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -341,6 +359,191 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
                       <span className="text-slate-700 font-medium">{docType}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Enrolled Clinical Staff & Approval Status per Insurance */}
+              <div className="pt-2 border-t border-slate-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-900 flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-[#2B4C9D]" />
+                      <span>Clinical Staff Credentialing Status for {activePayer.name}</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Roster of clinical staff and their active approval status with this insurance network.
+                    </p>
+                  </div>
+                  
+                  {/* Status filter tabs */}
+                  <div className="flex items-center space-x-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-semibold">
+                    <button
+                      onClick={() => setEmployeeStatusFilter('all')}
+                      className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                        employeeStatusFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All ({providers.length})
+                    </button>
+                    <button
+                      onClick={() => setEmployeeStatusFilter('approved')}
+                      className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                        employeeStatusFilter === 'approved' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Approved
+                    </button>
+                    <button
+                      onClick={() => setEmployeeStatusFilter('review')}
+                      className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                        employeeStatusFilter === 'review' ? 'bg-white text-sky-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      In Review
+                    </button>
+                    <button
+                      onClick={() => setEmployeeStatusFilter('not_enrolled')}
+                      className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                        employeeStatusFilter === 'not_enrolled' ? 'bg-white text-slate-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Not Enrolled
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search input for staff */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Filter staff by name or discipline..."
+                    value={employeeSearch}
+                    onChange={(e) => setEmployeeSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2B4C9D]"
+                  />
+                </div>
+
+                {/* Staff Roster List */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-[360px] overflow-y-auto">
+                  {providers
+                    .filter((p) => {
+                      if (employeeSearch.trim()) {
+                        const q = employeeSearch.toLowerCase();
+                        const match = `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+                          (p.disciplines && p.disciplines.some((d: string) => d.toLowerCase().includes(q)));
+                        if (!match) return false;
+                      }
+                      
+                      const isCred = ((p as any)?.credentialedPayerIds || []).includes(activePayer.id);
+                      const rec = records.find(r => r.providerId === p.id && r.payerId === activePayer.id);
+                      const isApproved = isCred || (rec && ['Approved', 'Linked', 'Effective'].includes(rec.stage));
+                      const isInReview = rec && ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(rec.stage);
+
+                      if (employeeStatusFilter === 'approved' && !isApproved) return false;
+                      if (employeeStatusFilter === 'review' && !isInReview) return false;
+                      if (employeeStatusFilter === 'not_enrolled' && (isApproved || isInReview)) return false;
+
+                      return true;
+                    })
+                    .map((prov) => {
+                      const isCred = ((prov as any)?.credentialedPayerIds || []).includes(activePayer.id);
+                      const rec = records.find(r => r.providerId === prov.id && r.payerId === activePayer.id);
+                      const isApproved = isCred || (rec && ['Approved', 'Linked', 'Effective'].includes(rec.stage));
+                      const isInReview = rec && ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(rec.stage);
+                      const entity = entities.find(e => e.id === prov.primaryEntityId);
+
+                      return (
+                        <div key={prov.id} className="p-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                            <div className="w-7 h-7 rounded-full bg-slate-100 text-[#2B4C9D] font-bold flex items-center justify-center text-[11px] shrink-0">
+                              {prov.firstName.charAt(0)}{prov.lastName.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="font-semibold text-xs text-slate-900 truncate">
+                                  {prov.firstName} {prov.lastName}
+                                </span>
+                                {entity && (
+                                  <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-medium truncate">
+                                    {entity.dba || entity.legalName}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10.5px] text-slate-400 block truncate">
+                                {prov.disciplines?.[0] || (prov as any).discipline || 'Clinician'} &bull; NPI: {prov.npi}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2 shrink-0">
+                            {isApproved ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                <span>Approved</span>
+                              </span>
+                            ) : isInReview ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                <Clock className="w-3 h-3 mr-1" />
+                                <span>In Review</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                                <span>Not Enrolled</span>
+                              </span>
+                            )}
+
+                            {/* Action toggle button to change approval */}
+                            <button
+                              disabled={isTogglingEmployee === prov.id}
+                              onClick={async () => {
+                                setIsTogglingEmployee(prov.id);
+                                try {
+                                  const currentList = (prov as any)?.credentialedPayerIds || [];
+                                  let updatedList: string[];
+                                  if (isApproved) {
+                                    updatedList = currentList.filter((id: string) => id !== activePayer.id);
+                                  } else {
+                                    updatedList = Array.from(new Set([...currentList, activePayer.id]));
+                                  }
+                                  await updateProviderCredentialing(prov.id, {
+                                    credentialedPayerIds: updatedList,
+                                    payerEnrollments: {
+                                      ...((prov as any)?.payerEnrollments || {}),
+                                      [activePayer.id]: {
+                                        status: isApproved ? 'Not Enrolled' : 'Credentialed',
+                                        effectiveDate: isApproved ? '' : new Date().toISOString().split('T')[0]
+                                      }
+                                    }
+                                  });
+                                  addToast(
+                                    isApproved 
+                                      ? `Removed ${prov.firstName} ${prov.lastName} from approved status.`
+                                      : `Marked ${prov.firstName} ${prov.lastName} as Approved for ${activePayer.name}!`,
+                                    'success'
+                                  );
+                                } catch (err: any) {
+                                  addToast(err.message || 'Failed to update approval status', 'error');
+                                } finally {
+                                  setIsTogglingEmployee(null);
+                                }
+                              }}
+                              className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                                isApproved
+                                  ? 'text-rose-600 hover:bg-rose-50'
+                                  : 'text-[#2B4C9D] bg-blue-50 hover:bg-blue-100'
+                              }`}
+                            >
+                              {isTogglingEmployee === prov.id 
+                                ? 'Updating...' 
+                                : isApproved 
+                                ? 'Revoke' 
+                                : 'Mark Approved'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </>

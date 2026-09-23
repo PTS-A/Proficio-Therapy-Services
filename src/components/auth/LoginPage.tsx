@@ -338,7 +338,7 @@ export const LoginPage: React.FC = () => {
                   id="login-email-input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. joel.reji@ageslearningsolutions.com"
+                  placeholder="enter your email"
                   className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D] transition-all text-slate-900"
                 />
               </div>

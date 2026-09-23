@@ -59,6 +59,7 @@ import {
   INITIAL_APPLICATION_DOCUMENTS,
   INITIAL_APPLICATION_COMMENTS,
 } from '../data/initialData';
+import { synchronizeSheetClinicians } from '../data/sheetClinicians';
 import { addBusinessDays, calculateBusinessDays, calculateDaysBetween, getAgingBucket, isFollowUpOverdue } from '../utils/slaCalculator';
 import { validateCredentialingRecord } from '../utils/entityValidation';
 import { 
@@ -211,6 +212,7 @@ interface CredentialingContextType {
   // Toast Notifications (Far Right Corner, Auto-Dismiss after 5s)
   toasts: Toast[];
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string, duration?: number) => void;
+  addToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   dismissToast: (id: string) => void;
 
   providers: Provider[];
@@ -311,6 +313,7 @@ interface CredentialingContextType {
   // Provider CRUD
   addProvider: (providerData: Omit<Provider, 'id' | 'createdAt' | 'updatedAt' | 'documents'>) => Provider;
   updateProvider: (id: string, updates: Partial<Provider>) => void;
+  updateProviderCredentialing: (id: string, updates: Partial<Provider>) => void;
   deleteProvider: (id: string) => void;
   addProviderCommentLog: (providerId: string, log: Omit<ProviderCommentLog, 'id' | 'timestamp' | 'authorId' | 'authorName' | 'authorRole'>) => void;
   addProviderDocument: (providerId: string, doc: Omit<DocumentItem, 'id' | 'uploadDate'>) => void;
@@ -595,10 +598,23 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const saved = localStorage.getItem('pts_supabase_cache_providers') || localStorage.getItem('cred_providers');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filter out any known fake/demo names or dummy placeholders
+          const valid = parsed.filter((p) => {
+            if (!p || !p.firstName) return false;
+            const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+            const isFake = ['fake', 'placeholder', 'demo user', 'test provider', 'john doe', 'jane doe'].some(f => fullName.includes(f));
+            if (isFake || p.id?.startsWith('fake-') || p.id?.startsWith('demo-')) return false;
+            return true;
+          });
+          if (valid.length > 0) {
+            const synced = synchronizeSheetClinicians(valid);
+            return synced;
+          }
+        }
       }
     } catch {}
-    return [];
+    return synchronizeSheetClinicians(INITIAL_PROVIDERS);
   });
 
   const [payers, setPayers] = useState<Payer[]>(() => {
@@ -3147,16 +3163,106 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const updateProvider = (id: string, updates: Partial<Provider>) => {
-    setProviders((prev) =>
-      prev.map((p) => {
+    setProviders((prev) => {
+      const next = prev.map((p) => {
         if (p.id === id) {
           const updated = { ...p, ...updates, updatedAt: new Date().toISOString().split('T')[0] };
           saveDocument('providers', id, updated).catch(console.error);
           return updated;
         }
         return p;
-      })
-    );
+      });
+      localStorage.setItem('cred_providers', JSON.stringify(next));
+      localStorage.setItem('pts_supabase_cache_providers', JSON.stringify(next));
+      return next;
+    });
+
+    // If payer enrollments are updated, synchronize with records so dashboard counts update automatically
+    if (updates.payerEnrollments) {
+      setRecords((prevRecords) => {
+        const nextRecords = [...prevRecords];
+        const targetProvider = providers.find((p) => p.id === id);
+        const discipline = targetProvider?.disciplines?.[0] || 'ABA';
+        const primaryLocId = targetProvider?.primaryLocationId || 'loc-1';
+        const primaryEntId = targetProvider?.primaryEntityId || targetProvider?.entityIds?.[0] || 'ent-1';
+        const specialist = users[0] || currentUser;
+
+        updates.payerEnrollments!.forEach((enrollment) => {
+          const existingIdx = nextRecords.findIndex(
+            (r) => r.providerId === id && r.payerId === enrollment.payerId
+          );
+
+          let mappedStage: CredentialingStage = 'Payer Review';
+          let mappedStatus: 'Submitted' | 'In Progress' | 'Approved' | 'Closed' = 'In Progress';
+
+          const st = enrollment.approvalStatus || enrollment.status;
+          if (st === 'Approved' || st === 'Approved / Active' || st === 'In-Network') {
+            mappedStage = 'Approved';
+            mappedStatus = 'Approved';
+          } else if (st === 'Submitted' || st === 'Application In Progress') {
+            mappedStage = 'Application Submitted';
+            mappedStatus = 'Submitted';
+          } else if (st === 'Not Applicable') {
+            mappedStage = 'Closed / Not Contracted';
+            mappedStatus = 'Closed';
+          } else {
+            // Pending / other
+            mappedStage = 'Payer Review';
+            mappedStatus = 'In Progress';
+          }
+
+          const effDate = enrollment.startDate || enrollment.effectiveDate || new Date().toISOString().split('T')[0];
+          const expDate = enrollment.expirationDate || enrollment.recredentialingDueDate;
+
+          if (existingIdx >= 0) {
+            nextRecords[existingIdx] = {
+              ...nextRecords[existingIdx],
+              stage: mappedStage,
+              status: mappedStatus,
+              effectiveDate: mappedStage === 'Approved' ? effDate : nextRecords[existingIdx].effectiveDate,
+              expirationDate: expDate || nextRecords[existingIdx].expirationDate,
+              updatedAt: new Date().toISOString().split('T')[0],
+            };
+            saveDocument('records', nextRecords[existingIdx].id, nextRecords[existingIdx]).catch(console.error);
+          } else if (st !== 'Not Applicable') {
+            const newRec: CredentialingRecord = {
+              id: `rec-${id}-${enrollment.payerId}`,
+              providerId: id,
+              payerId: enrollment.payerId,
+              entityId: primaryEntId,
+              locationId: primaryLocId,
+              applicationType: 'Initial credentialing',
+              discipline: discipline as any,
+              stage: mappedStage,
+              followUps: [],
+              checklist: [],
+              documents: [],
+              validationIssues: [],
+              linkingStatus: 'Not Applicable',
+              contractStatus: 'Not Started',
+              isOverdue: false,
+              daysInCurrentStage: 0,
+              totalCycleDays: 0,
+              auditTrail: [],
+              intakeDate: new Date().toISOString().split('T')[0],
+              effectiveDate: mappedStage === 'Approved' ? effDate : undefined,
+              expirationDate: expDate,
+              assignedSpecialistId: specialist?.id || 'user-1',
+              assignedSpecialistName: specialist?.name || 'Assigned Specialist',
+              notes: `Enrollment status: ${st}`,
+              createdAt: new Date().toISOString().split('T')[0],
+              updatedAt: new Date().toISOString().split('T')[0],
+            };
+            nextRecords.push(newRec);
+            saveDocument('records', newRec.id, newRec).catch(console.error);
+          }
+        });
+
+        localStorage.setItem('cred_records', JSON.stringify(nextRecords));
+        localStorage.setItem('pts_supabase_cache_records', JSON.stringify(nextRecords));
+        return nextRecords;
+      });
+    }
   };
 
   const deleteProvider = (id: string) => {
@@ -4513,6 +4619,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         updateProviderLinking,
         addProvider,
         updateProvider,
+        updateProviderCredentialing: updateProvider,
         deleteProvider,
         addProviderCommentLog,
         addProviderDocument,
@@ -4588,6 +4695,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         deleteSecurityIncident,
         toasts,
         showToast,
+        addToast: showToast,
         dismissToast,
       }}
     >

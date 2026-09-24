@@ -422,11 +422,17 @@ function toPostgresRow(collectionName: string, item: any): any {
       taxonomy: item.taxonomy || '',
       specialty: item.specialty || '',
       notes: item.notes || '',
-      region: item.region || '',
-      bcbaCertificationNumber: item.bcbaCertificationNumber || '',
-      bcbaEffectiveDate: item.bcbaEffectiveDate || '',
-      bcbaExpiryDate: item.bcbaExpiryDate || '',
-      utStateLicense: item.utStateLicense || '',
+      region: item.region || (item.contractInfo?.region || ''),
+      bcbaCertificationNumber: item.bcbaCertificationNumber || (item.contractInfo?.bcbaCertificationNumber || ''),
+      bcbaEffectiveDate: item.bcbaEffectiveDate || (item.contractInfo?.bcbaEffectiveDate || ''),
+      bcbaExpiryDate: item.bcbaExpiryDate || (item.contractInfo?.bcbaExpiryDate || ''),
+      rbtCertificationNumber: item.rbtCertificationNumber || (item.contractInfo?.rbtCertificationNumber || ''),
+      rbtEffectiveDate: item.rbtEffectiveDate || (item.contractInfo?.rbtEffectiveDate || ''),
+      rbtExpiryDate: item.rbtExpiryDate || (item.contractInfo?.rbtExpiryDate || ''),
+      role: item.role || (item.contractInfo?.role || ''),
+      utStateLicense: item.utStateLicense || item.utahLicenseNumber || '',
+      utahLicenseNumber: item.utahLicenseNumber || item.utStateLicense || '',
+      isUtah: Boolean(item.isUtah || item.licenseState === 'UT' || item.utStateLicense || item.utahLicenseNumber),
       primaryEntityId: item.primaryEntityId || 'ent-1',
     };
   }
@@ -480,6 +486,10 @@ function toPostgresRow(collectionName: string, item: any): any {
   if (tableName === 'employees' && !mapped.full_name && (item.firstName || item.lastName)) {
     mapped.full_name = [item.firstName, item.lastName].filter(Boolean).join(' ');
   }
+  if (tableName === 'entities') {
+    if (item.legalName && !mapped.legal_name) mapped.legal_name = item.legalName;
+    if (item.name && !mapped.legal_name) mapped.legal_name = item.name;
+  }
 
   return mapped;
 }
@@ -521,11 +531,39 @@ function fromPostgresRow(collectionName: string, row: any): any {
     if (row.contract_info.bcbaCertificationNumber) result.bcbaCertificationNumber = row.contract_info.bcbaCertificationNumber;
     if (row.contract_info.bcbaEffectiveDate) result.bcbaEffectiveDate = row.contract_info.bcbaEffectiveDate;
     if (row.contract_info.bcbaExpiryDate) result.bcbaExpiryDate = row.contract_info.bcbaExpiryDate;
+    if (row.contract_info.rbtCertificationNumber) result.rbtCertificationNumber = row.contract_info.rbtCertificationNumber;
+    if (row.contract_info.rbtEffectiveDate) result.rbtEffectiveDate = row.contract_info.rbtEffectiveDate;
+    if (row.contract_info.rbtExpiryDate) result.rbtExpiryDate = row.contract_info.rbtExpiryDate;
+    if (row.contract_info.role) result.role = row.contract_info.role;
     if (row.contract_info.utStateLicense) result.utStateLicense = row.contract_info.utStateLicense;
+    if (row.contract_info.utahLicenseNumber) {
+      result.utahLicenseNumber = row.contract_info.utahLicenseNumber;
+      if (!result.utStateLicense) result.utStateLicense = row.contract_info.utahLicenseNumber;
+    }
+    if (row.contract_info.isUtah !== undefined) {
+      result.isUtah = row.contract_info.isUtah;
+    } else if (result.licenseState === 'UT' || Boolean(result.utStateLicense)) {
+      result.isUtah = true;
+    }
     if (row.contract_info.primaryEntityId) result.primaryEntityId = row.contract_info.primaryEntityId;
     if (row.contract_info.taxonomy && !result.taxonomy) result.taxonomy = row.contract_info.taxonomy;
     if (row.contract_info.specialty && !result.specialty) result.specialty = row.contract_info.specialty;
     if (row.contract_info.notes && !result.notes) result.notes = row.contract_info.notes;
+  }
+
+  if (tableName === 'providers') {
+    if (!result.primaryEntityId) {
+      result.primaryEntityId = row.contract_info?.primaryEntityId || (Array.isArray(result.entityIds) && result.entityIds[0]) || 'ent-1';
+    }
+    if (!result.primaryLocationId) {
+      result.primaryLocationId = row.contract_info?.primaryLocationId || (Array.isArray(result.locationIds) && result.locationIds[0]) || '';
+    }
+    if (!result.entityIds || !Array.isArray(result.entityIds) || result.entityIds.length === 0) {
+      result.entityIds = [result.primaryEntityId];
+    }
+    if (!result.locationIds || !Array.isArray(result.locationIds) || result.locationIds.length === 0) {
+      result.locationIds = result.primaryLocationId ? [result.primaryLocationId] : [];
+    }
   }
 
   // User schema normalization and role derivation directly from Supabase
@@ -538,6 +576,11 @@ function fromPostgresRow(collectionName: string, row: any): any {
     result.accessLevel = row.access_level || result.accessLevel || (row.is_super_admin ? 'ADMINISTRATOR' : 'USER');
     result.isSuperAdmin = Boolean(row.is_super_admin || row.access_level === 'ADMINISTRATOR' || result.systemRole === 'System Administrator');
     result.email = (row.email || result.email || '').toLowerCase().trim();
+  }
+
+  if (tableName === 'entities') {
+    result.name = row.legal_name || row.name || result.legalName || result.dba || '';
+    result.legalName = row.legal_name || row.name || result.legalName || result.name || '';
   }
 
   return result;
@@ -770,7 +813,13 @@ export async function fetchCollection<T = any>(collectionName: string): Promise<
       if (data !== null && Array.isArray(data)) {
         const transformed = data.map((row) => fromPostgresRow(collectionName, row));
         // Update local cache with exact database records
-        localStorage.setItem(LOCAL_STORAGE_PREFIX + collectionName, JSON.stringify(transformed));
+        try {
+          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+            localStorage.setItem(LOCAL_STORAGE_PREFIX + collectionName, JSON.stringify(transformed));
+          }
+        } catch (cacheErr) {
+          console.warn(`[Supabase] Local cache write warning for ${collectionName}:`, cacheErr);
+        }
         updateSyncStatus({
           isSyncing: false,
           lastSyncedAt: new Date().toISOString(),

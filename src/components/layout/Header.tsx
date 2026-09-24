@@ -305,7 +305,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-500 truncate">{currentAccount?.email || 'demo@proficiotherapy.com'}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{currentAccount?.email || ''}</p>
                     <div className="mt-1.5 flex items-center justify-between">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded truncate max-w-[140px] ${
                         isSuperAdmin(currentAccount)

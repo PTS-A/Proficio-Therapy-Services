@@ -30,6 +30,7 @@ import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeM
 import { ToastContainer } from './components/common/ToastContainer';
 import { Discipline } from './types';
 import { canAccessTab, getAllowedTabs } from './utils/rbac';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTabType>('dashboard');
@@ -324,10 +325,14 @@ const MainContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <CredentialingProvider>
-      <MainContent />
-      <ToastContainer />
-    </CredentialingProvider>
+    <ErrorBoundary fallbackTitle="Proficio Credentialing Application Error">
+      <CredentialingProvider>
+        <ErrorBoundary fallbackTitle="Proficio Workspace View Error">
+          <MainContent />
+        </ErrorBoundary>
+        <ToastContainer />
+      </CredentialingProvider>
+    </ErrorBoundary>
   );
 };
 

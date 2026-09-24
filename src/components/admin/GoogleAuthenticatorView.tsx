@@ -774,7 +774,7 @@ export const GoogleAuthenticatorView: React.FC<GoogleAuthenticatorViewProps> = (
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
                           <div className="w-6 h-6 rounded-full bg-slate-100 text-[#2B4C9D] flex items-center justify-center font-bold text-[10px]">
-                            {name.charAt(0).toUpperCase()}
+                            {(name || 'U').charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <p className="font-semibold text-slate-800">{name}</p>
@@ -889,7 +889,7 @@ export const GoogleAuthenticatorView: React.FC<GoogleAuthenticatorViewProps> = (
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center space-x-2.5">
                         <div className="w-7 h-7 rounded-full bg-[#2B4C9D] text-white flex items-center justify-center font-bold text-xs">
-                          {account.name.charAt(0)}
+                          {(account.name || 'U').charAt(0)}
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">{account.name}</p>

@@ -527,8 +527,8 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
                     const entity = entities.find((e) => e.id === rec.entityId);
                     const location = locations.find((l) => l.id === rec.locationId);
 
-                    const errorCount = rec.validationIssues.filter((i) => i.severity === 'Error').length;
-                    const warningCount = rec.validationIssues.filter((i) => i.severity === 'Warning').length;
+                    const errorCount = (rec.validationIssues || []).filter((i) => i.severity === 'Error').length;
+                    const warningCount = (rec.validationIssues || []).filter((i) => i.severity === 'Warning').length;
 
                     return (
                       <tr

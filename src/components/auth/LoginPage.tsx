@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mail, 
   Lock,
@@ -13,7 +13,8 @@ import {
   Key,
   UserPlus,
   Eye,
-  EyeOff
+  EyeOff,
+  ExternalLink
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { ProficioLogo } from '../common/ProficioLogo';
@@ -23,15 +24,6 @@ import { MfaVerificationView } from './MfaVerificationView';
 export const LoginPage: React.FC = () => {
   const { login, loginWithGoogle, sessionTimeoutMessage, pendingMfaAccount, cancelMfa } = useCredentialing();
 
-  if (pendingMfaAccount) {
-    return (
-      <MfaVerificationView
-        account={pendingMfaAccount}
-        onCancel={cancelMfa}
-      />
-    );
-  }
-  
   // Request Access Page State (for unregistered users)
   const [showRequestAccess, setShowRequestAccess] = useState(false);
   const [requestAccessEmail, setRequestAccessEmail] = useState('');
@@ -45,6 +37,19 @@ export const LoginPage: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showProviderSetupHelp, setShowProviderSetupHelp] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
+
+  const popupRef = useRef<Window | null>(null);
+  const pollIntervalRef = useRef<any>(null);
+
+  // Clean up any ongoing polling timers on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Access Control Verification Result Modal
   const [denialDetails, setDenialDetails] = useState<{
@@ -54,15 +59,6 @@ export const LoginPage: React.FC = () => {
     reason: string;
     email?: string;
   } | null>(null);
-
-  if (showRequestAccess) {
-    return (
-      <RequestAccessPage
-        initialEmail={requestAccessEmail}
-        onBackToLogin={() => setShowRequestAccess(false)}
-      />
-    );
-  }
 
   useEffect(() => {
     // Check for access control denial stored by OAuth callback
@@ -86,6 +82,24 @@ export const LoginPage: React.FC = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
+
+  if (pendingMfaAccount) {
+    return (
+      <MfaVerificationView
+        account={pendingMfaAccount}
+        onCancel={cancelMfa}
+      />
+    );
+  }
+
+  if (showRequestAccess) {
+    return (
+      <RequestAccessPage
+        initialEmail={requestAccessEmail}
+        onBackToLogin={() => setShowRequestAccess(false)}
+      />
+    );
+  }
 
   // Email + Password Sign In Handler
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
@@ -119,42 +133,100 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Google OAuth Sign In Handler (Redirect flow in the SAME TAB - strictly no popups)
+  // Google OAuth SSO Sign In Handler (Opens Popup directly to provider URL to avoid X-Frame-Options iframe denial)
   const handleGoogleSignIn = async () => {
     setError(null);
     setDenialDetails(null);
     setShowProviderSetupHelp(false);
-
-    const cleanEmail = email.trim().toLowerCase();
+    setPopupBlockedUrl(null);
     setIsGoogleLoading(true);
 
+    // Open popup synchronously during user click to guarantee browser pop-up blocker bypass
+    let popup: Window | null = null;
     try {
-      // Initiate Google OAuth with same-tab redirect (preferredFlow: 'redirect')
-      const res = await loginWithGoogle(cleanEmail || undefined, 'redirect');
-      setIsGoogleLoading(false);
+      popup = window.open('about:blank', 'google_oauth_popup', 'width=540,height=680,left=150,top=100,status=no,toolbar=no');
+      popupRef.current = popup;
+    } catch (e) {
+      console.warn('[Popup creation blocked]:', e);
+    }
+
+    const isPopupBlocked = !popup || popup.closed || typeof popup.closed === 'undefined';
+
+    try {
+      const res = await loginWithGoogle(undefined, { 
+        popupWindow: isPopupBlocked ? null : popup,
+        preferPopup: true 
+      });
 
       if (!res.success) {
-        if (res.step && res.step > 0 && res.code !== 'REQUIRES_MFA') {
-          setDenialDetails({
-            step: res.step,
-            stepName: res.stepName || 'Employee Access Control',
-            code: res.code || 'ACCESS_DENIED',
-            reason: res.error || 'Access Denied by corporate security gate.',
-            email: cleanEmail || 'Corporate Account',
-          });
-        } else if (res.error?.includes('provider is not enabled') || res.error?.includes('Unsupported provider')) {
+        setIsGoogleLoading(false);
+        if (popup && !popup.closed) popup.close();
+
+        if (res.error?.includes('provider is not enabled') || res.error?.includes('Unsupported provider')) {
           setShowProviderSetupHelp(true);
         } else {
-          setError(res.error || 'Failed to authenticate corporate identity.');
+          setError(res.error || 'Failed to initialize Google Single Sign-On.');
         }
+        return;
       }
-      // If res.url exists and browser hasn't already navigated, redirect in the same tab
-      if (res.url) {
-        window.location.href = res.url;
+
+      // If browser blocked the popup, show fallback modal with direct launch link
+      if (isPopupBlocked) {
+        setIsGoogleLoading(false);
+        if (res.url) {
+          setPopupBlockedUrl(res.url);
+        }
+        return;
+      }
+
+      // Set up real-time session polling for the active OAuth handshake
+      const activeSessionId = res.sessionId;
+      if (activeSessionId) {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+
+        pollIntervalRef.current = setInterval(async () => {
+          try {
+            // If user closed the popup window manually
+            if (popup && popup.closed) {
+              clearInterval(pollIntervalRef.current);
+              setIsGoogleLoading(false);
+              return;
+            }
+
+            const pollRes = await fetch(`/api/auth/session/status?sessionId=${encodeURIComponent(activeSessionId)}`);
+            if (pollRes.ok) {
+              const sessionData = await pollRes.json();
+              if (sessionData.status === 'authorized' && sessionData.account) {
+                clearInterval(pollIntervalRef.current);
+                if (popup && !popup.closed) popup.close();
+                setIsGoogleLoading(false);
+
+                // Set account directly in storage & notify context
+                localStorage.setItem('cred_current_account', JSON.stringify(sessionData.account));
+                localStorage.setItem('cred_last_activity', String(Date.now()));
+                window.dispatchEvent(new Event('storage'));
+              } else if (sessionData.status === 'denied' || sessionData.status === 'error') {
+                clearInterval(pollIntervalRef.current);
+                if (popup && !popup.closed) popup.close();
+                setIsGoogleLoading(false);
+                setDenialDetails(sessionData.details || {
+                  step: 7,
+                  stepName: 'Access Control Gate',
+                  code: 'ACCESS_DENIED',
+                  reason: sessionData.error || 'Access Denied by corporate security gate.',
+                  email: sessionData.account?.email || 'Google Account',
+                });
+              }
+            }
+          } catch (e) {
+            // Ignore transient network errors during polling
+          }
+        }, 600);
       }
     } catch (err: any) {
       setIsGoogleLoading(false);
-      setError('An error occurred during authentication: ' + (err.message || 'Unknown error'));
+      if (popup && !popup.closed) popup.close();
+      setError('An error occurred during authentication: ' + (err?.message || 'Unknown error'));
     }
   };
 
@@ -178,7 +250,39 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 20-Minute Session Timeout Alert */}
+        {/* Popup Blocked Fallback Modal */}
+        {popupBlockedUrl && (
+          <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl shadow-xs text-xs text-indigo-950 space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2 text-[#2B4C9D] font-bold">
+                <ExternalLink className="w-4 h-4 text-[#2B4C9D] shrink-0" />
+                <span className="text-sm">Complete Google Sign-In</span>
+              </div>
+              <button
+                onClick={() => setPopupBlockedUrl(null)}
+                className="text-indigo-400 hover:text-indigo-700 cursor-pointer p-0.5"
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-indigo-900 leading-relaxed">
+              Your browser blocked the Google authentication popup. Please click below to open Google Sign-In in a new window:
+            </p>
+            <div className="flex items-center space-x-2 pt-1 flex-wrap gap-y-2">
+              <a
+                href={popupBlockedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setPopupBlockedUrl(null)}
+                className="px-3.5 py-2 bg-[#2B4C9D] hover:bg-[#1a2f64] text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-xs cursor-pointer"
+              >
+                <span>Open Google Sign-In</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        )}
         {sessionTimeoutMessage && (
           <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-2xl flex items-start space-x-2.5 text-xs text-amber-900 shadow-xs">
             <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
@@ -402,7 +506,7 @@ export const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Official Google Sign-In Button (Redirect in SAME TAB - Strictly No Popups) */}
+          {/* Official Google Sign-In Button */}
           <button
             type="button"
             id="google-signin-button"
@@ -413,7 +517,7 @@ export const LoginPage: React.FC = () => {
             {isGoogleLoading ? (
               <div className="flex items-center space-x-2 text-slate-600">
                 <div className="w-4 h-4 border-2 border-slate-300 border-t-[#2B4C9D] rounded-full animate-spin"></div>
-                <span>Redirecting to Google...</span>
+                <span>Connecting to Google SSO...</span>
               </div>
             ) : (
               <>

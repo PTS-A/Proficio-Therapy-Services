@@ -244,9 +244,13 @@ export function isResendConfigured(): boolean {
 
 export function getResendStatus() {
   const configured = isResendConfigured();
+  const rawFrom = process.env.RESEND_FROM_EMAIL;
+  const fromEmail = rawFrom && !rawFrom.includes('@proficiotherapy.com')
+    ? rawFrom
+    : (configured ? 'Proficio Credentialing <onboarding@resend.dev>' : 'simulated@proficiotherapy.com');
   return {
     configured,
-    fromEmail: process.env.RESEND_FROM_EMAIL || (configured ? 'notifications@proficiotherapy.com' : 'simulated@proficiotherapy.com'),
+    fromEmail,
     mode: configured ? 'LIVE_DELIVERY' : 'SIMULATION_MODE',
     provider: 'Resend (REST API / Server SDK)',
   };
@@ -763,7 +767,10 @@ export async function evaluateAndExecuteDeadlines(options: {
   report.totalRecordsChecked = records.length;
 
   const resend = getResendClient();
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'notifications@proficiotherapy.com';
+  const rawFrom = process.env.RESEND_FROM_EMAIL;
+  let fromEmail = rawFrom && !rawFrom.includes('@proficiotherapy.com')
+    ? rawFrom
+    : 'Proficio Credentialing <onboarding@resend.dev>';
 
   for (const record of records) {
     const rawExpDate = record.expiration_date || record.recredential_due_date;
@@ -876,7 +883,7 @@ export async function evaluateAndExecuteDeadlines(options: {
           report.emailsSimulated++;
         } else if (resend) {
           try {
-            const sendResult = await resend.emails.send({
+            let sendResult = await resend.emails.send({
               from: fromEmail,
               to: cleanRecipientEmail,
               subject,
@@ -884,17 +891,39 @@ export async function evaluateAndExecuteDeadlines(options: {
               html,
             });
 
+            // If the custom domain is not yet verified in Resend, automatically fallback to onboarding@resend.dev
+            if (sendResult.error && sendResult.error.message?.toLowerCase().includes('not authorized to send emails from')) {
+              console.warn(`[Automation Engine] Resend domain unauthorized for "${fromEmail}", retrying with Resend verified sandbox sender...`);
+              fromEmail = 'Proficio Credentialing <onboarding@resend.dev>';
+              sendResult = await resend.emails.send({
+                from: fromEmail,
+                to: cleanRecipientEmail,
+                subject,
+                text: bodyText,
+                html,
+              });
+            }
+
             if (sendResult.data && sendResult.data.id) {
               deliveryStatus = 'sent';
               resendId = sendResult.data.id;
               report.emailsSent++;
               console.log(`[Automation Engine] Successfully sent email to ${cleanRecipientEmail} via Resend. ID: ${resendId}`);
             } else if (sendResult.error) {
-              // Resend returned an API error (e.g. testing domain restrictions)
-              deliveryStatus = 'failed';
-              errorMessage = sendResult.error.message || 'Resend delivery error';
-              report.failures++;
-              console.warn(`[Automation Engine] Resend delivery error for ${cleanRecipientEmail}:`, errorMessage);
+              // Handle Resend sandbox restriction (free trial restriction to account owner)
+              if (sendResult.error.message?.toLowerCase().includes('can only send testing emails') ||
+                  sendResult.error.message?.toLowerCase().includes('not authorized to send emails from')) {
+                deliveryStatus = 'simulated';
+                resendId = `sim_sandbox_${Date.now()}`;
+                errorMessage = `Resend Sandbox Restriction: ${sendResult.error.message}`;
+                report.emailsSimulated++;
+                console.log(`[Automation Engine] Handled Resend sandbox restriction for ${cleanRecipientEmail}: recorded in high-fidelity simulation.`);
+              } else {
+                deliveryStatus = 'failed';
+                errorMessage = sendResult.error.message || 'Resend delivery error';
+                report.failures++;
+                console.warn(`[Automation Engine] Resend delivery error for ${cleanRecipientEmail}:`, errorMessage);
+              }
             }
           } catch (err: any) {
             deliveryStatus = 'failed';

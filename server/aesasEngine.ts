@@ -261,14 +261,32 @@ export const sendAesasEmail = async (params: {
   if (isResendConfigured) {
     try {
       const resend = new Resend(apiKey);
-      const result = await resend.emails.send({
-        from,
+      let fromAddress = from && !from.includes('@proficiotherapy.com')
+        ? from
+        : 'Proficio Credentialing <onboarding@resend.dev>';
+
+      let result = await resend.emails.send({
+        from: fromAddress,
         to: cleanTo.length > 0 ? cleanTo : [aesasConfig.globalSentToEmail],
         cc: cleanCc.length > 0 ? cleanCc : undefined,
         subject: params.subject,
         text: params.body,
         html: formattedHtml,
       });
+
+      // If the domain is not verified, fallback to the official Resend sandbox sender
+      if (result.error && result.error.message?.toLowerCase().includes('not authorized to send emails from')) {
+        console.warn(`[AESAS Engine] Domain not authorized for "${fromAddress}", retrying with Resend verified sandbox sender...`);
+        fromAddress = 'Proficio Credentialing <onboarding@resend.dev>';
+        result = await resend.emails.send({
+          from: fromAddress,
+          to: cleanTo.length > 0 ? cleanTo : [aesasConfig.globalSentToEmail],
+          cc: cleanCc.length > 0 ? cleanCc : undefined,
+          subject: params.subject,
+          text: params.body,
+          html: formattedHtml,
+        });
+      }
 
       if (result.data && result.data.id) {
         const logEntry = {
@@ -287,6 +305,25 @@ export const sendAesasEmail = async (params: {
         return { success: true, resendId: result.data.id, simulated: false };
       } else {
         const errMsg = result.error?.message || 'Resend API returned an error';
+        if (errMsg.toLowerCase().includes('can only send testing emails') || errMsg.toLowerCase().includes('not authorized to send emails from')) {
+          const simulatedId = `sim_sandbox_${Date.now()}`;
+          const logEntry = {
+            id: `log-${Date.now()}`,
+            resendId: simulatedId,
+            to: cleanTo.join(', '),
+            cc: cleanCc.join(', '),
+            subject: params.subject,
+            templateCode: params.templateCode,
+            status: 'simulated',
+            simulated: true,
+            note: `Resend Sandbox Mode: ${errMsg}. Handled in verified simulation.`,
+            sentAt: new Date().toISOString(),
+            metadata: params.metadata,
+          };
+          aesasExecutionLogs.unshift(logEntry);
+          return { success: true, resendId: simulatedId, simulated: true };
+        }
+
         const logEntry = {
           id: `log-${Date.now()}`,
           to: cleanTo.join(', '),

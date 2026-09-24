@@ -764,7 +764,7 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="flex items-start space-x-3">
                         <div className="w-10 h-10 rounded-full bg-[#2B4C9D] text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
-                          {req.fullName.charAt(0).toUpperCase()}
+                          {(req.fullName || 'U').charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <div className="flex items-center space-x-2">

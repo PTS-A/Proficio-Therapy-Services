@@ -91,7 +91,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
           <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-9 h-9 rounded-xl bg-[#2B4C9D] text-white font-bold flex items-center justify-center text-xs">
-                {currentAccount.name.charAt(0)}
+                {(currentAccount.name || 'U').charAt(0)}
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-900 leading-none">

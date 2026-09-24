@@ -166,8 +166,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     setDocExpiry('');
   };
 
-  const errorIssues = record.validationIssues.filter((i) => i.severity === 'Error');
-  const warningIssues = record.validationIssues.filter((i) => i.severity === 'Warning');
+  const validationIssues = record.validationIssues || [];
+  const errorIssues = validationIssues.filter((i) => i.severity === 'Error');
+  const warningIssues = validationIssues.filter((i) => i.severity === 'Warning');
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
@@ -402,7 +403,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {record.validationIssues.length === 0 ? (
+                  {validationIssues.length === 0 ? (
                     <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1">
                       <Check className="w-3.5 h-3.5" />
                       <span>100% Validated</span>

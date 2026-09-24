@@ -190,7 +190,7 @@ export const StaffApprovalsView: React.FC<StaffApprovalsViewProps> = ({ onBackTo
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
-                      {req.employeeName.charAt(0) || 'C'}
+                      {(req.employeeName || 'C').charAt(0)}
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">

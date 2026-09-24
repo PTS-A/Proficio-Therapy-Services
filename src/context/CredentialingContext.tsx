@@ -59,7 +59,6 @@ import {
   INITIAL_APPLICATION_DOCUMENTS,
   INITIAL_APPLICATION_COMMENTS,
 } from '../data/initialData';
-import { synchronizeSheetClinicians } from '../data/sheetClinicians';
 import { addBusinessDays, calculateBusinessDays, calculateDaysBetween, getAgingBucket, isFollowUpOverdue } from '../utils/slaCalculator';
 import { validateCredentialingRecord } from '../utils/entityValidation';
 import { 
@@ -80,6 +79,7 @@ import {
   NotificationTemplate, 
   SystemSettings 
 } from '../types';
+import { safeStorage } from '../utils/safeStorage';
 
 export interface Toast {
   id: string;
@@ -130,13 +130,20 @@ interface CredentialingContextType {
   isSuperAdminUser: boolean;
   isAuthenticatingOAuth?: boolean;
   login: (email: string, password?: string) => { success: boolean; error?: string };
-  loginWithGoogle: (emailOverride?: string, preferredFlow?: 'popup' | 'redirect') => Promise<{
+  loginWithGoogle: (
+    emailOverride?: string,
+    optionsOrFlow?: { popupWindow?: Window | null; sessionId?: string; preferPopup?: boolean } | ('popup' | 'redirect')
+  ) => Promise<{
     success: boolean;
     error?: string;
     step?: number;
     stepName?: string;
     code?: string;
     account?: AppAccount;
+    url?: string;
+    sessionId?: string;
+    popupOpened?: boolean;
+    denial?: any;
   }>;
   logout: (reason?: string) => void;
   changePassword: (newPassword: string) => { success: boolean; error?: string };
@@ -378,6 +385,8 @@ interface CredentialingContextType {
     field5_discipline: string;
     field3_npi_license: string;
     field6_caqh_specialty: string;
+    isUtah?: boolean;
+    utahLicenseNumber?: string;
     documents: { name: string; type: string; url: string; expirationDate?: string }[];
     payerIds: string[];
     comments: { commentText: string; authorName: string; dateCreated: string; timeCreated: string; timestamp: string }[];
@@ -608,13 +617,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
             return true;
           });
           if (valid.length > 0) {
-            const synced = synchronizeSheetClinicians(valid);
-            return synced;
+            return valid;
           }
         }
       }
     } catch {}
-    return synchronizeSheetClinicians(INITIAL_PROVIDERS);
+    return INITIAL_PROVIDERS;
   });
 
   const [payers, setPayers] = useState<Payer[]>(() => {
@@ -733,9 +741,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     }
     return {
-      id: 'acc-admin-clean',
-      name: 'Administrator',
-      email: 'admin@example.com',
+      id: 'acc-user-joel-reji',
+      name: 'Joel Mathew Reji',
+      email: 'joel.reji@ageslearningsolutions.com',
       role: 'Admin',
       accessLevel: 'ADMINISTRATOR',
     };
@@ -1121,63 +1129,63 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Local state cache in localStorage for fast initial render
   useEffect(() => {
-    localStorage.setItem('cred_stage_configs', JSON.stringify(stageConfigs));
+    safeStorage.setItem('cred_stage_configs', JSON.stringify(stageConfigs));
   }, [stageConfigs]);
 
   useEffect(() => {
     // Sanitize accounts before caching: strip plaintext passwords (HIPAA §164.308 / ISO A.8.5)
     const sanitized = accounts.map(({ password, ...rest }) => rest);
-    localStorage.setItem('cred_accounts', JSON.stringify(sanitized));
+    safeStorage.setItem('cred_accounts', JSON.stringify(sanitized));
   }, [accounts]);
 
   useEffect(() => {
     if (currentAccount) {
       // Never store plaintext password in browser storage (HIPAA §164.312(a)(2)(iv))
       const { password, ...sanitized } = currentAccount;
-      localStorage.setItem('cred_current_account', JSON.stringify(sanitized));
+      safeStorage.setItem('cred_current_account', JSON.stringify(sanitized));
     }
     // Do NOT wipe cred_current_account when currentAccount is null during mount/re-renders.
     // Explicit session clearing happens only in logout() or session timeout expiration.
   }, [currentAccount]);
 
   useEffect(() => {
-    localStorage.setItem('cred_providers', JSON.stringify(providers));
+    safeStorage.setItem('cred_providers', JSON.stringify(providers));
   }, [providers]);
 
   useEffect(() => {
-    localStorage.setItem('cred_payers', JSON.stringify(payers));
+    safeStorage.setItem('cred_payers', JSON.stringify(payers));
   }, [payers]);
 
   useEffect(() => {
-    localStorage.setItem('cred_entities', JSON.stringify(entities));
+    safeStorage.setItem('cred_entities', JSON.stringify(entities));
   }, [entities]);
 
   useEffect(() => {
-    localStorage.setItem('cred_locations', JSON.stringify(locations));
+    safeStorage.setItem('cred_locations', JSON.stringify(locations));
   }, [locations]);
 
   useEffect(() => {
-    localStorage.setItem('cred_records', JSON.stringify(records));
+    safeStorage.setItem('cred_records', JSON.stringify(records));
   }, [records]);
 
   useEffect(() => {
-    localStorage.setItem('cred_notifications', JSON.stringify(notifications));
+    safeStorage.setItem('cred_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
   useEffect(() => {
-    localStorage.setItem('cred_employees', JSON.stringify(employees));
+    safeStorage.setItem('cred_employees', JSON.stringify(employees));
   }, [employees]);
 
   useEffect(() => {
-    localStorage.setItem('cred_clinical_staff', JSON.stringify(clinicalStaff));
+    safeStorage.setItem('cred_clinical_staff', JSON.stringify(clinicalStaff));
   }, [clinicalStaff]);
 
   useEffect(() => {
-    localStorage.setItem('cred_documents', JSON.stringify(documentsList));
+    safeStorage.setItem('cred_documents', JSON.stringify(documentsList));
   }, [documentsList]);
 
   useEffect(() => {
-    localStorage.setItem('cred_comments', JSON.stringify(commentsList));
+    safeStorage.setItem('cred_comments', JSON.stringify(commentsList));
   }, [commentsList]);
 
   // Sync currentUser with currentAccount changes
@@ -1226,8 +1234,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!isMounted) return;
       if (res && res.handled) {
         if (res.authorized && res.account) {
-          // Every login must proceed through Google Authenticator MFA
-          setPendingMfaAccount(res.account);
+          // If the account specifically enrolled in MFA and MFA is software-wide enabled, challenge
+          if (res.account.mfaEnabled && isMfaSoftwareWideEnabled) {
+            setPendingMfaAccount(res.account);
+          } else {
+            finalizeLogin(res.account);
+          }
           localStorage.removeItem('cred_timeout_reason');
           localStorage.removeItem('cred_oauth_denial');
         } else if (res.denial || res.error) {
@@ -1380,7 +1392,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // HIPAA §164.312(a)(1) & ISO/IEC 27001:2022 A.8.5: Cryptographic zero-knowledge password hash verification
   const INITIAL_ACCOUNT_HASHES: Record<string, string> = {
-    'admin@example.com': '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',
+    'joel.reji@ageslearningsolutions.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
     'superadmin@proficiotherapy.com': 'e34f92a20532a873cb3184398070b4b82a8fa29cf48572c203dc5f0fa6158231',
     'manager@proficiotherapy.com': 'c30ff2e299a730a4f44295ac948cf600e947fbaa38970f23a4e60c6f97a77cab',
     'specialist@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
@@ -1389,8 +1401,6 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     'clinical@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
     'billing@proficiotherapy.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
     'leadership@proficiotherapy.com': 'd5d9b5953ffe9c87e48e5d8acb17c098f5686b62bc66a45582c18acade19beee',
-    'demo@proficiotherapy.com': 'd5d9b5953ffe9c87e48e5d8acb17c098f5686b62bc66a45582c18acade19beee',
-    'joel.reji@ageslearningsolutions.com': 'e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446',
   };
 
   const KNOWN_HASH_REVERSE: Record<string, string> = {
@@ -1506,7 +1516,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loginWithGoogle = async (
     emailOverride?: string,
-    preferredFlow: 'popup' | 'redirect' = 'redirect'
+    optionsOrFlow?: { popupWindow?: Window | null; sessionId?: string; preferPopup?: boolean } | ('popup' | 'redirect')
   ): Promise<{
     success: boolean;
     error?: string;
@@ -1515,8 +1525,15 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     code?: string;
     account?: AppAccount;
     url?: string;
+    sessionId?: string;
+    popupOpened?: boolean;
+    denial?: any;
   }> => {
     try {
+      const opts = typeof optionsOrFlow === 'object' && optionsOrFlow !== null
+        ? optionsOrFlow
+        : { preferPopup: optionsOrFlow === 'popup' || true };
+
       // If direct corporate identity verification is requested
       if (emailOverride) {
         const verifyRes = await authenticateCorporateGoogleUser(emailOverride);
@@ -1526,6 +1543,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
             error: verifyRes.error || 'Employee Access Control validation failed.',
             step: verifyRes.step,
             stepName: verifyRes.stepName,
+            code: verifyRes.code,
+            denial: verifyRes.denial,
           };
         }
 
@@ -1549,20 +1568,36 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           };
         }
 
-        // Google Workspace identity authentication (Google OAuth / Enterprise IdP)
-        // Every login must strictly proceed through Google Authenticator MFA verification
-        setPendingMfaAccount(verifiedAcc);
+        // Check if MFA is required: only if account specifically enrolled and MFA is software-wide enabled
+        if (verifiedAcc.mfaEnabled && isMfaSoftwareWideEnabled) {
+          setPendingMfaAccount(verifiedAcc);
+          return {
+            success: true,
+            account: verifiedAcc,
+            step: 10,
+            stepName: 'Google Authenticator MFA',
+            code: 'REQUIRES_MFA',
+          };
+        }
+
+        // Authoritative corporate identity verified: finalize login directly
+        finalizeLogin(verifiedAcc);
         return {
           success: true,
           account: verifiedAcc,
           step: 10,
-          stepName: 'Google Authenticator MFA',
-          code: 'REQUIRES_MFA',
+          stepName: 'Application Access',
+          code: 'AUTHORIZED',
         };
       }
 
-      // Live Google OAuth via Supabase
-      const res = await initiateGoogleSignIn({ preferPopup: preferredFlow === 'popup' });
+      // Live Google OAuth via Supabase / Popup
+      const res = await initiateGoogleSignIn({ 
+        preferPopup: opts.preferPopup !== false,
+        popupWindow: opts.popupWindow,
+        sessionId: opts.sessionId,
+      });
+
       if (!res.success) {
         return {
           success: false,
@@ -1572,6 +1607,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       return {
         success: true,
         url: res.url,
+        sessionId: res.sessionId,
+        popupOpened: res.popupOpened,
       };
     } catch (err: any) {
       return {
@@ -2639,8 +2676,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteRecord = (id: string): { success: boolean; error?: string } => {
     setRecords((prev) => {
       const next = prev.filter((r) => r.id !== id);
-      localStorage.setItem('cred_records', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_records', JSON.stringify(next));
+      safeStorage.setItem('cred_records', JSON.stringify(next));
       return next;
     });
     deleteDocument('records', id).catch(console.error);
@@ -2993,8 +3029,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // 5. Explicitly log audit trail to Supabase audit_logs
     logAuditEvent({
-      userEmail: currentUser.email || currentAccount?.email || 'admin@example.com',
-      userName: currentUser.name || currentAccount?.name || 'Administrator',
+      userEmail: currentUser.email || currentAccount?.email || 'joel.reji@ageslearningsolutions.com',
+      userName: currentUser.name || currentAccount?.name || 'Joel Mathew Reji',
       action: 'APPROVE',
       entityType: 'credentialing_records',
       entityId: record.id,
@@ -3172,8 +3208,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         return p;
       });
-      localStorage.setItem('cred_providers', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_providers', JSON.stringify(next));
+      safeStorage.setItem('cred_providers', JSON.stringify(next));
       return next;
     });
 
@@ -3258,8 +3293,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         });
 
-        localStorage.setItem('cred_records', JSON.stringify(nextRecords));
-        localStorage.setItem('pts_supabase_cache_records', JSON.stringify(nextRecords));
+        safeStorage.setItem('cred_records', JSON.stringify(nextRecords));
         return nextRecords;
       });
     }
@@ -3268,8 +3302,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteProvider = (id: string) => {
     setProviders((prev) => {
       const next = prev.filter((p) => p.id !== id);
-      localStorage.setItem('cred_providers', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_providers', JSON.stringify(next));
+      safeStorage.setItem('cred_providers', JSON.stringify(next));
       return next;
     });
     deleteDocument('providers', id).catch(console.error);
@@ -4008,8 +4041,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setEmployees((prev) => {
       const next = [newEmp, ...prev];
-      localStorage.setItem('cred_employees', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_employees', JSON.stringify(next));
+      safeStorage.setItem('cred_employees', JSON.stringify(next));
       return next;
     });
     saveDocument('employees', id, newEmp).catch(console.error);
@@ -4021,8 +4053,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const next = prev.map((emp) =>
         emp.id === id ? { ...emp, ...updates, updatedAt: new Date().toISOString() } : emp
       );
-      localStorage.setItem('cred_employees', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_employees', JSON.stringify(next));
+      safeStorage.setItem('cred_employees', JSON.stringify(next));
       return next;
     });
     saveDocument('employees', id, updates).catch(console.error);
@@ -4055,8 +4086,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteEmployee = (id: string) => {
     setEmployees((prev) => {
       const next = prev.filter((e) => e.id !== id);
-      localStorage.setItem('cred_employees', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_employees', JSON.stringify(next));
+      safeStorage.setItem('cred_employees', JSON.stringify(next));
       return next;
     });
     setDemoEmployees((prev) => prev.filter((e) => e.id !== id));
@@ -4066,8 +4096,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteClinicalStaff = (id: string) => {
     setClinicalStaff((prev) => {
       const next = prev.filter((s) => s.id !== id);
-      localStorage.setItem('cred_clinical_staff', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_clinical_staff', JSON.stringify(next));
+      safeStorage.setItem('cred_clinical_staff', JSON.stringify(next));
       return next;
     });
     deleteDocument('clinical_staff', id).catch(console.error);
@@ -4189,6 +4218,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     field5_discipline: string;
     field3_npi_license: string;
     field6_caqh_specialty: string;
+    isUtah?: boolean;
+    utahLicenseNumber?: string;
     documents: { name: string; type: string; url: string; expirationDate?: string }[];
     payerIds: string[];
     comments: { commentText: string; authorName: string; dateCreated: string; timeCreated: string; timestamp: string }[];
@@ -4324,8 +4355,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         disciplines: [targetDiscipline],
         providerType: targetProviderType,
         licenseNumber,
-        licenseState: 'CA',
+        licenseState: data.isUtah ? 'UT' : 'CA',
         licenseExpiration: '2028-12-31',
+        isUtah: Boolean(data.isUtah),
+        utahLicenseNumber: data.utahLicenseNumber || '',
+        utStateLicense: data.utahLicenseNumber || '',
         npi,
         taxonomy:
           targetDiscipline === 'ABA'
@@ -4345,7 +4379,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       // 9. Step 3 (DB): Automatically create Application Document records
-      const newDocuments: ApplicationDocument[] = data.documents.map((doc, idx) => ({
+      const newDocuments: ApplicationDocument[] = (data.documents || []).map((doc, idx) => ({
         id: `doc-${applicationId}-${idx + 1}`,
         applicationId,
         providerId,
@@ -4406,8 +4440,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         email,
         phone,
         licenseNumber,
-        licenseState: 'CA',
+        licenseState: data.isUtah ? 'UT' : 'CA',
         licenseExpiration: '2028-12-31',
+        isUtah: Boolean(data.isUtah),
+        utahLicenseNumber: data.utahLicenseNumber || '',
+        utStateLicense: data.utahLicenseNumber || '',
+        contractInfo: {
+          isUtah: Boolean(data.isUtah),
+          utahLicenseNumber: data.utahLicenseNumber || '',
+          notes: data.isUtah ? `Utah Clinician. License: ${data.utahLicenseNumber}` : ''
+        },
         taxonomy: newClinicalStaff.taxonomy,
         specialty,
         entityIds: [targetEntityId],
@@ -4557,9 +4599,16 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Enforce Demo Employee Data Separation:
+  // Filter out any fake/demo employees or dummy placeholders:
   const visibleEmployees = useMemo(() => {
-    return employees;
+    return employees.filter(emp => {
+      if (!emp) return false;
+      const email = (emp.email || '').toLowerCase().trim();
+      const fullName = (emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`).toLowerCase();
+      if (email.includes('example.com') || email.includes('fake') || email.includes('demo@') || emp.is_demo || (emp as any).isDemo) return false;
+      if (['fake', 'placeholder', 'demo user', 'test user', 'john doe', 'jane doe'].some(f => fullName.includes(f))) return false;
+      return true;
+    });
   }, [employees]);
 
   return (

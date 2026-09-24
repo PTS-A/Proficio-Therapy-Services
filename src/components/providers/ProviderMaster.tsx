@@ -222,14 +222,21 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
   const filteredProviders = providers.filter((p) => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchName = `${p.firstName} ${p.lastName}`.toLowerCase().includes(q);
-      const matchNpi = p.npi.includes(q);
+      const matchName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase().includes(q);
+      const matchNpi = p.npi ? p.npi.includes(q) : false;
       const matchLic = p.licenseNumber?.toLowerCase().includes(q);
-      const matchCaqh = p.caqhId?.includes(q);
+      const matchCaqh = p.caqhId ? p.caqhId.includes(q) : false;
       const matchSpec = p.specialty?.toLowerCase().includes(q);
-      if (!matchName && !matchNpi && !matchLic && !matchCaqh && !matchSpec) return false;
+      const matchRbt = (p as any).rbtCertificationNumber ? (p as any).rbtCertificationNumber.toLowerCase().includes(q) : false;
+      const matchRegion = (p as any).region ? (p as any).region.toLowerCase().includes(q) : false;
+      if (!matchName && !matchNpi && !matchLic && !matchCaqh && !matchSpec && !matchRbt && !matchRegion) return false;
     }
-    if (disciplineFilter !== 'All' && !p.disciplines.includes(disciplineFilter)) return false;
+    if (disciplineFilter !== 'All') {
+      const matchDiscipline = (p.disciplines && p.disciplines.includes(disciplineFilter)) ||
+        (disciplineFilter === 'RBT' && (p.providerType === 'RBT' || (p.credentials && p.credentials.toLowerCase().includes('rbt')))) ||
+        (disciplineFilter === 'ABA' && (p.providerType === 'BCBA' || (p.disciplines && p.disciplines.includes('ABA'))));
+      if (!matchDiscipline) return false;
+    }
     return true;
   });
 
@@ -318,7 +325,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
       bcbaCertificationNumber: p.bcbaCertificationNumber || '',
       bcbaEffectiveDate: p.bcbaEffectiveDate || '',
       bcbaExpiryDate: p.bcbaExpiryDate || '',
-      utStateLicense: p.utStateLicense || '',
+      utStateLicense: p.utStateLicense || p.utahLicenseNumber || '',
       email: p.email || '',
       phone: p.phone || '',
       altPhone: p.altPhone || '',
@@ -596,7 +603,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
             </div>
 
             <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
-              {(['All', 'ABA', 'Speech', 'OT'] as (Discipline | 'All')[]).map((disc) => (
+              {(['All', 'ABA', 'Speech', 'OT', 'RBT'] as (Discipline | 'All')[]).map((disc) => (
                 <button
                   key={disc}
                   onClick={() => setDisciplineFilter(disc)}
@@ -663,11 +670,11 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                       <span className="font-mono font-semibold">NPI: {p.npi || 'Pending'}</span>
                       <span>•</span>
                       <span>{p.licenseState || 'CA'} Lic: {p.bcbaCertificationNumber || p.licenseNumber}</span>
-                      {(p.licenseState === 'UT' || p.region?.toLowerCase() === 'utah' || Boolean(p.utStateLicense)) && p.utStateLicense && (
+                      {(p.licenseState === 'UT' || p.region?.toLowerCase() === 'utah' || Boolean(p.utStateLicense) || Boolean(p.isUtah) || Boolean(p.utahLicenseNumber)) && (p.utStateLicense || p.utahLicenseNumber) && (
                         <>
                           <span>•</span>
                           <span className="text-amber-800 font-bold bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded text-[10px]">
-                            UT: {p.utStateLicense}
+                            UT: {p.utStateLicense || p.utahLicenseNumber}
                           </span>
                         </>
                       )}
@@ -721,7 +728,7 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                           </span>
                         </>
                       )}
-                      {(activeProvider.licenseState === 'UT' || activeProvider.region?.toLowerCase() === 'utah' || Boolean(activeProvider.utStateLicense)) && (
+                      {(activeProvider.licenseState === 'UT' || activeProvider.region?.toLowerCase() === 'utah' || Boolean(activeProvider.utStateLicense) || Boolean(activeProvider.isUtah) || Boolean(activeProvider.utahLicenseNumber)) && (
                         <>
                           <span>•</span>
                           <span className="text-amber-800 font-bold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md text-[10px]">
@@ -986,13 +993,13 @@ export const ProviderMaster: React.FC<ProviderMasterProps> = ({
                       </div>
 
                       {/* CONDITIONAL UTAH FIELD: If they are Utah, show the Utah field otherwise don't show it */}
-                      {(activeProvider.licenseState === 'UT' || activeProvider.region?.toLowerCase() === 'utah' || Boolean(activeProvider.utStateLicense)) && (
+                      {(activeProvider.licenseState === 'UT' || activeProvider.region?.toLowerCase() === 'utah' || Boolean(activeProvider.utStateLicense) || Boolean(activeProvider.isUtah) || Boolean(activeProvider.utahLicenseNumber)) && (
                         <div className="p-2.5 bg-amber-50/90 rounded-xl border border-amber-200">
                           <span className="text-amber-800 block text-[10px] uppercase font-bold flex items-center space-x-1">
                             <span>Utah State License # (DOPL)</span>
                           </span>
                           <div className="font-mono font-bold text-amber-950 mt-0.5 text-xs">
-                            {activeProvider.utStateLicense || 'Not on file'}
+                            {activeProvider.utStateLicense || activeProvider.utahLicenseNumber || 'Not on file'}
                           </div>
                           <span className="text-[10px] text-amber-700">Utah DOPL State Licensure</span>
                         </div>

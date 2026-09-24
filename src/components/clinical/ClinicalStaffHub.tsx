@@ -100,6 +100,10 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
     bcbaCertificationNumber: string;
     bcbaEffectiveDate: string;
     bcbaExpiryDate: string;
+    rbtCertificationNumber: string;
+    rbtEffectiveDate: string;
+    rbtExpiryDate: string;
+    role: string;
     utStateLicense: string;
     caqhId: string;
     caqhStatus: string;
@@ -151,22 +155,69 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
     );
   };
 
+  const isAgesEntity = Boolean(
+    selectedEntityId === 'ent-1' ||
+    activeEntity?.id === 'ent-1' ||
+    activeEntity?.dba?.toLowerCase().includes('ages') ||
+    activeEntity?.name?.toLowerCase().includes('ages')
+  );
+
+  const isProviderRbt = (p: Provider) => {
+    return (
+      p.providerType === 'RBT' ||
+      (p.disciplines && p.disciplines.includes('RBT')) ||
+      (p.credentials && p.credentials.toLowerCase().includes('rbt')) ||
+      Boolean((p as any).rbtCertificationNumber) ||
+      Boolean((p as any).contractInfo?.rbtCertificationNumber)
+    );
+  };
+
+  const isProviderBcba = (p: Provider) => {
+    return (
+      p.providerType === 'BCBA' ||
+      (p.disciplines && p.disciplines.includes('ABA') && !isProviderRbt(p)) ||
+      (p.credentials && p.credentials.toLowerCase().includes('bcba')) ||
+      Boolean((p as any).bcbaCertificationNumber) ||
+      Boolean((p as any).contractInfo?.bcbaCertificationNumber)
+    );
+  };
+
   // Filter providers belonging to selected entity
   const entityProviders = selectedEntityId 
     ? (providers || []).filter((p) => isProviderInEntity(p, selectedEntityId))
     : [];
 
+  const agesBcbaCount = entityProviders.filter(isProviderBcba).length;
+  const agesRbtCount = entityProviders.filter(isProviderRbt).length;
+
+  const disciplineOptions = isAgesEntity
+    ? (['ALL', 'BCBA', 'RBT'] as const)
+    : (['ALL', 'ABA', 'Speech', 'OT'] as const);
+
   const filteredProviders = entityProviders.filter((p) => {
     if (selectedDiscipline !== 'ALL') {
-      const hasDiscipline = (p.disciplines && p.disciplines.includes(selectedDiscipline as any)) || (p as any).discipline === selectedDiscipline;
-      if (!hasDiscipline) return false;
+      if (selectedDiscipline === 'RBT') {
+        if (!isProviderRbt(p)) return false;
+      } else if (selectedDiscipline === 'BCBA') {
+        if (!isProviderBcba(p)) return false;
+      } else {
+        const hasDiscipline = (p.disciplines && p.disciplines.includes(selectedDiscipline as any)) || (p as any).discipline === selectedDiscipline;
+        if (!hasDiscipline) return false;
+      }
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = `${p.firstName} ${p.lastName}`.toLowerCase().includes(q);
       const matchNpi = p.npi?.toLowerCase().includes(q);
       const matchEmail = p.email?.toLowerCase().includes(q);
-      if (!matchName && !matchNpi && !matchEmail) return false;
+      const matchRbtCert = (p as any).rbtCertificationNumber?.toLowerCase().includes(q) ||
+        (p as any).contractInfo?.rbtCertificationNumber?.toLowerCase().includes(q);
+      const matchBcbaCert = (p as any).bcbaCertificationNumber?.toLowerCase().includes(q) ||
+        (p as any).contractInfo?.bcbaCertificationNumber?.toLowerCase().includes(q);
+      const matchLic = p.licenseNumber?.toLowerCase().includes(q);
+      const matchRegion = (p as any).region?.toLowerCase().includes(q) ||
+        (p as any).contractInfo?.region?.toLowerCase().includes(q);
+      if (!matchName && !matchNpi && !matchEmail && !matchRbtCert && !matchBcbaCert && !matchLic && !matchRegion) return false;
     }
     return true;
   });
@@ -521,10 +572,14 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
       licenseNumber: prov.licenseNumber || '',
       licenseState: prov.licenseState || 'CA',
       licenseExpiration: prov.licenseExpiration || '',
-      bcbaCertificationNumber: prov.bcbaCertificationNumber || '',
-      bcbaEffectiveDate: prov.bcbaEffectiveDate || '',
-      bcbaExpiryDate: prov.bcbaExpiryDate || '',
-      utStateLicense: prov.utStateLicense || '',
+      bcbaCertificationNumber: prov.bcbaCertificationNumber || (prov as any).contractInfo?.bcbaCertificationNumber || '',
+      bcbaEffectiveDate: prov.bcbaEffectiveDate || (prov as any).contractInfo?.bcbaEffectiveDate || '',
+      bcbaExpiryDate: prov.bcbaExpiryDate || (prov as any).contractInfo?.bcbaExpiryDate || '',
+      rbtCertificationNumber: (prov as any).rbtCertificationNumber || (prov as any).contractInfo?.rbtCertificationNumber || '',
+      rbtEffectiveDate: (prov as any).rbtEffectiveDate || (prov as any).contractInfo?.rbtEffectiveDate || '',
+      rbtExpiryDate: (prov as any).rbtExpiryDate || (prov as any).contractInfo?.rbtExpiryDate || '',
+      role: (prov as any).role || (prov as any).contractInfo?.role || '',
+      utStateLicense: prov.utStateLicense || (prov as any).contractInfo?.utStateLicense || (prov as any).contractInfo?.utahLicenseNumber || prov.utahLicenseNumber || '',
       caqhId: prov.caqhId || '',
       caqhStatus: prov.caqhStatus || 'Attested',
       lastAttestationDate: prov.lastAttestationDate || '',
@@ -542,8 +597,8 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
     e.preventDefault();
     if (!selectedProfileEmployee || !edit360Form) return;
 
-    if (!edit360Form.firstName.trim() || !edit360Form.lastName.trim() || !edit360Form.npi.trim()) {
-      addToast('Please enter First Name, Last Name, and 10-digit NPI.', 'error');
+    if (!edit360Form.firstName.trim() || !edit360Form.lastName.trim() || (!edit360Form.npi.trim() && edit360Form.providerType !== 'RBT')) {
+      addToast('Please enter First Name and Last Name.', 'error');
       return;
     }
 
@@ -553,6 +608,13 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
         ...edit360Form,
         entityIds: [edit360Form.primaryEntityId],
         locationIds: [edit360Form.primaryLocationId],
+        contractInfo: {
+          ...((selectedProfileEmployee as any).contractInfo || {}),
+          rbtCertificationNumber: edit360Form.rbtCertificationNumber,
+          rbtEffectiveDate: edit360Form.rbtEffectiveDate,
+          rbtExpiryDate: edit360Form.rbtExpiryDate,
+          role: edit360Form.role,
+        },
       };
 
       await updateProviderCredentialing(selectedProfileEmployee.id, payload);
@@ -901,12 +963,14 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                   <div className="space-y-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
                     <div className="flex justify-between">
                       <span className="text-slate-400">Roster Count:</span>
-                      <span className="font-bold text-slate-800">{entityProviders.length} Active Staff</span>
+                      <span className="font-bold text-slate-800">
+                        {isAgesEntity ? `${entityProviders.length} Active Staff (${agesBcbaCount} BCBAs, ${agesRbtCount} RBTs)` : `${entityProviders.length} Active Staff`}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Primary Disciplines:</span>
+                      <span className="text-slate-400">Clinical Disciplines:</span>
                       <span className="font-bold text-[#2B4C9D]">
-                        {Array.from(new Set(entityProviders.flatMap(p => p.disciplines || [(p as any).discipline || 'Clinical']))).slice(0, 3).join(', ') || 'ABA, Speech, OT'}
+                        {isAgesEntity ? 'BCBA • RBT (Registered Behavior Technician)' : (Array.from(new Set(entityProviders.flatMap(p => p.disciplines || [(p as any).discipline || 'Clinical']))).slice(0, 3).join(', ') || 'ABA, Speech, OT')}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -1000,7 +1064,7 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                 </span>
               </div>
               <span className="text-xs font-semibold text-slate-500">
-                {entityProviders.length} Clinicians Roster
+                {isAgesEntity ? `${entityProviders.length} Clinicians (${agesBcbaCount} BCBA, ${agesRbtCount} RBT)` : `${entityProviders.length} Clinicians Roster`}
               </span>
             </div>
           </div>
@@ -1020,7 +1084,7 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
 
               {/* Discipline filter */}
               <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-                {(['ALL', 'ABA', 'Speech', 'OT'] as const).map((disc) => (
+                {disciplineOptions.map((disc) => (
                   <button
                     key={disc}
                     onClick={() => setSelectedDiscipline(disc)}
@@ -1058,6 +1122,11 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                 const approvedEnrollments = (prov.payerEnrollments || []).filter((e) => e.status === 'Approved' || e.approvalStatus === 'Approved');
                 const docCount = (prov.documentLinks || []).length;
                 const commentCount = (prov.commentLogs || []).length;
+                const isProvRbt = isProviderRbt(prov);
+                const rbtCert = (prov as any).rbtCertificationNumber || (prov as any).contractInfo?.rbtCertificationNumber || prov.licenseNumber || '—';
+                const rbtEff = (prov as any).rbtEffectiveDate || (prov as any).contractInfo?.rbtEffectiveDate || '—';
+                const rbtExp = (prov as any).rbtExpiryDate || (prov as any).contractInfo?.rbtExpiryDate || prov.licenseExpiration || '—';
+                const regionName = (prov as any).region || (prov as any).contractInfo?.region || getLocationName(prov.primaryLocationId);
 
                 return (
                   <div
@@ -1069,16 +1138,29 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                       {/* Clinician Header */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 text-[#2B4C9D] font-bold flex items-center justify-center text-sm shrink-0">
-                            {prov.firstName.charAt(0)}{prov.lastName.charAt(0)}
+                          <div className={`w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 ${
+                            isProvRbt ? 'bg-amber-50 border border-amber-200 text-amber-800' : 'bg-blue-50 border border-blue-100 text-[#2B4C9D]'
+                          }`}>
+                            {(prov.firstName || '').charAt(0)}{(prov.lastName || '').charAt(0)}
                           </div>
                           <div>
                             <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#2B4C9D] transition-colors">
                               {prov.firstName} {prov.lastName}
                             </h3>
-                            <p className="text-[11px] text-slate-500 font-medium">
-                              {prov.credentials || 'Clinician'} &bull; {prov.disciplines?.[0] || (prov as any).discipline || 'Clinical Staff'}
-                            </p>
+                            {isProvRbt ? (
+                              <div className="flex items-center space-x-1.5 mt-0.5">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  RBT
+                                </span>
+                                <span className="text-[11px] text-slate-500 font-medium truncate">
+                                  {regionName}
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                {prov.credentials || 'Clinician'} &bull; {prov.disciplines?.[0] || (prov as any).discipline || 'Clinical Staff'}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -1089,31 +1171,55 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
 
                       {/* Primary Location */}
                       <div className="text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1 text-slate-600">
-                        <div className="font-semibold text-slate-800 text-[11px]">Primary Location:</div>
+                        <div className="font-semibold text-slate-800 text-[11px] flex justify-between">
+                          <span>{isProvRbt ? 'Region & Facility:' : 'Primary Location:'}</span>
+                          {isProvRbt && <span className="text-amber-800 font-bold">{regionName}</span>}
+                        </div>
                         <p className="text-[11px] text-slate-500 truncate">
                           {getLocationName(prov.primaryLocationId)}
                         </p>
                       </div>
 
                       {/* Credentials Grid */}
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">NPI Number:</span>
-                          <span className="font-mono font-bold text-slate-800">{prov.npi}</span>
+                      {isProvRbt ? (
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">RBT Cert #:</span>
+                            <span className="font-mono font-bold text-amber-900 truncate block">{rbtCert}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">Classification:</span>
+                            <span className="font-semibold text-slate-800 truncate block">Behavior Tech</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">Effective Date:</span>
+                            <span className="font-semibold text-slate-700 truncate block">{rbtEff}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">Expiration Date:</span>
+                            <span className="font-semibold text-slate-700">{rbtExp}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">CAQH ProView:</span>
-                          <span className="font-mono font-bold text-slate-800">{prov.caqhId || '—'}</span>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">NPI Number:</span>
+                            <span className="font-mono font-bold text-slate-800">{prov.npi}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">CAQH ProView:</span>
+                            <span className="font-mono font-bold text-slate-800">{prov.caqhId || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">State License:</span>
+                            <span className="font-semibold text-slate-700 truncate block">{prov.licenseNumber || 'Active'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">License Expiry:</span>
+                            <span className="font-semibold text-slate-700">{prov.licenseExpiration || '—'}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">State License:</span>
-                          <span className="font-semibold text-slate-700 truncate block">{prov.licenseNumber || 'Active'}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">License Expiry:</span>
-                          <span className="font-semibold text-slate-700">{prov.licenseExpiration || '—'}</span>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Footer with Documents & Comments indicators */}
@@ -1218,7 +1324,7 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2B4C9D] font-bold flex items-center justify-center text-sm shrink-0">
-                    {activeInsuranceEmployee.firstName.charAt(0)}{activeInsuranceEmployee.lastName.charAt(0)}
+                    {(activeInsuranceEmployee.firstName || '').charAt(0)}{(activeInsuranceEmployee.lastName || '').charAt(0)}
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-slate-900">
@@ -1598,7 +1704,7 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
 
                   {/* Discipline filter */}
                   <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-                    {(['ALL', 'ABA', 'Speech', 'OT'] as const).map((disc) => (
+                    {disciplineOptions.map((disc) => (
                       <button
                         key={disc}
                         onClick={() => setSelectedDiscipline(disc)}
@@ -1626,6 +1732,10 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                   </div>
                 ) : (
                   filteredProviders.map((prov) => {
+                    const isProvRbt = isProviderRbt(prov);
+                    const rbtCert = (prov as any).rbtCertificationNumber || (prov as any).contractInfo?.rbtCertificationNumber || prov.licenseNumber || '—';
+                    const regionName = (prov as any).region || (prov as any).contractInfo?.region || getLocationName(prov.primaryLocationId);
+
                     // Compute status counts for this provider using effective status
                     let approvedCount = 0;
                     let pendingCount = 0;
@@ -1650,36 +1760,53 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                           {/* Header with Avatar & Disciplines */}
                           <div className="flex items-start justify-between">
                             <div className="flex items-center space-x-3">
-                              <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-sm border border-emerald-200 shrink-0">
-                                {prov.firstName.charAt(0)}{prov.lastName.charAt(0)}
+                              <div className={`w-11 h-11 rounded-full font-bold flex items-center justify-center text-sm border shrink-0 ${
+                                isProvRbt ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}>
+                                {(prov.firstName || '').charAt(0)}{(prov.lastName || '').charAt(0)}
                               </div>
                               <div>
                                 <h4 className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
-                                  {prov.firstName} {prov.lastName}, {prov.credentials}
+                                  {prov.firstName} {prov.lastName}, {isProvRbt ? 'RBT' : (prov.credentials || 'Clinician')}
                                 </h4>
                                 <div className="flex items-center space-x-2 mt-0.5">
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">
-                                    {prov.disciplines?.[0] || (prov as any).discipline || 'Clinical'}
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                    isProvRbt ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-700'
+                                  }`}>
+                                    {isProvRbt ? 'RBT' : (prov.disciplines?.[0] || (prov as any).discipline || 'Clinical')}
                                   </span>
                                   <span className="text-[11px] text-slate-400">
-                                    {getLocationName(prov.primaryLocationId)}
+                                    {isProvRbt ? regionName : getLocationName(prov.primaryLocationId)}
                                   </span>
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          {/* NPI & CAQH identifiers */}
-                          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span className="text-slate-400 block text-[10px]">Individual NPI:</span>
-                              <span className="font-mono font-bold text-slate-700">{prov.npi || '—'}</span>
+                          {/* NPI & CAQH / RBT identifiers */}
+                          {isProvRbt ? (
+                            <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="text-slate-400 block text-[10px]">RBT Cert #:</span>
+                                <span className="font-mono font-bold text-amber-900 truncate block">{rbtCert}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px]">Region:</span>
+                                <span className="font-semibold text-slate-800 truncate block">{regionName}</span>
+                              </div>
                             </div>
-                            <div>
-                              <span className="text-slate-400 block text-[10px]">CAQH ProView ID:</span>
-                              <span className="font-mono font-bold text-slate-700">{prov.caqhId || '—'}</span>
+                          ) : (
+                            <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="text-slate-400 block text-[10px]">Individual NPI:</span>
+                                <span className="font-mono font-bold text-slate-700">{prov.npi || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px]">CAQH ProView ID:</span>
+                                <span className="font-mono font-bold text-slate-700">{prov.caqhId || '—'}</span>
+                              </div>
                             </div>
-                          </div>
+                          )}
 
                           {/* Insurance status summary pills */}
                           <div className="space-y-1.5 pt-1">
@@ -1731,7 +1858,7 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
             <div className="flex items-start justify-between pb-4 border-b border-slate-100 shrink-0">
               <div className="flex items-center space-x-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-[#2B4C9D] font-bold flex items-center justify-center text-lg shadow-xs shrink-0">
-                  {selectedProfileEmployee.firstName.charAt(0)}{selectedProfileEmployee.lastName.charAt(0)}
+                  {(selectedProfileEmployee.firstName || '').charAt(0)}{(selectedProfileEmployee.lastName || '').charAt(0)}
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
@@ -2444,6 +2571,57 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                           className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20"
                         />
                       </div>
+
+                      {/* RBT Fields - Specifically for AGES entity */}
+                      {(isAgesEntity || edit360Form.providerType === 'RBT') && (
+                        <>
+                          <div className="sm:col-span-full pt-2 pb-1 border-t border-slate-100 flex items-center space-x-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              AGES RBT Credentials
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              Registered Behavior Technician Certification (Only for AGES)
+                            </span>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              RBT Certification Number:
+                            </label>
+                            <input
+                              type="text"
+                              value={edit360Form.rbtCertificationNumber}
+                              onChange={(e) => setEdit360Form({ ...edit360Form, rbtCertificationNumber: e.target.value })}
+                              placeholder="e.g. RBT-21-17894"
+                              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              RBT Effective Date:
+                            </label>
+                            <input
+                              type="date"
+                              value={edit360Form.rbtEffectiveDate}
+                              onChange={(e) => setEdit360Form({ ...edit360Form, rbtEffectiveDate: e.target.value })}
+                              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              RBT Expiration Date:
+                            </label>
+                            <input
+                              type="date"
+                              value={edit360Form.rbtExpiryDate}
+                              onChange={(e) => setEdit360Form({ ...edit360Form, rbtExpiryDate: e.target.value })}
+                              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20"
+                            />
+                          </div>
+                        </>
+                      )}
 
                       <div>
                         <label className="block text-[11px] font-bold text-slate-700 mb-1">

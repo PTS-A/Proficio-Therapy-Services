@@ -87,7 +87,7 @@ export const ClinicalStaffDocuments: React.FC<ClinicalStaffDocumentsProps> = ({ 
         logAuditEvent({
           userId: currentAccount?.id || currentUser?.id || 'anonymous',
           userName: currentAccount?.name || currentUser?.name || 'System User',
-          userEmail: currentAccount?.email || currentUser?.email || 'user@example.com',
+          userEmail: currentAccount?.email || currentUser?.email || 'authenticated-user@proficiotherapy.com',
           action: 'DOCUMENT_UPLOAD',
           entityType: 'PROVIDER_DOCUMENT',
           entityId: provider.id,

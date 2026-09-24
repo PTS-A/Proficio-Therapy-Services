@@ -293,7 +293,7 @@ export const CommentsRosterView: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-full bg-blue-50 text-[#2B4C9D] font-bold text-xs flex items-center justify-center shrink-0">
-                    {comment.providerName.charAt(0)}
+                    {(comment.providerName || 'P').charAt(0)}
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">

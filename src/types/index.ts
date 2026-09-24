@@ -125,7 +125,7 @@ export interface User {
   assignedEntities?: string[];
 }
 
-export type Discipline = 'ABA' | 'Speech' | 'OT';
+export type Discipline = 'ABA' | 'Speech' | 'OT' | 'RBT';
 
 export type ProviderType = 
   | 'BCBA' 
@@ -161,8 +161,8 @@ export interface Employee {
   officeLocationId?: string;
   entityId?: string;
   notes?: string;
-  isDemo?: boolean; // True if record is demo data, strictly isolated for admin@example.com
-  ownerAccountEmail?: string; // Restricted to admin@example.com for demo records
+  isDemo?: boolean; // Legacy flag for demo data isolation
+  ownerAccountEmail?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -189,7 +189,13 @@ export interface ClinicalStaff {
   bcbaCertificationNumber?: string;
   bcbaEffectiveDate?: string;
   bcbaExpiryDate?: string;
+  rbtCertificationNumber?: string;
+  rbtEffectiveDate?: string;
+  rbtExpiryDate?: string;
+  role?: string;
   utStateLicense?: string;
+  isUtah?: boolean;
+  utahLicenseNumber?: string;
   primaryLocationId?: string;
   locationIds: string[];
   entityIds: string[];
@@ -312,6 +318,26 @@ export interface ProviderContractInfo {
   contractEffectiveDate?: string;
   recredentialingCycleYears?: number;
   notes?: string;
+  isUtah?: boolean;
+  utahLicenseNumber?: string;
+  utStateLicense?: string;
+  region?: string;
+  primaryEntityId?: string;
+  primaryLocationId?: string;
+  additionalLocationIds?: string[];
+  bcbaCertificationNumber?: string;
+  bcbaEffectiveDate?: string;
+  bcbaExpiryDate?: string;
+  rbtCertificationNumber?: string;
+  rbtEffectiveDate?: string;
+  rbtExpiryDate?: string;
+  role?: string;
+  groupAffiliation?: string;
+  contractClassification?: string;
+  dob?: string;
+  taxonomy?: string;
+  specialty?: string;
+  [key: string]: any;
 }
 
 export interface ProviderPayerEnrollment {
@@ -364,7 +390,13 @@ export interface Provider {
   bcbaCertificationNumber?: string;
   bcbaEffectiveDate?: string;
   bcbaExpiryDate?: string;
+  rbtCertificationNumber?: string;
+  rbtEffectiveDate?: string;
+  rbtExpiryDate?: string;
+  role?: string;
   utStateLicense?: string;
+  isUtah?: boolean;
+  utahLicenseNumber?: string;
 
   // 2. Employment / Group Information
   entityIds: string[]; // Legal entities provider works under

@@ -266,49 +266,120 @@ export async function checkForPendingOAuth(): Promise<{
 }
 
 /**
- * Initiates Google OAuth authentication via Supabase.
- * Retrieves the OAuth URL with skipBrowserRedirect so callers can launch a popup or redirect safely.
+ * Initiates Google OAuth authentication via Supabase / Server Provider URL.
+ * Retrieves the OAuth URL with skipBrowserRedirect and directs the popup securely,
+ * while preventing X-Frame-Options iframe denial errors.
  */
 export async function initiateGoogleSignIn(options?: {
   preferPopup?: boolean;
-}): Promise<{ success: boolean; url?: string; popupOpened?: boolean; error?: string }> {
-  const client = supabase || await ensureSupabaseClient();
-  if (!client) {
-    return { success: false, error: 'Database and authentication service is not connected.' };
-  }
-
+  popupWindow?: Window | null;
+  sessionId?: string;
+}): Promise<{ success: boolean; url?: string; popupOpened?: boolean; sessionId?: string; error?: string }> {
   try {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
-    const { data, error } = await client.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'select_account',
-        },
-      },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    if (data?.url) {
-      if (options?.preferPopup) {
-        const popup = window.open(
-          data.url,
-          'google_oauth_popup',
-          'width=520,height=660,left=150,top=100,status=no,toolbar=no'
-        );
-        return { success: true, url: data.url, popupOpened: !!popup };
+    // 1. Ensure or generate session ID for cross-window / iframe communication
+    let sessionId = options?.sessionId;
+    if (!sessionId) {
+      try {
+        const sessRes = await fetch('/api/auth/session/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (sessRes.ok) {
+          const sessData = await sessRes.json();
+          sessionId = sessData.sessionId;
+        }
+      } catch (e) {
+        sessionId = 'sess_' + Math.random().toString(36).substring(2, 10);
       }
-      window.location.href = data.url;
-      return { success: true, url: data.url };
     }
 
-    return { success: false, error: 'Unable to acquire authorization URL from Google.' };
+    const redirectUrl = `${window.location.origin}/auth/callback${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`;
+
+    // 2. Fetch authoritative OAuth URL from server first
+    let authUrl = '';
+    try {
+      const urlRes = await fetch('/api/auth/google/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ redirectUrl }),
+      });
+      if (urlRes.ok) {
+        const urlData = await urlRes.json();
+        authUrl = urlData.url || '';
+      }
+    } catch (e) {
+      console.warn('[Server Google Auth URL fetch fallback]:', e);
+    }
+
+    // 3. Fallback to client-side Supabase client if server endpoint didn't respond
+    if (!authUrl) {
+      const client = supabase || await ensureSupabaseClient();
+      if (!client) {
+        return { success: false, error: 'Database and authentication service is not connected.' };
+      }
+
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+            state: sessionId || '',
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      authUrl = data?.url || '';
+    }
+
+    if (!authUrl) {
+      return { success: false, error: 'Unable to acquire authorization URL from Google.' };
+    }
+
+    // 4. Safely navigate pre-existing popup window (if caller provided one synchronously on click)
+    const targetPopup = options?.popupWindow;
+    if (targetPopup && !targetPopup.closed) {
+      try {
+        targetPopup.location.href = authUrl;
+        return { success: true, url: authUrl, popupOpened: true, sessionId };
+      } catch (e) {
+        console.warn('[Target popup navigation fallback]', e);
+      }
+    }
+
+    // 5. If preferPopup is requested and no popup was provided
+    if (options?.preferPopup) {
+      const popup = window.open(
+        authUrl,
+        'google_oauth_popup',
+        'width=540,height=680,left=150,top=100,status=no,toolbar=no'
+      );
+      const isOpened = !!popup && !popup.closed;
+      return { success: true, url: authUrl, popupOpened: isOpened, sessionId };
+    }
+
+    // 6. CAUTION: Check if running inside iframe (e.g. AI Studio development preview)
+    const isInIframe = window.self !== window.top;
+    if (!isInIframe) {
+      window.location.href = authUrl;
+      return { success: true, url: authUrl, sessionId };
+    } else {
+      // In an iframe, navigating window.location causes Google to reject with X-Frame-Options: DENY.
+      // Therefore, open popup or return URL for user interaction.
+      const popup = window.open(
+        authUrl,
+        'google_oauth_popup',
+        'width=540,height=680,left=150,top=100,status=no,toolbar=no'
+      );
+      const isOpened = !!popup && !popup.closed;
+      return { success: true, url: authUrl, popupOpened: isOpened, sessionId };
+    }
   } catch (err: any) {
     return { success: false, error: err?.message || 'Google OAuth failed to initialize' };
   }

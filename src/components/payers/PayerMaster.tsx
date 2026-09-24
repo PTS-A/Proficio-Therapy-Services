@@ -457,7 +457,7 @@ export const PayerMaster: React.FC<PayerMasterProps> = ({ onSelectPayerApplicati
                         <div key={prov.id} className="p-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
                           <div className="flex items-center space-x-2.5 min-w-0 pr-2">
                             <div className="w-7 h-7 rounded-full bg-slate-100 text-[#2B4C9D] font-bold flex items-center justify-center text-[11px] shrink-0">
-                              {prov.firstName.charAt(0)}{prov.lastName.charAt(0)}
+                              {(prov.firstName || '').charAt(0)}{(prov.lastName || '').charAt(0)}
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center space-x-1.5">

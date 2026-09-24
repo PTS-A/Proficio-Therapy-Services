@@ -27,7 +27,6 @@ async function startServer() {
   app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
@@ -391,7 +390,6 @@ async function startServer() {
     const userEmail = (req.headers['x-user-email'] as string || req.query.email as string || '').trim().toLowerCase();
 
     const isAuthorized =
-      userEmail === 'admin@example.com' ||
       userEmail === 'joel.reji@ageslearningsolutions.com' ||
       userEmail === 'superadmin@proficiotherapy.com' ||
       userEmail.endsWith('@ageslearningsolutions.com') ||
@@ -420,7 +418,6 @@ async function startServer() {
     const cleanEmail = (email || '').trim().toLowerCase();
 
     const isAuthorized =
-      cleanEmail === 'admin@example.com' ||
       cleanEmail === 'joel.reji@ageslearningsolutions.com' ||
       cleanEmail === 'superadmin@proficiotherapy.com' ||
       cleanEmail.endsWith('@ageslearningsolutions.com') ||
@@ -435,7 +432,7 @@ async function startServer() {
 
     res.json({
       allowed: true,
-      role: cleanEmail === 'superadmin@proficiotherapy.com' || cleanEmail === 'admin@example.com' ? 'Administrator' : 'Credentialing Specialist',
+      role: cleanEmail === 'superadmin@proficiotherapy.com' || cleanEmail === 'joel.reji@ageslearningsolutions.com' ? 'Administrator' : 'Credentialing Specialist',
       email: cleanEmail,
     });
   });
@@ -1028,9 +1025,22 @@ async function startServer() {
     try {
       const email = req.body?.email || req.query?.email;
       const googleProfile = req.body?.googleProfile || {};
+      const sessionId = req.body?.sessionId || req.query?.sessionId;
       const { verifyEmployeeAuthorization } = await import('./server/authGate');
       
       const result = await verifyEmployeeAuthorization(String(email || ''), googleProfile);
+
+      // If sessionId is provided, sync session state immediately
+      if (sessionId && oauthSessions.has(String(sessionId))) {
+        const sess = oauthSessions.get(String(sessionId))!;
+        sess.status = result.authorized ? 'authorized' : 'denied';
+        sess.account = result.account;
+        sess.details = result;
+        if (!result.authorized) {
+          sess.error = result.reason;
+        }
+        oauthSessions.set(String(sessionId), sess);
+      }
       
       // Always return 200 with the structured verification result so client can gracefully handle denial / access request dialogs
       return res.json(result);
@@ -1081,12 +1091,12 @@ async function startServer() {
           expectedResult: 'AUTHORIZED (Specialist Level Access)'
         },
         {
-          name: 'Administrator',
-          email: 'admin@example.com',
+          name: 'Super Administrator',
+          email: 'superadmin@proficiotherapy.com',
           role: 'System Administrator',
           status: 'Active',
-          entity: 'Enterprise (All Entities)',
-          location: 'All Practice Locations',
+          entity: 'Proficio Therapy Services LLC',
+          location: 'Livermore Clinic',
           description: 'IT Governance & System Administrator with full security access.',
           expectedResult: 'AUTHORIZED (Super Admin Access)'
         },

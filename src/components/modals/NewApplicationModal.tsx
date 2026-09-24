@@ -92,6 +92,8 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
 
   // STEP 2 FIELDS (Provider Information & Credentialing) - Clean, empty defaults
   const [field3NpiLicense, setField3NpiLicense] = useState<string>('');
+  const [isUtah, setIsUtah] = useState<boolean>(false);
+  const [utahLicenseNumber, setUtahLicenseNumber] = useState<string>('');
   const [field6CaqhSpecialty, setField6CaqhSpecialty] = useState<string>('');
   
   // Supporting Documents - Starts completely empty
@@ -154,6 +156,8 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
       setField4Location(locations[0]?.id || '');
       setField5Discipline('ABA');
       setField3NpiLicense('');
+      setIsUtah(false);
+      setUtahLicenseNumber('');
       setField6CaqhSpecialty('');
       setDocuments([]);
       setSelectedPayerIds([]);
@@ -258,6 +262,8 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
       field5_discipline: field5Discipline,
       field3_npi_license: field3NpiLicense,
       field6_caqh_specialty: field6CaqhSpecialty,
+      isUtah,
+      utahLicenseNumber,
       documents: documents.map((d) => ({
         name: d.name,
         type: d.type,
@@ -657,6 +663,52 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
                   <p className="text-[11px] text-slate-500">
                     Individual Type 1 NPI with California state license number and expiration.
                   </p>
+                </div>
+
+                {/* Field 3.5: Utah Practice Toggle & License */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isUtah}
+                          onChange={(e) => setIsUtah(e.target.checked)}
+                          className="w-4 h-4 rounded text-[#2B4C9D] focus:ring-[#2B4C9D] border-slate-300 cursor-pointer"
+                        />
+                        <span>Is this clinician practicing in Utah?</span>
+                      </label>
+                      <p className="text-[11px] text-slate-500 mt-0.5 ml-6">
+                        Enable if provider is licensed or providing clinical care in the State of Utah.
+                      </p>
+                    </div>
+                    {isUtah && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-blue-100 text-blue-800 border border-blue-200">
+                        Utah Clinician
+                      </span>
+                    )}
+                  </div>
+
+                  {isUtah && (
+                    <div className="space-y-1.5 pt-2 border-t border-slate-200">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Utah State License Number <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Award className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={utahLicenseNumber}
+                          onChange={(e) => setUtahLicenseNumber(e.target.value)}
+                          placeholder="e.g. 14268177-4201, 12814739-4201"
+                          className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#2B4C9D] focus:border-[#2B4C9D] text-slate-800 font-medium"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Recorded for Utah payer enrollments (e.g. SelectHealth, Regence UT, Molina UT, Utah Medicaid).
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Field 6: CAQH & Specialty / Taxonomy */}

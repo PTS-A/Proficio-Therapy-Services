@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { ProficioLogo } from '../common/ProficioLogo';
 import { 
@@ -36,6 +36,18 @@ export const RequestAccessPage: React.FC<RequestAccessPageProps> = ({
   const [entityId, setEntityId] = useState(entities[0]?.id || 'ent-1');
   const [locationId, setLocationId] = useState(locations[0]?.id || 'loc-1');
   const [justification, setJustification] = useState('');
+
+  useEffect(() => {
+    if ((!entityId || entityId === 'ent-1') && entities.length > 0) {
+      setEntityId(entities[0].id);
+    }
+  }, [entities]);
+
+  useEffect(() => {
+    if ((!locationId || locationId === 'loc-1') && locations.length > 0) {
+      setLocationId(locations[0].id);
+    }
+  }, [locations]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

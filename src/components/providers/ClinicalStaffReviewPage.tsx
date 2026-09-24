@@ -107,7 +107,7 @@ export const ClinicalStaffReviewPage: React.FC<ClinicalStaffReviewPageProps> = (
       payerName: selectedPayer?.name || 'Insurance Payer',
       status: linkStatus === 'Linked' ? ('In-Network' as const) : ('Application In Progress' as const),
       effectiveDate: linkStatus === 'Linked' ? linkEffectiveDate : '',
-      providerIdNumber: `${selectedPayer?.name.substring(0, 3).toUpperCase()}-${provider.npi.substring(5)}`,
+      providerIdNumber: `${selectedPayer?.name ? selectedPayer.name.substring(0, 3).toUpperCase() : 'PAY'}-${(provider.npi || provider.id || '0000000000').slice(-5)}`,
     };
 
     const existingEnrollments = provider.payerEnrollments || [];

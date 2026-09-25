@@ -68,6 +68,13 @@ export const ReportsView: React.FC = () => {
   const weeklyApprovals = records.filter(r => ['Approved', 'Linked', 'Effective'].includes(r.stage));
   const weeklyEscalations = records.filter(r => r.isOverdue || r.stage === 'Overdue' || (r.externalDelayDays && r.externalDelayDays > 0));
 
+  const weeklyEscalationsClean = weeklyEscalations
+    .filter(r => {
+      const year = r.intakeDate ? parseInt(r.intakeDate.substring(0, 4)) : 0;
+      return year === 0 || year >= 2024;
+    })
+    .sort((a, b) => (b.daysInCurrentStage || 0) - (a.daysInCurrentStage || 0));
+
   // Discipline grouping
   const abaRecords = records.filter((r) => r.discipline === 'ABA');
   const speechRecords = records.filter((r) => r.discipline === 'Speech');
@@ -109,14 +116,53 @@ export const ReportsView: React.FC = () => {
   const speechStats = getDisciplineStats(speechRecords, speechProviders);
   const otStats = getDisciplineStats(otRecords, otProviders);
 
-  // Dynamic Monthly Records Scope
-  const currentMonthlyRecords = selectedMonthlyDiscipline === 'Consolidated'
+  // Map selectedMonth string to YYYY-MM
+  const monthMap: Record<string, string> = {
+    'September 2026': '2026-09',
+    'August 2026': '2026-08',
+    'July 2026': '2026-07',
+    'June 2026': '2026-06',
+    'All 2026 Cycles': '2026',
+  };
+  const activeMonthPrefix = monthMap[selectedMonth] || '2026-08';
+
+  // Dynamic Monthly Records Scope (Cleaned: strictly filter modern records >= 2024)
+  const currentMonthlyRecords = (selectedMonthlyDiscipline === 'Consolidated'
     ? records
-    : records.filter(r => r.discipline === selectedMonthlyDiscipline);
+    : records.filter(r => r.discipline === selectedMonthlyDiscipline)
+  ).filter(r => {
+    const subYear = r.submissionDate ? parseInt(r.submissionDate.substring(0, 4)) : 0;
+    const appYear = r.approvalDate ? parseInt(r.approvalDate.substring(0, 4)) : 0;
+    const effYear = r.effectiveDate ? parseInt(r.effectiveDate.substring(0, 4)) : 0;
+    const intYear = r.intakeDate ? parseInt(r.intakeDate.substring(0, 4)) : 0;
+    const maxYear = Math.max(subYear, appYear, effYear, intYear);
+    return maxYear === 0 || maxYear >= 2024;
+  });
 
   const currentMonthlyProviders = selectedMonthlyDiscipline === 'Consolidated'
     ? providers
     : providers.filter(p => p.disciplines.includes(selectedMonthlyDiscipline as Discipline));
+
+  // Monthly Submissions: Prioritize current period, sorted descending by date
+  const submittedRecordsAll = currentMonthlyRecords
+    .filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage))
+    .sort((a, b) => (b.submissionDate || '').localeCompare(a.submissionDate || ''));
+  const monthSubmitted = submittedRecordsAll.filter(r => r.submissionDate?.startsWith(activeMonthPrefix));
+  const displayMonthlySubmitted = monthSubmitted.length > 0 ? monthSubmitted : submittedRecordsAll;
+
+  // Monthly Approvals: Prioritize current period, sorted descending by date
+  const approvedRecordsAll = currentMonthlyRecords
+    .filter(r => ['Approved', 'Linked', 'Effective', 'Payer Approved / In-Network'].includes(r.stage))
+    .sort((a, b) => (b.approvalDate || '').localeCompare(a.approvalDate || ''));
+  const monthApproved = approvedRecordsAll.filter(r => r.approvalDate?.startsWith(activeMonthPrefix));
+  const displayMonthlyApproved = monthApproved.length > 0 ? monthApproved : approvedRecordsAll;
+
+  // Monthly Effective Dates: Prioritize current period, sorted descending by date
+  const effectiveRecordsAll = currentMonthlyRecords
+    .filter(r => Boolean(r.effectiveDate))
+    .sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || ''));
+  const monthEffective = effectiveRecordsAll.filter(r => r.effectiveDate?.startsWith(activeMonthPrefix));
+  const displayMonthlyEffective = monthEffective.length > 0 ? monthEffective : effectiveRecordsAll;
 
   // Export CSV handler
   const handleExportCsv = () => {
@@ -431,11 +477,11 @@ export const ReportsView: React.FC = () => {
               </h4>
             </div>
 
-            {weeklyEscalations.length === 0 ? (
+            {weeklyEscalationsClean.length === 0 ? (
               <p className="text-xs text-slate-500 italic">No critical escalation blockers logged this reporting cycle.</p>
             ) : (
               <div className="divide-y divide-purple-100 text-xs">
-                {weeklyEscalations.slice(0, 5).map((rec) => {
+                {weeklyEscalationsClean.slice(0, 5).map((rec) => {
                   const prov = providers.find(p => p.id === rec.providerId);
                   const pay = payers.find(p => p.id === rec.payerId);
                   return (
@@ -501,9 +547,11 @@ export const ReportsView: React.FC = () => {
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="text-xs font-bold bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-slate-900 outline-none cursor-pointer"
               >
+                <option value="September 2026">September 2026 (Current Month)</option>
                 <option value="August 2026">August 2026 (Previous Month)</option>
                 <option value="July 2026">July 2026</option>
                 <option value="June 2026">June 2026</option>
+                <option value="All 2026 Cycles">All Active 2026 Cycles</option>
               </select>
             </div>
           </div>
@@ -599,7 +647,7 @@ export const ReportsView: React.FC = () => {
                   </h3>
                 </div>
                 <span className="text-xs font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-100">
-                  {currentMonthlyRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage)).length} In-Review
+                  {submittedRecordsAll.length} In-Review
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -619,7 +667,7 @@ export const ReportsView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {currentMonthlyRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage)).slice(0, 5).map((rec) => {
+                    {displayMonthlySubmitted.slice(0, 6).map((rec) => {
                       const prov = providers.find(p => p.id === rec.providerId);
                       const pay = payers.find(p => p.id === rec.payerId);
                       return (
@@ -653,7 +701,7 @@ export const ReportsView: React.FC = () => {
                 </p>
 
                 <div className="space-y-2 text-xs">
-                  {currentMonthlyRecords.filter(r => ['Approved', 'Linked', 'Effective'].includes(r.stage)).slice(0, 4).map((rec) => {
+                  {displayMonthlyApproved.slice(0, 5).map((rec) => {
                     const prov = providers.find(p => p.id === rec.providerId);
                     const pay = payers.find(p => p.id === rec.payerId);
                     return (
@@ -682,7 +730,7 @@ export const ReportsView: React.FC = () => {
                 </p>
 
                 <div className="space-y-2 text-xs">
-                  {currentMonthlyRecords.filter(r => r.effectiveDate).slice(0, 4).map((rec) => {
+                  {displayMonthlyEffective.slice(0, 5).map((rec) => {
                     const prov = providers.find(p => p.id === rec.providerId);
                     const pay = payers.find(p => p.id === rec.payerId);
                     return (

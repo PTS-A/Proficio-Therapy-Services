@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Plus, 
@@ -25,7 +25,14 @@ export const AdminInsuranceManager: React.FC = () => {
   const [type, setType] = useState<PayerType>('Commercial');
   const [submissionMethod, setSubmissionMethod] = useState<SubmissionMethod>('Online Portal');
   const [averageTatDays, setAverageTatDays] = useState<number>(60);
-  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>(['ent-1', 'ent-2', 'ent-3']);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>(() => entities.map((e) => e.id));
+
+  // Sync when entities load from database
+  useEffect(() => {
+    if (entities.length > 0 && selectedEntityIds.length === 0) {
+      setSelectedEntityIds(entities.map((e) => e.id));
+    }
+  }, [entities]);
   const [portalUrl, setPortalUrl] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [notes, setNotes] = useState('');
@@ -84,7 +91,7 @@ export const AdminInsuranceManager: React.FC = () => {
       setType('Commercial');
       setSubmissionMethod('Online Portal');
       setAverageTatDays(60);
-      setSelectedEntityIds(['ent-1', 'ent-2', 'ent-3']);
+      setSelectedEntityIds(entities.map((e) => e.id));
       setPortalUrl('');
       setContactEmail('');
       setNotes('');

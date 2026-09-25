@@ -54,7 +54,7 @@ let inMemoryComments: ServerClinicalStaffComment[] = [
   },
   {
     id: 'comm-init-2',
-    entityId: 'ent-2',
+    entityId: 'ent-pstg-inc',
     authorId: 'acc-user-sanjay',
     authorName: 'Sanjay Tom',
     authorRole: 'Credentialing Specialist',

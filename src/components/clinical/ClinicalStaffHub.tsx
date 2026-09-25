@@ -56,8 +56,8 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
     updateProviderCredentialing
   } = useCredentialing();
 
-  // Top level entity selection: null means showing the 3 Entity selection screen
-  // Otherwise: 'ent-1' (AGES), 'ent-2' (Proficio), 'ent-3' (Child's Play)
+  // Top level entity selection: null means showing the Operating Entity selection screen
+  // Otherwise: specific entity ID (e.g. 'ent-1', 'ent-pts-llc', 'ent-pstg-inc', 'ent-3')
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
 
   // Three primary view states within the chosen entity:
@@ -663,13 +663,13 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
 
             <div className="flex items-center space-x-2">
               <span className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                {providers.length} Total Clinicians Across 3 Entities
+                {providers.length} Total Clinicians Across {entities.length} Operating Entities
               </span>
             </div>
           </div>
         </div>
 
-        {/* 3 ENTITY SELECTION CARDS */}
+        {/* DYNAMIC ENTITY SELECTION CARDS */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -680,31 +680,60 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 1. AGES Learning Solutions */}
-            {(() => {
-              const agesEntity = entities.find((e) => e.id === 'ent-1') || {
-                id: 'ent-1',
-                legalName: 'AGES Learning Solutions LLC',
-                dba: 'AGES Learning Solutions',
-                npi: '1487920183',
-                taxId: '47-2891234',
-              };
-              const staffCount = providers.filter((p) => isProviderInEntity(p, 'ent-1')).length;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {entities.map((entity) => {
+              const staffCount = providers.filter((p) => isProviderInEntity(p, entity.id)).length;
+              const nameLower = (entity.legalName || entity.dba || '').toLowerCase();
+              const isPstg = entity.id === 'ent-pstg-inc' || nameLower.includes('speech');
+              const isPts = entity.id === 'ent-pts-llc' || (nameLower.includes('therapy services') && !nameLower.includes('speech'));
+              const isAges = entity.id === 'ent-1' || nameLower.includes('ages');
+              const isChild = entity.id === 'ent-3' || nameLower.includes("child");
+
+              let badgeText = 'Multi-Disciplinary Care';
+              let badgeBg = 'bg-blue-50 text-[#2B4C9D] border-blue-200';
+              let disciplineText = 'Speech & OT Healthcare';
+              let hoverBorder = 'hover:border-[#2B4C9D]';
+              let actionColor = 'text-[#2B4C9D]';
+
+              if (isAges) {
+                badgeText = 'ABA & Autism Therapy';
+                badgeBg = 'bg-orange-50 text-[#E86424] border-orange-200';
+                disciplineText = 'Applied Behavior Analysis (ABA)';
+                hoverBorder = 'hover:border-[#E86424]';
+                actionColor = 'text-[#E86424]';
+              } else if (isPstg) {
+                badgeText = 'Speech & AAC Therapy';
+                badgeBg = 'bg-blue-50 text-[#2B4C9D] border-blue-200';
+                disciplineText = 'Speech-Language Pathology (SLP)';
+                hoverBorder = 'hover:border-[#2B4C9D]';
+                actionColor = 'text-[#2B4C9D]';
+              } else if (isPts) {
+                badgeText = 'Systemwide Therapy Services';
+                badgeBg = 'bg-teal-50 text-teal-700 border-teal-200';
+                disciplineText = 'Occupational Therapy (OT)';
+                hoverBorder = 'hover:border-teal-600';
+                actionColor = 'text-teal-700';
+              } else if (isChild) {
+                badgeText = 'Pediatric OT & PT';
+                badgeBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                disciplineText = 'Occupational Therapy (OT)';
+                hoverBorder = 'hover:border-emerald-600';
+                actionColor = 'text-emerald-700';
+              }
 
               return (
                 <div
-                  key="ent-1"
+                  key={entity.id}
                   onClick={() => {
-                    setSelectedEntityId('ent-1');
+                    setSelectedEntityId(entity.id);
                     setEntitySubView('hub');
                   }}
-                  className="bg-white rounded-3xl border-2 border-slate-200 hover:border-[#E86424] p-6 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-6"
+                  className={`bg-white rounded-3xl border-2 border-slate-200 ${hoverBorder} p-6 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-6`}
                 >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-[#E86424] border border-orange-200">
-                        ABA &amp; Autism Therapy
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${badgeBg} border`}>
+                        {badgeText}
                       </span>
                       <span className="text-xs font-bold text-slate-500">
                         {staffCount} Clinicians
@@ -712,163 +741,43 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                     </div>
 
                     <div>
-                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-[#E86424] transition-colors">
-                        AGES Learning Solutions
+                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-slate-700 transition-colors">
+                        {entity.dba || entity.legalName}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-1 font-mono">
-                        {agesEntity.legalName}
+                      <p className="text-xs text-slate-500 mt-1 font-mono line-clamp-1">
+                        {entity.legalName}
                       </p>
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs text-slate-600">
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Type 2 Organization NPI:</span>
-                        <span className="font-mono font-bold text-slate-800">{agesEntity.npi || '1487920183'}</span>
+                        <span className="text-slate-400">Type 2 Org NPI:</span>
+                        <span className="font-mono font-bold text-slate-800">{(entity as any).npiType2 || entity.npi || '—'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">Federal Tax ID (EIN):</span>
-                        <span className="font-mono font-bold text-slate-800">{agesEntity.taxId || '47-2891234'}</span>
+                        <span className="font-mono font-bold text-slate-800">{(entity as any).ein || entity.taxId || '—'}</span>
                       </div>
+                      {entity.taxonomy && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Taxonomy:</span>
+                          <span className="font-mono font-bold text-slate-800">{entity.taxonomy}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Primary Discipline:</span>
-                        <span className="font-bold text-[#E86424]">Applied Behavior Analysis (ABA)</span>
+                        <span className="text-slate-400">Discipline:</span>
+                        <span className={`font-bold ${actionColor}`}>{disciplineText}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#E86424]">
-                    <span>Enter AGES Portal</span>
+                  <div className={`pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold ${actionColor}`}>
+                    <span>Enter {entity.dba || entity.legalName} Portal</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               );
-            })()}
-
-            {/* 2. Proficio Therapy Services */}
-            {(() => {
-              const profEntity = entities.find((e) => e.id === 'ent-2') || {
-                id: 'ent-2',
-                legalName: 'Proficio Speech Therapy Group INC',
-                dba: 'Proficio Therapy Services',
-                npi: '1598031294',
-                taxId: '48-1928374',
-              };
-              const staffCount = providers.filter((p) => isProviderInEntity(p, 'ent-2')).length;
-
-              return (
-                <div
-                  key="ent-2"
-                  onClick={() => {
-                    setSelectedEntityId('ent-2');
-                    setEntitySubView('hub');
-                  }}
-                  className="bg-white rounded-3xl border-2 border-slate-200 hover:border-[#2B4C9D] p-6 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-6"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-[#2B4C9D] border border-blue-200">
-                        Speech &amp; AAC Therapy
-                      </span>
-                      <span className="text-xs font-bold text-slate-500">
-                        {staffCount} Clinicians
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-[#2B4C9D] transition-colors">
-                        Proficio Therapy Services
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-1 font-mono">
-                        {profEntity.legalName}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs text-slate-600">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Type 2 Organization NPI:</span>
-                        <span className="font-mono font-bold text-slate-800">{profEntity.npi || '1598031294'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Federal Tax ID (EIN):</span>
-                        <span className="font-mono font-bold text-slate-800">{profEntity.taxId || '48-1928374'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Primary Discipline:</span>
-                        <span className="font-bold text-[#2B4C9D]">Speech-Language Pathology (Speech)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#2B4C9D]">
-                    <span>Enter Proficio Portal</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* 3. Child's Play Therapy Services */}
-            {(() => {
-              const childEntity = entities.find((e) => e.id === 'ent-3') || {
-                id: 'ent-3',
-                legalName: "Child's Play Therapy Services PC",
-                dba: "Child's Play Therapy Services",
-                npi: '1609142305',
-                taxId: '49-3847562',
-              };
-              const staffCount = providers.filter((p) => isProviderInEntity(p, 'ent-3')).length;
-
-              return (
-                <div
-                  key="ent-3"
-                  onClick={() => {
-                    setSelectedEntityId('ent-3');
-                    setEntitySubView('hub');
-                  }}
-                  className="bg-white rounded-3xl border-2 border-slate-200 hover:border-emerald-600 p-6 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-6"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Occupational &amp; Sensory Therapy
-                      </span>
-                      <span className="text-xs font-bold text-slate-500">
-                        {staffCount} Clinicians
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
-                        Child&apos;s Play Therapy Services
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-1 font-mono">
-                        {childEntity.legalName}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs text-slate-600">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Type 2 Organization NPI:</span>
-                        <span className="font-mono font-bold text-slate-800">{childEntity.npi || '1609142305'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Federal Tax ID (EIN):</span>
-                        <span className="font-mono font-bold text-slate-800">{childEntity.taxId || '49-3847562'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Primary Discipline:</span>
-                        <span className="font-bold text-emerald-700">Occupational Therapy (OT)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-700">
-                    <span>Enter Child&apos;s Play Portal</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              );
-            })()}
+            })}
           </div>
         </div>
       </div>

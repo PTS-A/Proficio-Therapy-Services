@@ -35,9 +35,10 @@ interface AesasStatus {
 interface AesasTemplate {
   code: string;
   name: string;
-  purpose: string;
+  purpose?: string;
+  description?: string;
   subject: string;
-  variables: string[];
+  variables?: string[];
 }
 
 interface AesasQueueItem {
@@ -74,7 +75,7 @@ export const AesasAlertsView: React.FC = () => {
   const [testRecipientEmail, setTestRecipientEmail] = useState<string>(
     currentAccount?.email || 'credentialing@proficiotherapy.com'
   );
-  const [testEmployeeName, setTestEmployeeName] = useState<string>('Sarah Jenkins, BCBA');
+  const [testEmployeeName, setTestEmployeeName] = useState<string>('Ashley Vanderbilt, BCBA');
   const [testPayerName, setTestPayerName] = useState<string>('Blue Shield of California');
 
   // Load AESAS data
@@ -111,6 +112,25 @@ export const AesasAlertsView: React.FC = () => {
       await loadData();
     } catch (err: any) {
       addToast(err.message || 'Failed to process AESAS queue', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Dispatch 1st of month expiration digest
+  const handleTriggerMonthlyDigest = async () => {
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/aesas/expirations/digest', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        addToast('AESAS Monthly Expirations Digest dispatched to joel.reji@ageslearningsolutions.com via Resend!', 'success');
+        await loadData();
+      } else {
+        addToast(data.error || 'Failed to dispatch digest', 'error');
+      }
+    } catch (err: any) {
+      addToast(err.message || 'Failed to dispatch digest', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -203,7 +223,7 @@ export const AesasAlertsView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             onClick={loadData}
             disabled={isLoading}
@@ -211,6 +231,16 @@ export const AesasAlertsView: React.FC = () => {
             title="Refresh AESAS telemetry"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={handleTriggerMonthlyDigest}
+            disabled={isProcessing}
+            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
+            title="Dispatches the 1st of month expiration digest to Joel Reji via AESAS"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Send Monthly Digest</span>
           </button>
 
           <button
@@ -337,7 +367,7 @@ export const AesasAlertsView: React.FC = () => {
                   type="text"
                   value={testEmployeeName}
                   onChange={(e) => setTestEmployeeName(e.target.value)}
-                  placeholder="e.g. Sarah Jenkins, BCBA"
+                  placeholder="e.g. Ashley Vanderbilt, BCBA"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20"
                 />
               </div>
@@ -396,7 +426,7 @@ export const AesasAlertsView: React.FC = () => {
                     {tpl.code}
                   </span>
                 </div>
-                <p className="text-slate-600 text-[11px]">{tpl.purpose}</p>
+                <p className="text-slate-600 text-[11px]">{tpl.purpose || tpl.description}</p>
                 <div className="text-[11px] text-slate-400 font-mono pt-1">
                   Subject: <span className="text-slate-700 font-sans font-medium">{tpl.subject}</span>
                 </div>

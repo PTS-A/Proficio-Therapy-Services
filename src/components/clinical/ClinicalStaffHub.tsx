@@ -35,15 +35,18 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { LegalEntity, Provider, Payer, ProviderPayerEnrollment } from '../../types';
+import { DeleteStaffSafetyModal } from '../modals/DeleteStaffSafetyModal';
 
 interface ClinicalStaffHubProps {
   onSelectProviderId?: (providerId: string) => void;
   onOpenNewApplication?: () => void;
+  onNavigateToIntake?: () => void;
 }
 
 export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
   onSelectProviderId,
   onOpenNewApplication,
+  onNavigateToIntake,
 }) => {
   const { 
     entities, 
@@ -53,8 +56,20 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
     records, 
     currentAccount,
     addToast,
-    updateProviderCredentialing
+    updateProviderCredentialing,
+    deleteProvider
   } = useCredentialing();
+
+  // Deletion modal state
+  const [deleteModalStaff, setDeleteModalStaff] = useState<Provider | null>(null);
+
+  const handleConfirmDeleteStaff = (staffId: string) => {
+    deleteProvider(staffId);
+    if (selectedProfileEmployee?.id === staffId) {
+      setSelectedProfileEmployee(null);
+    }
+    addToast('Clinical staff member successfully removed.', 'success');
+  };
 
   // Top level entity selection: null means showing the Operating Entity selection screen
   // Otherwise: specific entity ID (e.g. 'ent-1', 'ent-pts-llc', 'ent-pstg-inc', 'ent-3')
@@ -511,20 +526,40 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
 
     try {
       const existingEnrollments = provider.payerEnrollments || [];
-      const updatedEnrollments = existingEnrollments.map((e) => {
-        if (e.payerId === payerId) {
-          return {
-            ...e,
+      const hasExisting = existingEnrollments.some((e) => e.payerId === payerId);
+      let updatedEnrollments: ProviderPayerEnrollment[];
+      if (hasExisting) {
+        updatedEnrollments = existingEnrollments.map((e) => {
+          if (e.payerId === payerId) {
+            return {
+              ...e,
+              status: 'Approved' as const,
+              approvalStatus: 'Approved' as const,
+              startDate: inputs.startDate,
+              expirationDate: inputs.expirationDate,
+              effectiveDate: inputs.startDate,
+              recredentialingDueDate: inputs.expirationDate,
+            };
+          }
+          return e;
+        });
+      } else {
+        updatedEnrollments = [
+          ...existingEnrollments,
+          {
+            payerId,
+            payerName,
             status: 'Approved' as const,
             approvalStatus: 'Approved' as const,
             startDate: inputs.startDate,
             expirationDate: inputs.expirationDate,
             effectiveDate: inputs.startDate,
             recredentialingDueDate: inputs.expirationDate,
-          };
-        }
-        return e;
-      });
+            reminderEmail: currentAccount?.email || 'credentialing@proficiotherapy.com',
+            responsiblePerson: currentAccount?.name || 'Credentialing Specialist',
+          },
+        ];
+      }
 
       await updateProviderCredentialing(provider.id, {
         payerEnrollments: updatedEnrollments,
@@ -661,9 +696,20 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                {providers.length} Total Clinicians Across {entities.length} Operating Entities
+            <div className="flex flex-wrap items-center gap-2">
+              {onNavigateToIntake && (
+                <button
+                  type="button"
+                  onClick={onNavigateToIntake}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#2B4C9D] hover:bg-[#223E80] text-white flex items-center space-x-1.5 shadow-xs cursor-pointer transition-all active:scale-95"
+                  title="Open AI-Powered Unified Document Intake & Onboarding Hub"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>AI Smart Intake &amp; Onboarding</span>
+                </button>
+              )}
+              <span className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                {providers.length} Clinicians Across {entities.length} Entities
               </span>
             </div>
           </div>
@@ -1073,9 +1119,22 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                           </div>
                         </div>
 
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {prov.employmentStatus || 'Active'}
-                        </span>
+                        <div className="flex items-center space-x-1.5 shrink-0">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {prov.employmentStatus || 'Active'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteModalStaff(prov);
+                            }}
+                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title={`Delete ${prov.firstName} ${prov.lastName}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Primary Location */}
@@ -1784,14 +1843,26 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedProfileEmployee(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Close Profile"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalStaff(selectedProfileEmployee)}
+                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                  title={`Delete ${selectedProfileEmployee.firstName} ${selectedProfileEmployee.lastName}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete Staff</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedProfileEmployee(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Close Profile"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* 4 MODAL TABS */}
@@ -2898,6 +2969,13 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
           </div>
         </div>
       )}
+      {/* Strict Typed-Confirmation Delete Safety Modal */}
+      <DeleteStaffSafetyModal
+        isOpen={Boolean(deleteModalStaff)}
+        staff={deleteModalStaff}
+        onClose={() => setDeleteModalStaff(null)}
+        onConfirmDelete={handleConfirmDeleteStaff}
+      />
     </div>
   );
 };

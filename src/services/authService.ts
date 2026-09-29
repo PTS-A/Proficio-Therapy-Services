@@ -326,7 +326,6 @@ export async function initiateGoogleSignIn(options?: {
           skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
-            prompt: 'select_account',
             state: sessionId || '',
           },
         },
@@ -342,44 +341,24 @@ export async function initiateGoogleSignIn(options?: {
       return { success: false, error: 'Unable to acquire authorization URL from Google.' };
     }
 
-    // 4. Safely navigate pre-existing popup window (if caller provided one synchronously on click)
-    const targetPopup = options?.popupWindow;
-    if (targetPopup && !targetPopup.closed) {
+    // 4. Standard Behavior: Navigate strictly in the SAME PAGE (zero new tabs or popups across all devices)
+    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // On mobile devices, always navigate within the current window to prevent browser popup interception
+    if (isMobile) {
+      window.location.href = authUrl;
+    } else {
       try {
-        targetPopup.location.href = authUrl;
-        return { success: true, url: authUrl, popupOpened: true, sessionId };
-      } catch (e) {
-        console.warn('[Target popup navigation fallback]', e);
+        if (window.top && window.top !== window.self) {
+          window.top.location.href = authUrl;
+        } else {
+          window.location.href = authUrl;
+        }
+      } catch {
+        window.location.href = authUrl;
       }
     }
-
-    // 5. If preferPopup is requested and no popup was provided
-    if (options?.preferPopup) {
-      const popup = window.open(
-        authUrl,
-        'google_oauth_popup',
-        'width=540,height=680,left=150,top=100,status=no,toolbar=no'
-      );
-      const isOpened = !!popup && !popup.closed;
-      return { success: true, url: authUrl, popupOpened: isOpened, sessionId };
-    }
-
-    // 6. CAUTION: Check if running inside iframe (e.g. AI Studio development preview)
-    const isInIframe = window.self !== window.top;
-    if (!isInIframe) {
-      window.location.href = authUrl;
-      return { success: true, url: authUrl, sessionId };
-    } else {
-      // In an iframe, navigating window.location causes Google to reject with X-Frame-Options: DENY.
-      // Therefore, open popup or return URL for user interaction.
-      const popup = window.open(
-        authUrl,
-        'google_oauth_popup',
-        'width=540,height=680,left=150,top=100,status=no,toolbar=no'
-      );
-      const isOpened = !!popup && !popup.closed;
-      return { success: true, url: authUrl, popupOpened: isOpened, sessionId };
-    }
+    return { success: true, url: authUrl, sessionId };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Google OAuth failed to initialize' };
   }

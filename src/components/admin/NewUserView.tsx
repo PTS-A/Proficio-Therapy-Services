@@ -52,6 +52,7 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     currentAccount, 
     isAdmin, 
     createAccount, 
+    sendOnboardingEmail,
     updateAccount, 
     deleteAccount,
     entities,
@@ -60,6 +61,7 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
   } = useCredentialing();
 
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'roster' | 'matrix' | 'requests'>('create');
+  const [sendingEmailUserId, setSendingEmailUserId] = useState<string | null>(null);
   
   // Search & Filter in roster
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,7 +206,7 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
       });
 
       if (res.success) {
-        showToast(`New user account "${name}" created with ${selectedRole} privileges.`, 'success');
+        showToast(`Account "${name}" created in database & AESAS onboarding email dispatched to ${email}!`, 'success');
         handleOpenCreateNew();
         setActiveSubTab('roster');
       } else {
@@ -485,6 +487,22 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                   </p>
                 </label>
               </div>
+
+              {/* Automated AESAS Onboarding Welcome Email Notice */}
+              {!isEditing && (
+                <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200/90 flex items-start space-x-3">
+                  <Mail className="w-4 h-4 text-[#2B4C9D] shrink-0 mt-0.5" />
+                  <div className="text-xs text-slate-700">
+                    <span className="font-bold text-[#2B4C9D] flex items-center space-x-1.5">
+                      <span>Automated AESAS Onboarding Email (Resend API)</span>
+                      <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">Live Dispatch</span>
+                    </span>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                      Upon creation, the system updates the database and dispatches Template 1 ("Onboarding to System") with portal access URL, assigned system role, operating entity, and 1st login password.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* System Role Selection Dropdown */}
@@ -765,6 +783,26 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                     </div>
 
                     <div className="flex items-center space-x-2 self-end md:self-center">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setSendingEmailUserId(acc.id);
+                          const res = await sendOnboardingEmail(acc);
+                          setSendingEmailUserId(null);
+                          if (res.success) {
+                            showToast(`AESAS Onboarding credentials email dispatched to ${acc.email}!`, 'success');
+                          } else {
+                            showToast(res.error || 'Failed to dispatch email.', 'error');
+                          }
+                        }}
+                        disabled={sendingEmailUserId === acc.id}
+                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2B4C9D] rounded-xl text-xs font-semibold inline-flex items-center space-x-1 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Send AESAS Onboarding Email with 1st Login Credentials"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{sendingEmailUserId === acc.id ? 'Sending...' : 'Send Onboarding Email'}</span>
+                      </button>
+
                       <button
                         onClick={() => handleOpenEdit(acc)}
                         className="px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-[#2B4C9D] rounded-xl text-xs font-semibold inline-flex items-center space-x-1 transition-colors cursor-pointer"

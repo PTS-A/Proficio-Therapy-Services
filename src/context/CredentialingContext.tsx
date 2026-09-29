@@ -151,6 +151,7 @@ interface CredentialingContextType {
   sessionSecondsLeft: number;
   resetSessionTimer: () => void;
   createAccount: (accData: Omit<AppAccount, 'id' | 'createdAt'>) => { success: boolean; account?: AppAccount; error?: string };
+  sendOnboardingEmail: (acc: AppAccount) => Promise<{ success: boolean; messageId?: string; simulated?: boolean; error?: string }>;
   updateAccount: (id: string, updates: Partial<AppAccount>) => void;
   deleteAccount: (id: string) => { success: boolean; error?: string };
   switchAccount: (accountId: string) => void;
@@ -486,17 +487,51 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }, duration);
   }, []);
 
+  // Strict validator to eliminate fake/demo employees from ever entering runtime state
+  const isFakeEmployeeRecord = (item: any): boolean => {
+    if (!item) return true;
+    const name = `${item.firstName || ''} ${item.lastName || ''} ${item.name || ''} ${item.fullName || ''} ${item.clinicianName || ''} ${item.employeeName || ''}`.toLowerCase().trim();
+    const email = (item.email || item.employeeEmail || item.clinicianEmail || item.ownerAccountEmail || '').toLowerCase().trim();
+    const id = (item.id || item.providerId || '').toLowerCase().trim();
+    const isFake = [
+      'fake',
+      'placeholder',
+      'demo user',
+      'test provider',
+      'john doe',
+      'jane doe',
+      'new clinical',
+      'new.clinical',
+      'sarah jenkins',
+      'sarah.j',
+      'michael chang',
+      'amanda brooks',
+      'david rodriguez',
+    ].some((f) => name.includes(f) || email.includes(f));
+
+    if (isFake || id.startsWith('fake-') || id === 'prv-1788608145700' || id === 'emp-prv-1788608145700') {
+      return true;
+    }
+    return false;
+  };
+
   const [accounts, setAccounts] = useState<AppAccount[]>(() => {
     try {
       const saved = localStorage.getItem('pts_supabase_cache_users') || localStorage.getItem('cred_accounts');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed as AppAccount[];
+          const filtered = parsed.map((a: AppAccount) => {
+            if (a.name && a.name.includes('Sarah Jenkins')) {
+              return { ...a, name: 'Clinical Quality Supervisor' };
+            }
+            return a;
+          }).filter((a: AppAccount) => !isFakeEmployeeRecord(a)) as AppAccount[];
+          if (filtered.length > 0) return filtered;
         }
       }
     } catch (e) {}
-    return [];
+    return INITIAL_ACCOUNTS;
   });
 
   // Session Timeout State (20 minutes inactivity)
@@ -608,14 +643,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out any known fake/demo names or dummy placeholders
-          const valid = parsed.filter((p) => {
-            if (!p || !p.firstName) return false;
-            const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
-            const isFake = ['fake', 'placeholder', 'demo user', 'test provider', 'john doe', 'jane doe'].some(f => fullName.includes(f));
-            if (isFake || p.id?.startsWith('fake-') || p.id?.startsWith('demo-')) return false;
-            return true;
-          });
+          const valid = parsed.filter((p) => !isFakeEmployeeRecord(p));
           if (valid.length > 0) {
             return valid;
           }
@@ -665,7 +693,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const saved = localStorage.getItem('pts_supabase_cache_records') || localStorage.getItem('cred_records');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((r) => !isFakeEmployeeRecord(r));
+        }
       }
     } catch {}
     return [];
@@ -678,7 +708,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const saved = localStorage.getItem('pts_supabase_cache_employees') || localStorage.getItem('cred_employees');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((e) => !isFakeEmployeeRecord(e));
+        }
       }
     } catch (e) {}
     return [];
@@ -692,7 +724,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const saved = localStorage.getItem('pts_supabase_cache_clinical_staff') || localStorage.getItem('cred_clinical_staff');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((s) => !isFakeEmployeeRecord(s));
+        }
       }
     } catch (e) {}
     return [];
@@ -844,6 +878,39 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
+  // One-time startup scrubber to wipe any legacy fake employee records from local storage caches
+  useEffect(() => {
+    try {
+      const keysToScrub = [
+        'pts_supabase_cache_providers',
+        'cred_providers',
+        'pts_supabase_cache_employees',
+        'cred_employees',
+        'pts_supabase_cache_clinical_staff',
+        'cred_clinical_staff',
+        'pts_supabase_cache_records',
+        'cred_records',
+        'pts_supabase_cache_users',
+        'cred_accounts',
+        'cred_users',
+      ];
+      keysToScrub.forEach((key) => {
+        const val = localStorage.getItem(key);
+        if (val) {
+          try {
+            const arr = JSON.parse(val);
+            if (Array.isArray(arr)) {
+              const cleaned = arr.filter((item) => !isFakeEmployeeRecord(item));
+              if (cleaned.length !== arr.length) {
+                localStorage.setItem(key, JSON.stringify(cleaned));
+              }
+            }
+          } catch {}
+        }
+      });
+    } catch {}
+  }, []);
+
   // Hydration & initial drain from Google Cloud Firestore
   const refreshFromCloud = async () => {
     try {
@@ -901,10 +968,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
-      setProviders(cloudProviders || []);
-      setRecords(cloudRecords || []);
-      setClinicalStaff(cloudClinicalStaff || []);
-      setEmployees(cloudEmployees || []);
+      setProviders((cloudProviders || []).filter((p) => !isFakeEmployeeRecord(p)));
+      setRecords((cloudRecords || []).filter((r) => !isFakeEmployeeRecord(r)));
+      setClinicalStaff((cloudClinicalStaff || []).filter((s) => !isFakeEmployeeRecord(s)));
+      setEmployees((cloudEmployees || []).filter((e) => !isFakeEmployeeRecord(e)));
       setDemoEmployees([]);
 
       if (!cloudPayers || cloudPayers.length === 0) {
@@ -1007,7 +1074,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     unsubs.push(
       subscribeToCollection<Provider>('providers', (cloudProviders) => {
-        setProviders(cloudProviders || []);
+        setProviders((cloudProviders || []).filter((p) => !isFakeEmployeeRecord(p)));
       })
     );
 
@@ -1031,7 +1098,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     unsubs.push(
       subscribeToCollection<CredentialingRecord>('records', (cloudRecords) => {
-        setRecords(cloudRecords || []);
+        setRecords((cloudRecords || []).filter((r) => !isFakeEmployeeRecord(r)));
       })
     );
 
@@ -1051,13 +1118,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     unsubs.push(
       subscribeToCollection<Employee>('employees', (cloudEmployees) => {
-        setEmployees(cloudEmployees || []);
+        setEmployees((cloudEmployees || []).filter((e) => !isFakeEmployeeRecord(e)));
       })
     );
 
     unsubs.push(
       subscribeToCollection<ClinicalStaff>('clinical_staff', (cloudStaff) => {
-        setClinicalStaff(cloudStaff || []);
+        setClinicalStaff((cloudStaff || []).filter((s) => !isFakeEmployeeRecord(s)));
       })
     );
 
@@ -1532,7 +1599,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const opts = typeof optionsOrFlow === 'object' && optionsOrFlow !== null
         ? optionsOrFlow
-        : { preferPopup: optionsOrFlow === 'popup' || true };
+        : { preferPopup: optionsOrFlow === 'popup' };
 
       // If direct corporate identity verification is requested
       if (emailOverride) {
@@ -1591,9 +1658,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         };
       }
 
-      // Live Google OAuth via Supabase / Popup
+      // Live Google OAuth via same-tab redirect
       const res = await initiateGoogleSignIn({ 
-        preferPopup: opts.preferPopup !== false,
+        preferPopup: opts.preferPopup === true,
         popupWindow: opts.popupWindow,
         sessionId: opts.sessionId,
       });
@@ -1604,6 +1671,25 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           error: res.error || 'Could not initiate Google Sign-In.',
         };
       }
+
+      // Background session listener in case authentication finalizes via callback in another context
+      if (res.sessionId) {
+        const checkSessId = res.sessionId;
+        const pollTimer = setInterval(async () => {
+          try {
+            const check = await fetch(`/api/auth/session/status?sessionId=${encodeURIComponent(checkSessId)}`);
+            if (check.ok) {
+              const data = await check.json();
+              if (data.status === 'authorized' && data.account) {
+                clearInterval(pollTimer);
+                finalizeLogin(data.account);
+              }
+            }
+          } catch {}
+        }, 800);
+        setTimeout(() => clearInterval(pollTimer), 120000);
+      }
+
       return {
         success: true,
         url: res.url,
@@ -2136,7 +2222,49 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       return [...prev, empRecord];
     });
 
+    // Automatically trigger AESAS onboarding credentials email via Resend
+    sendOnboardingEmail(newAcc).catch((e) => console.warn('[AESAS] Auto-onboard dispatch notice:', e));
+
     return { success: true, account: newAcc };
+  };
+
+  const sendOnboardingEmail = async (
+    acc: AppAccount
+  ): Promise<{ success: boolean; messageId?: string; simulated?: boolean; error?: string }> => {
+    try {
+      const primaryEntity = entities.find((e) => e.id === acc.assignedEntities?.[0]);
+      const res = await fetch('/api/aesas/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeName: acc.name,
+          employeeEmail: acc.email,
+          roleTitle: acc.roleTitle || acc.systemRole,
+          entityName: primaryEntity?.name || 'AGES Learning Solutions / Proficio Therapy Services',
+          temporaryPassword: acc.password || 'proficio',
+          portalUrl: typeof window !== 'undefined' ? window.location.origin : 'https://proficiotherapy.com',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Failed to dispatch onboarding email.' };
+      }
+
+      logAuditEvent({
+        userId: currentAccount?.id || 'sys-admin',
+        userName: currentAccount?.name || 'Administrator',
+        userEmail: currentAccount?.email || 'admin@proficiotherapy.com',
+        action: 'ONBOARDING_EMAIL_SENT',
+        entityType: 'USER',
+        entityId: acc.id,
+        details: { email: acc.email, messageId: data.messageId, simulated: data.simulated },
+      }).catch(() => {});
+
+      return { success: true, messageId: data.messageId, simulated: data.simulated };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error dispatching onboarding email' };
+    }
   };
 
   const updateAccount = (id: string, updates: Partial<AppAccount>) => {
@@ -2163,8 +2291,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         return a;
       });
-      localStorage.setItem('cred_accounts', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_users', JSON.stringify(next));
+      safeStorage.setItem('cred_accounts', JSON.stringify(next));
+      safeStorage.setItem('pts_supabase_cache_users', JSON.stringify(next));
       return next;
     });
   };
@@ -2175,8 +2303,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setAccounts((prev) => {
       const next = prev.filter((a) => a.id !== id);
-      localStorage.setItem('cred_accounts', JSON.stringify(next));
-      localStorage.setItem('pts_supabase_cache_users', JSON.stringify(next));
+      safeStorage.setItem('cred_accounts', JSON.stringify(next));
+      safeStorage.setItem('pts_supabase_cache_users', JSON.stringify(next));
       return next;
     });
     deleteDocument('users', id).catch(console.error);
@@ -4630,6 +4758,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         sessionSecondsLeft,
         resetSessionTimer,
         createAccount,
+        sendOnboardingEmail,
         updateAccount,
         deleteAccount,
         switchAccount,

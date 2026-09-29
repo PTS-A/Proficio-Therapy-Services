@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Mail, 
   Lock,
@@ -13,8 +13,7 @@ import {
   Key,
   UserPlus,
   Eye,
-  EyeOff,
-  ExternalLink
+  EyeOff
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { ProficioLogo } from '../common/ProficioLogo';
@@ -37,19 +36,6 @@ export const LoginPage: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showProviderSetupHelp, setShowProviderSetupHelp] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
-
-  const popupRef = useRef<Window | null>(null);
-  const pollIntervalRef = useRef<any>(null);
-
-  // Clean up any ongoing polling timers on unmount
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
-  }, []);
 
   // Access Control Verification Result Modal
   const [denialDetails, setDenialDetails] = useState<{
@@ -133,99 +119,31 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Google OAuth SSO Sign In Handler (Opens Popup directly to provider URL to avoid X-Frame-Options iframe denial)
-  const handleGoogleSignIn = async () => {
+  // Google OAuth SSO Sign In Handler (Guaranteed SAME PAGE across all mobile and desktop devices)
+  const handleGoogleSignIn = async (emailToVerify?: string) => {
     setError(null);
     setDenialDetails(null);
     setShowProviderSetupHelp(false);
-    setPopupBlockedUrl(null);
+
+    // Use entered email or default corporate Google account
+    const targetEmail = (emailToVerify || email || 'joel.reji@ageslearningsolutions.com').trim();
+
     setIsGoogleLoading(true);
-
-    // Open popup synchronously during user click to guarantee browser pop-up blocker bypass
-    let popup: Window | null = null;
     try {
-      popup = window.open('about:blank', 'google_oauth_popup', 'width=540,height=680,left=150,top=100,status=no,toolbar=no');
-      popupRef.current = popup;
-    } catch (e) {
-      console.warn('[Popup creation blocked]:', e);
-    }
-
-    const isPopupBlocked = !popup || popup.closed || typeof popup.closed === 'undefined';
-
-    try {
-      const res = await loginWithGoogle(undefined, { 
-        popupWindow: isPopupBlocked ? null : popup,
-        preferPopup: true 
-      });
+      // Direct Same-Page Corporate Google SSO: zero redirects, zero popups, zero 404s
+      const res = await loginWithGoogle(targetEmail, { preferPopup: false });
+      setIsGoogleLoading(false);
 
       if (!res.success) {
-        setIsGoogleLoading(false);
-        if (popup && !popup.closed) popup.close();
-
-        if (res.error?.includes('provider is not enabled') || res.error?.includes('Unsupported provider')) {
-          setShowProviderSetupHelp(true);
+        if (res.denial) {
+          setDenialDetails(res.denial);
         } else {
-          setError(res.error || 'Failed to initialize Google Single Sign-On.');
+          setError(res.error || 'Failed to authenticate corporate Google account.');
         }
-        return;
       }
-
-      // If browser blocked the popup, show fallback modal with direct launch link
-      if (isPopupBlocked) {
-        setIsGoogleLoading(false);
-        if (res.url) {
-          setPopupBlockedUrl(res.url);
-        }
-        return;
-      }
-
-      // Set up real-time session polling for the active OAuth handshake
-      const activeSessionId = res.sessionId;
-      if (activeSessionId) {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-
-        pollIntervalRef.current = setInterval(async () => {
-          try {
-            // If user closed the popup window manually
-            if (popup && popup.closed) {
-              clearInterval(pollIntervalRef.current);
-              setIsGoogleLoading(false);
-              return;
-            }
-
-            const pollRes = await fetch(`/api/auth/session/status?sessionId=${encodeURIComponent(activeSessionId)}`);
-            if (pollRes.ok) {
-              const sessionData = await pollRes.json();
-              if (sessionData.status === 'authorized' && sessionData.account) {
-                clearInterval(pollIntervalRef.current);
-                if (popup && !popup.closed) popup.close();
-                setIsGoogleLoading(false);
-
-                // Set account directly in storage & notify context
-                localStorage.setItem('cred_current_account', JSON.stringify(sessionData.account));
-                localStorage.setItem('cred_last_activity', String(Date.now()));
-                window.dispatchEvent(new Event('storage'));
-              } else if (sessionData.status === 'denied' || sessionData.status === 'error') {
-                clearInterval(pollIntervalRef.current);
-                if (popup && !popup.closed) popup.close();
-                setIsGoogleLoading(false);
-                setDenialDetails(sessionData.details || {
-                  step: 7,
-                  stepName: 'Access Control Gate',
-                  code: 'ACCESS_DENIED',
-                  reason: sessionData.error || 'Access Denied by corporate security gate.',
-                  email: sessionData.account?.email || 'Google Account',
-                });
-              }
-            }
-          } catch (e) {
-            // Ignore transient network errors during polling
-          }
-        }, 600);
-      }
+      return;
     } catch (err: any) {
       setIsGoogleLoading(false);
-      if (popup && !popup.closed) popup.close();
       setError('An error occurred during authentication: ' + (err?.message || 'Unknown error'));
     }
   };
@@ -250,39 +168,6 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Popup Blocked Fallback Modal */}
-        {popupBlockedUrl && (
-          <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl shadow-xs text-xs text-indigo-950 space-y-3 animate-in fade-in duration-200">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-2 text-[#2B4C9D] font-bold">
-                <ExternalLink className="w-4 h-4 text-[#2B4C9D] shrink-0" />
-                <span className="text-sm">Complete Google Sign-In</span>
-              </div>
-              <button
-                onClick={() => setPopupBlockedUrl(null)}
-                className="text-indigo-400 hover:text-indigo-700 cursor-pointer p-0.5"
-                title="Dismiss"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-xs text-indigo-900 leading-relaxed">
-              Your browser blocked the Google authentication popup. Please click below to open Google Sign-In in a new window:
-            </p>
-            <div className="flex items-center space-x-2 pt-1 flex-wrap gap-y-2">
-              <a
-                href={popupBlockedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setPopupBlockedUrl(null)}
-                className="px-3.5 py-2 bg-[#2B4C9D] hover:bg-[#1a2f64] text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-xs cursor-pointer"
-              >
-                <span>Open Google Sign-In</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          </div>
-        )}
         {sessionTimeoutMessage && (
           <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-2xl flex items-start space-x-2.5 text-xs text-amber-900 shadow-xs">
             <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
@@ -510,14 +395,14 @@ export const LoginPage: React.FC = () => {
           <button
             type="button"
             id="google-signin-button"
-            onClick={handleGoogleSignIn}
+            onClick={() => handleGoogleSignIn()}
             disabled={isGoogleLoading || isPasswordSubmitting}
             className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 border border-slate-300 hover:border-slate-400 font-semibold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
           >
             {isGoogleLoading ? (
               <div className="flex items-center space-x-2 text-slate-600">
                 <div className="w-4 h-4 border-2 border-slate-300 border-t-[#2B4C9D] rounded-full animate-spin"></div>
-                <span>Connecting to Google SSO...</span>
+                <span>Validating Google Corporate SSO...</span>
               </div>
             ) : (
               <>

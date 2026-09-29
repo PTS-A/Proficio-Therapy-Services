@@ -9,6 +9,7 @@ export type ActiveTabType =
   | 'locations' 
   | 'entities' 
   | 'reports' 
+  | 'document-intake'
   | 'users' 
   | 'new-user' 
   | 'import' 
@@ -105,12 +106,12 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
     return [
       'dashboard',
       'tracker',
-      'linking',
       'providers',
       'locations',
       'payers',
       'entities',
       'reports',
+      'document-intake',
       'new-user',
       'users',
       'import',
@@ -134,12 +135,12 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       return [
         'dashboard',
         'tracker',
-        'linking',
         'providers',
         'locations',
         'payers',
         'entities',
         'reports',
+        'document-intake',
         'automations',
         'admin-dashboard',
         'staff-approvals',
@@ -152,22 +153,23 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       return [
         'dashboard',
         'tracker',
-        'linking',
         'providers',
         'locations',
         'payers',
+        'document-intake',
         'staff-approvals',
         'clinical-portal',
+        'aesas',
         'comments-roster'
       ];
 
     case 'Billing and Claims':
       return [
         'dashboard',
-        'linking',
         'tracker',
         'payers',
         'reports',
+        'document-intake',
         'clinical-portal',
         'comments-roster'
       ];
@@ -179,6 +181,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'locations',
         'entities',
         'tracker',
+        'document-intake',
         'clinical-portal',
         'comments-roster'
       ];
@@ -189,6 +192,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'providers',
         'tracker',
         'reports',
+        'document-intake',
         'clinical-portal',
         'comments-roster'
       ];
@@ -198,7 +202,6 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'dashboard',
         'reports',
         'tracker',
-        'linking',
         'payers',
         'clinical-portal',
         'aesas',

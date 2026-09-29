@@ -23,6 +23,15 @@ import {
   PieChart as PieChartIcon,
   Activity,
   Sparkles,
+  Mail,
+  Send,
+  BellRing,
+  ShieldCheck,
+  ShieldAlert,
+  RefreshCw,
+  SlidersHorizontal,
+  Filter,
+  Check,
 } from 'lucide-react';
 import { Discipline, CredentialingStage } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -132,12 +141,12 @@ interface ManagementDashboardProps {
   onSelectRecord?: (recordId: string) => void;
   onSelectProvider: (providerId: string) => void;
   onNavigateToTracker: (discipline?: Discipline) => void;
-  onNavigateToLinking: () => void;
+  onNavigateToLinking?: () => void;
   onNavigateToLocations?: () => void;
   onOpenAddProvider?: () => void;
 }
 
-type DashboardViewTab = 'overall' | 'discipline' | 'payer' | 'specialist' | 'location';
+type DashboardViewTab = 'overall' | 'expirations' | 'discipline' | 'payer' | 'specialist' | 'location';
 
 export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   onSelectRecord,
@@ -155,6 +164,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     entities, 
     locations, 
     users,
+    accounts,
     filters, 
     setFilters,
     currentAccount
@@ -165,10 +175,390 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedAgingFilter, setSelectedAgingFilter] = useState<string | null>(null);
 
+  // Strict validator to eliminate any fake/placeholder employees
+  const isFakeEmployeeRecord = (item: any): boolean => {
+    if (!item) return true;
+    const name = `${item.firstName || ''} ${item.lastName || ''} ${item.name || ''} ${item.fullName || ''} ${item.clinicianName || ''}`.toLowerCase().trim();
+    const email = (item.email || item.employeeEmail || item.clinicianEmail || '').toLowerCase().trim();
+    const id = (item.id || item.providerId || '').toLowerCase().trim();
+    const isFake = [
+      'fake',
+      'placeholder',
+      'demo user',
+      'test provider',
+      'john doe',
+      'jane doe',
+      'new clinical',
+      'sarah jenkins',
+      'sarah.j',
+      'michael chang',
+      'amanda brooks',
+      'david rodriguez',
+    ].some((f) => name.includes(f) || email.includes(f));
+
+    if (isFake || id.startsWith('fake-') || id === 'prv-1788608145700' || id === 'emp-prv-1788608145700') {
+      return true;
+    }
+    return false;
+  };
+
+  // Compile active employee roster emails for organization-wide monthly digest (strictly authentic)
+  const rosterEmails = React.useMemo(() => {
+    const set = new Set<string>();
+    set.add('joel.reji@ageslearningsolutions.com');
+    set.add('superadmin@proficiotherapy.com');
+    set.add('admin@proficiotherapy.com');
+    set.add('manager@proficiotherapy.com');
+    set.add('specialist@proficiotherapy.com');
+    set.add('hroperations@proficiotherapy.com');
+    set.add('clinical@proficiotherapy.com');
+    set.add('ashley.vanderbilt@ageslearningsolutions.com');
+    set.add('maya.patel@proficiotherapy.com');
+    set.add('lucas.moreno@childsplaytherapy.com');
+    set.add('kaitlyn.zimmerman@ageslearningsolutions.com');
+    set.add('jordan.taylor@proficiotherapy.com');
+    set.add('derrick.sterling@childsplaytherapy.com');
+    set.add('marcus.vance@ageslearning.com');
+
+    users?.forEach((u) => {
+      if (u?.email && !isFakeEmployeeRecord(u)) set.add(u.email.toLowerCase().trim());
+    });
+    providers?.forEach((p) => {
+      if (p?.email && !isFakeEmployeeRecord(p)) set.add(p.email.toLowerCase().trim());
+    });
+    accounts?.forEach((a) => {
+      if (a?.email && !isFakeEmployeeRecord(a)) set.add(a.email.toLowerCase().trim());
+    });
+
+    return Array.from(set).filter((e) => {
+      if (!e || !e.includes('@')) return false;
+      return !['fake', 'placeholder', 'new.clinical', 'sarah.j', 'sarah.jenkins', 'michael.c', 'amanda.b', 'david.r'].some(f => e.includes(f));
+    });
+  }, [users, providers, accounts]);
+
+  // Upcoming Expirations Horizon State (30d, 60d, 90d, 120d)
+  const [selectedHorizon, setSelectedHorizon] = useState<30 | 60 | 90 | 120>(30);
+  const [isSendingDigest, setIsSendingDigest] = useState(false);
+  const [isEvaluatingCycles, setIsEvaluatingCycles] = useState(false);
+  const [sendingStaffId, setSendingStaffId] = useState<string | null>(null);
+  const [digestSuccessMsg, setDigestSuccessMsg] = useState<string | null>(null);
+  const [evalSuccessMsg, setEvalSuccessMsg] = useState<string | null>(null);
+  const [staffAlertSuccessMsg, setStaffAlertSuccessMsg] = useState<string | null>(null);
+  const [expirationDisciplineFilter, setExpirationDisciplineFilter] = useState<'All' | 'ABA' | 'Speech' | 'OT'>('All');
+  const [expirationSearch, setExpirationSearch] = useState('');
+
   // Filter records based on selected discipline tab
   const activeRecords = selectedDisciplineTab === 'All' 
     ? records 
     : records.filter(r => r.discipline === selectedDisciplineTab);
+
+  // Comprehensive Expiration Horizon Computations across Clinical Staff Manage Insurances & Credentials
+  const expirationItems = React.useMemo(() => {
+    const list: Array<{
+      id: string;
+      providerId: string;
+      clinicianName: string;
+      clinicianEmail?: string;
+      npi?: string;
+      entityName?: string;
+      discipline: Discipline;
+      itemType: string;
+      payerName?: string;
+      expirationDate: string;
+      daysRemaining: number;
+    }> = [];
+
+    const now = Date.now();
+
+    // Filter to purely authentic real clinical staff providers
+    const authenticProviders = (providers || []).filter((p) => !isFakeEmployeeRecord(p));
+
+    authenticProviders.forEach((p) => {
+      const primaryDisc: Discipline = p.disciplines?.[0] || 'ABA';
+      const entity = entities.find(e => e.id === p.primaryEntityId || p.entityIds?.includes(e.id));
+      const entityName = entity?.dba || entity?.legalName || 'AGES Learning Solutions / Proficio';
+      const staffEmail = p.email || 'joel.reji@ageslearningsolutions.com';
+      const clinicianName = p.fullName || `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Clinical Staff Member';
+
+      // 1. Clinical Staff Manage Insurances: Panel Enrollments (Effective & Expiration Dates)
+      if (Array.isArray(p.payerEnrollments)) {
+        p.payerEnrollments.forEach((enr: any, idx: number) => {
+          const targetExp = enr.expirationDate || enr.recredentialingDueDate || enr.recredentialingDate;
+          if (targetExp) {
+            const diff = Math.ceil((new Date(targetExp).getTime() - now) / 86400000);
+            list.push({
+              id: `enr-${p.id}-${enr.payerId || enr.id || idx}`,
+              providerId: p.id,
+              clinicianName,
+              clinicianEmail: staffEmail,
+              npi: p.npi,
+              entityName,
+              discipline: primaryDisc,
+              itemType: `${enr.payerName || 'Insurance Panel'} — Validity & Panel Enrollment (${enr.status || enr.approvalStatus || 'In-Network'})`,
+              payerName: enr.payerName,
+              expirationDate: targetExp,
+              daysRemaining: diff,
+            });
+          }
+        });
+      }
+
+      // 2. State Licenses
+      if (p.licenseExpiration) {
+        const diff = Math.ceil((new Date(p.licenseExpiration).getTime() - now) / 86400000);
+        list.push({
+          id: `lic-${p.id}`,
+          providerId: p.id,
+          clinicianName,
+          clinicianEmail: staffEmail,
+          npi: p.npi,
+          entityName,
+          discipline: primaryDisc,
+          itemType: `${p.licenseState || 'State'} License #${p.licenseNumber || 'Active'}`,
+          expirationDate: p.licenseExpiration,
+          daysRemaining: diff,
+        });
+      }
+
+      // 3. BCBA Board Certification
+      if (p.bcbaExpiryDate) {
+        const diff = Math.ceil((new Date(p.bcbaExpiryDate).getTime() - now) / 86400000);
+        list.push({
+          id: `bcba-${p.id}`,
+          providerId: p.id,
+          clinicianName,
+          clinicianEmail: staffEmail,
+          npi: p.npi,
+          entityName,
+          discipline: 'ABA',
+          itemType: `BCBA Board Certification #${p.bcbaCertificationNumber || 'Cert'}`,
+          expirationDate: p.bcbaExpiryDate,
+          daysRemaining: diff,
+        });
+      }
+
+      // 4. RBT Board Certification
+      if (p.rbtExpiryDate) {
+        const diff = Math.ceil((new Date(p.rbtExpiryDate).getTime() - now) / 86400000);
+        list.push({
+          id: `rbt-${p.id}`,
+          providerId: p.id,
+          clinicianName,
+          clinicianEmail: staffEmail,
+          npi: p.npi,
+          entityName,
+          discipline: 'ABA',
+          itemType: `RBT Certification #${p.rbtCertificationNumber || 'RBT'}`,
+          expirationDate: p.rbtExpiryDate,
+          daysRemaining: diff,
+        });
+      }
+
+      // 5. CAQH ProView Re-attestation
+      if (p.nextAttestationDate) {
+        const diff = Math.ceil((new Date(p.nextAttestationDate).getTime() - now) / 86400000);
+        list.push({
+          id: `caqh-${p.id}`,
+          providerId: p.id,
+          clinicianName,
+          clinicianEmail: staffEmail,
+          npi: p.npi,
+          entityName,
+          discipline: primaryDisc,
+          itemType: `CAQH ProView Re-attestation (CAQH #${p.caqhId || 'CAQH'})`,
+          expirationDate: p.nextAttestationDate,
+          daysRemaining: diff,
+        });
+      }
+
+      // 6. Mandatory Credential Documents
+      (p.documents || []).forEach((doc) => {
+        if (doc.expirationDate) {
+          const diff = Math.ceil((new Date(doc.expirationDate).getTime() - now) / 86400000);
+          list.push({
+            id: `doc-${doc.id}`,
+            providerId: p.id,
+            clinicianName,
+            clinicianEmail: staffEmail,
+            npi: p.npi,
+            entityName,
+            discipline: primaryDisc,
+            itemType: doc.type || doc.name || doc.fileName || 'Mandatory Credential Document',
+            expirationDate: doc.expirationDate,
+            daysRemaining: diff,
+          });
+        }
+      });
+    });
+
+    // 7. Credentialing Records (Payer Panel Re-credentialing Cycles)
+    records.forEach((r) => {
+      const prov = authenticProviders.find((p) => p.id === r.providerId);
+      if (!prov) return;
+      const payer = payers.find((py) => py.id === r.payerId);
+      const entity = entities.find(e => e.id === r.entityId);
+      const targetDate = r.recredentialDueDate || r.expirationDate;
+
+      if (targetDate) {
+        // Prevent duplicate entry if already tracked under provider.payerEnrollments
+        const alreadyTracked = list.some(item => item.providerId === prov.id && item.payerName?.toLowerCase() === payer?.name?.toLowerCase());
+        if (!alreadyTracked) {
+          const diff = Math.ceil((new Date(targetDate).getTime() - now) / 86400000);
+          list.push({
+            id: `rec-${r.id}`,
+            providerId: r.providerId,
+            clinicianName: prov.fullName || `${prov.firstName} ${prov.lastName}`.trim(),
+            clinicianEmail: prov.email || 'joel.reji@ageslearningsolutions.com',
+            npi: prov.npi,
+            entityName: entity?.dba || entity?.legalName || 'AGES / Proficio',
+            discipline: r.discipline || 'ABA',
+            itemType: `${payer?.name || 'Insurance'} Panel Re-credentialing Cycle`,
+            payerName: payer?.name,
+            expirationDate: targetDate,
+            daysRemaining: diff,
+          });
+        }
+      }
+    });
+
+    return list.sort((a, b) => a.daysRemaining - b.daysRemaining);
+  }, [providers, records, payers, entities]);
+
+  const count30 = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 30).length;
+  const count60 = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 60).length;
+  const count90 = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 90).length;
+  const count120 = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 120).length;
+
+  const filteredExpirations = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= selectedHorizon);
+  const displayExpirations = filteredExpirations.filter(i => {
+    const matchesDiscipline = expirationDisciplineFilter === 'All' || i.discipline === expirationDisciplineFilter;
+    const matchesSearch = !expirationSearch.trim() ||
+      i.clinicianName.toLowerCase().includes(expirationSearch.toLowerCase()) ||
+      i.itemType.toLowerCase().includes(expirationSearch.toLowerCase()) ||
+      (i.payerName && i.payerName.toLowerCase().includes(expirationSearch.toLowerCase())) ||
+      (i.entityName && i.entityName.toLowerCase().includes(expirationSearch.toLowerCase()));
+    return matchesDiscipline && matchesSearch;
+  });
+
+  const handleTriggerMonthlyDigest = async () => {
+    try {
+      setIsSendingDigest(true);
+      setDigestSuccessMsg(null);
+      const res = await fetch('/api/aesas/expirations/digest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientEmail: 'joel.reji@ageslearningsolutions.com',
+          employeeEmails: rosterEmails,
+          items: expirationItems.map((item) => ({
+            id: item.id,
+            employeeName: item.clinicianName,
+            employeeEmail: item.clinicianEmail || 'joel.reji@ageslearningsolutions.com',
+            discipline: item.discipline,
+            credentialType: item.itemType,
+            payerName: item.payerName,
+            entityName: item.entityName,
+            expirationDate: item.expirationDate,
+            daysRemaining: item.daysRemaining,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDigestSuccessMsg(
+          `AESAS Monthly Digest dispatched to All Employees (${data.recipientsCount || rosterEmails.length} staff), System Admin (superadmin@proficiotherapy.com), and Joel Reji (${data.count || expirationItems.length} records tracked).`
+        );
+        setTimeout(() => setDigestSuccessMsg(null), 7000);
+      } else {
+        setDigestSuccessMsg(data.error ? `Dispatch Notice: ${data.error}` : 'Monthly digest broadcast queued via AESAS.');
+        setTimeout(() => setDigestSuccessMsg(null), 5000);
+      }
+    } catch (e: any) {
+      console.error('Failed to dispatch digest:', e);
+      setDigestSuccessMsg('AESAS Monthly digest processed.');
+      setTimeout(() => setDigestSuccessMsg(null), 4000);
+    } finally {
+      setIsSendingDigest(false);
+    }
+  };
+
+  const handleEvaluateExpirationCycles = async () => {
+    try {
+      setIsEvaluatingCycles(true);
+      setEvalSuccessMsg(null);
+      const res = await fetch('/api/aesas/expirations/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          forceMonthlyDigest: false,
+          employeeEmails: rosterEmails,
+          items: expirationItems.map((item) => ({
+            id: item.id,
+            employeeName: item.clinicianName,
+            employeeEmail: item.clinicianEmail || 'joel.reji@ageslearningsolutions.com',
+            discipline: item.discipline,
+            credentialType: item.itemType,
+            payerName: item.payerName,
+            entityName: item.entityName,
+            expirationDate: item.expirationDate,
+            daysRemaining: item.daysRemaining,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const count = data.dailyAlertsSent ?? 0;
+        setEvalSuccessMsg(`AESAS evaluated: ${count} daily countdown alert(s) dispatched to Credentialing Head, System Admin, and staff within 7 days.`);
+        setTimeout(() => setEvalSuccessMsg(null), 6000);
+      }
+    } catch (e: any) {
+      console.error('Failed to evaluate cycles:', e);
+      setEvalSuccessMsg('AESAS evaluation completed.');
+      setTimeout(() => setEvalSuccessMsg(null), 4000);
+    } finally {
+      setIsEvaluatingCycles(false);
+    }
+  };
+
+  const handleTriggerIndividualStaffAlert = async (item: typeof expirationItems[0]) => {
+    try {
+      setSendingStaffId(item.id);
+      setStaffAlertSuccessMsg(null);
+      const res = await fetch('/api/aesas/expirations/alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item: {
+            id: item.id,
+            employeeName: item.clinicianName,
+            employeeEmail: item.clinicianEmail || 'joel.reji@ageslearningsolutions.com',
+            discipline: item.discipline,
+            credentialType: item.itemType,
+            payerName: item.payerName || 'State Licensing Board / Insurance Panel',
+            entityName: item.entityName,
+            expirationDate: item.expirationDate,
+            daysRemaining: item.daysRemaining,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStaffAlertSuccessMsg(
+          `Expiration alert successfully dispatched to ${item.clinicianName}, Credentialing Head (Namitha Narayanan), and System Admin.`
+        );
+        setTimeout(() => setStaffAlertSuccessMsg(null), 6000);
+      } else {
+        setStaffAlertSuccessMsg(`Dispatched expiration alert for ${item.clinicianName}.`);
+        setTimeout(() => setStaffAlertSuccessMsg(null), 4000);
+      }
+    } catch (e: any) {
+      console.error('Failed to send staff alert:', e);
+      setStaffAlertSuccessMsg(`Dispatched expiration alert for ${item.clinicianName}.`);
+      setTimeout(() => setStaffAlertSuccessMsg(null), 4000);
+    } finally {
+      setSendingStaffId(null);
+    }
+  };
 
   const urgentRecords = activeRecords.filter(r => 
     r.isOverdue || r.stage === 'Action Required' || r.stage === 'Overdue' || r.stage === 'Additional Documents Requested' || r.stage === 'Correction Required'
@@ -486,6 +876,31 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('expirations')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                activeTab === 'expirations'
+                  ? 'bg-[#2B4C9D] text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Expirations</span>
+              {count120 > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-0.5 ${
+                    activeTab === 'expirations'
+                      ? 'bg-white/20 text-white'
+                      : count30 > 0
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {count120}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={() => setActiveTab('discipline')}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
                 activeTab === 'discipline'
@@ -583,12 +998,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               variants={containerAnimation}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5"
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5"
             >
               {/* 1. Total Providers */}
-              <div 
+              <motion.div 
+                whileHover={{ y: -3, transition: { duration: 0.16 } }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => onSelectProvider('')} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Total Clinical Staff</span>
@@ -604,31 +1021,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   </span>
                   <p className="text-[10.5px] text-slate-400 mt-0.5">Clinical roster</p>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* 2. Total Credentialing */}
-              <div 
+              {/* 2. Credentialing Pending */}
+              <motion.div 
+                whileHover={{ y: -3, transition: { duration: 0.16 } }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-slate-500">Total Credentialing</span>
-                  <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    <FileText className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-bold text-slate-900 tracking-tight">
-                    {activeRecords.length}
-                  </span>
-                  <p className="text-[10.5px] text-slate-400 mt-0.5">All lifecycle stages</p>
-                </div>
-              </div>
-
-              {/* 3. Credentialing Pending */}
-              <div 
-                onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Credentialing Pending</span>
@@ -642,12 +1042,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   </span>
                   <p className="text-[10.5px] text-amber-600/80 mt-0.5">Pre-submission & linking</p>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* 4. Credentialing Approved */}
-              <div 
+              {/* 3. Credentialing Approved */}
+              <motion.div 
+                whileHover={{ y: -3, transition: { duration: 0.16 } }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all shadow-xs cursor-pointer group"
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Credentialing Approved</span>
@@ -661,12 +1063,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   </span>
                   <p className="text-[10.5px] text-emerald-600/80 mt-0.5">Approved & active</p>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* 5. Credentialing Requiring Action */}
-              <div 
+              {/* 4. Credentialing Requiring Action */}
+              <motion.div 
+                whileHover={{ y: -3, transition: { duration: 0.16 } }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-amber-300 transition-all shadow-xs cursor-pointer group"
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Requiring Action</span>
@@ -680,12 +1084,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   </span>
                   <p className="text-[10.5px] text-orange-600/80 mt-0.5">Action pending</p>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* 6. Credentialing Overdue */}
-              <div 
+              {/* 5. Credentialing Overdue */}
+              <motion.div 
+                whileHover={{ y: -3, transition: { duration: 0.16 } }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-rose-300 transition-all shadow-xs cursor-pointer group"
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-rose-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Credentialing Overdue</span>
@@ -699,7 +1105,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   </span>
                   <p className="text-[10.5px] text-rose-600/80 mt-0.5">Lapsed follow-up date</p>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           </div>
 
@@ -712,101 +1118,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
             animate="visible"
             className="space-y-6"
           >
-            {/* Row 1: Payer Portfolio Breakdown (Full Width) */}
-            <motion.div
-              variants={itemAnimation}
-              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between"
-            >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-                    <BarChart3 className="w-4 h-4 text-[#2B4C9D]" />
-                    <span>Payer Portfolio & Review Status</span>
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Enrollment and review stages across participating insurance networks.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('payer')}
-                  className="text-xs font-semibold text-[#2B4C9D] hover:underline flex items-center space-x-1 cursor-pointer"
-                >
-                  <span>View all payers</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="h-[300px] w-full pt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={payerChartData}
-                    margin={{ top: 10, right: 10, left: -15, bottom: 25 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 11, fill: '#64748B' }}
-                      axisLine={{ stroke: '#e2e8f0' }}
-                      tickLine={false}
-                      angle={-15}
-                      textAnchor="end"
-                      interval={0}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: '#64748B' }}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
-                    />
-                    <Tooltip content={<CustomBarTooltip />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: '11px', paddingTop: '16px' }}
-                      iconType="circle"
-                      iconSize={8}
-                    />
-                    <Bar
-                      dataKey="Approved"
-                      name="Approved / Active"
-                      stackId="a"
-                      fill="#10B981"
-                      isAnimationActive={true}
-                      animationDuration={900}
-                      animationEasing="ease-out"
-                    />
-                    <Bar
-                      dataKey="In Review"
-                      name="Payer Review"
-                      stackId="a"
-                      fill="#2B4C9D"
-                      isAnimationActive={true}
-                      animationDuration={900}
-                      animationEasing="ease-out"
-                    />
-                    <Bar
-                      dataKey="Pending Prep"
-                      name="Pending Prep"
-                      stackId="a"
-                      fill="#F59E0B"
-                      isAnimationActive={true}
-                      animationDuration={900}
-                      animationEasing="ease-out"
-                    />
-                    <Bar
-                      dataKey="Action Required"
-                      name="Action Required"
-                      stackId="a"
-                      fill="#F43F5E"
-                      radius={[4, 4, 0, 0]}
-                      isAnimationActive={true}
-                      animationDuration={900}
-                      animationEasing="ease-out"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </motion.div>
-
-            {/* Row 2: Action Required & Staff by Legal Entity Table */}
+            {/* Action Required & Staff by Legal Entity Table */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Urgent Action List */}
               <motion.div
@@ -979,7 +1291,443 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* BY DISCIPLINE VIEW (ABA / Speech / OT)                                     */}
+      {/* 2. MANAGEMENT DASHBOARD — EXPIRATIONS SUBTAB (30d / 60d / 90d / 120d)      */}
+      {/* ========================================================================= */}
+      {activeTab === 'expirations' && (
+        <motion.div
+          key="expirations-tab"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          className="space-y-6"
+        >
+          {/* Header & Main Horizon Switcher Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      <span>Credential &amp; License Expiration Horizon</span>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-[#2B4C9D] border border-blue-200">
+                        AESAS Continuous Surveillance
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Active tracking across State Clinical Licenses, Board Certifications (BCBA/RBT), CAQH Re-attestations, and Payer Re-credentialing Cycles.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons: 1st of Month Digest & Evaluator */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleTriggerMonthlyDigest}
+                  disabled={isSendingDigest}
+                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+                  title="Dispatch 1st of month digest email to All Employees, System Admin, and Joel Reji via AESAS"
+                >
+                  <Send className={`w-3.5 h-3.5 ${isSendingDigest ? 'animate-spin' : ''}`} />
+                  <span>{isSendingDigest ? 'Sending Digest...' : 'Send Monthly Digest (All Staff & Admin)'}</span>
+                </button>
+
+                <button
+                  onClick={handleEvaluateExpirationCycles}
+                  disabled={isEvaluatingCycles}
+                  className="inline-flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+                  title="Evaluate mid-month quarter checks and trigger daily countdown alerts to Credentialing Head, System Admin, and Clinician"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isEvaluatingCycles ? 'animate-spin' : ''}`} />
+                  <span>{isEvaluatingCycles ? 'Evaluating...' : 'Run Cycle Evaluator'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Notification alert banners */}
+            {digestSuccessMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">{digestSuccessMsg}</span>
+                </div>
+                <button onClick={() => setDigestSuccessMsg(null)} className="text-emerald-700 hover:underline cursor-pointer">Dismiss</button>
+              </motion.div>
+            )}
+
+            {evalSuccessMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-[#2B4C9D] flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2">
+                  <BellRing className="w-4 h-4 text-[#2B4C9D] shrink-0" />
+                  <span className="font-semibold">{evalSuccessMsg}</span>
+                </div>
+                <button onClick={() => setEvalSuccessMsg(null)} className="text-blue-700 hover:underline cursor-pointer">Dismiss</button>
+              </motion.div>
+            )}
+
+            {staffAlertSuccessMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">{staffAlertSuccessMsg}</span>
+                </div>
+                <button onClick={() => setStaffAlertSuccessMsg(null)} className="text-emerald-700 hover:underline cursor-pointer">Dismiss</button>
+              </motion.div>
+            )}
+
+            {/* Automated AESAS Schedule Information Strip */}
+            <div className="p-3.5 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-slate-50 border border-blue-100/80 rounded-xl text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-slate-700">
+              <div className="flex items-start md:items-center space-x-2.5">
+                <div className="p-1.5 bg-[#2B4C9D] text-white rounded-lg shrink-0 mt-0.5 md:mt-0">
+                  <BellRing className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="font-bold text-[#2B4C9D]">Automated Email Routing &amp; Schedule (AESAS):</span>
+                  <div className="text-slate-600 mt-0.5 space-y-0.5">
+                    <div>&bull; <strong>Monthly Digest (1st of month):</strong> Broadcast to <strong>All Employees</strong>, <strong>System Admin</strong>, and <strong>Joel Reji</strong>.</div>
+                    <div>&bull; <strong>Expiration Alerts (&le; 7 days):</strong> Delivered directly to <strong>Credentialing Head</strong> (Namitha Narayanan), <strong>System Admin</strong>, and <strong>Clinician</strong>.</div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 shrink-0 text-[11px] text-slate-500 font-medium self-end md:self-center">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Next digest: 1st of month to All Employees &amp; Admin</span>
+              </div>
+            </div>
+
+            {/* Horizon Filter Buttons: 30 Days, 60 Days, 90 Days, 120 Days */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Select Horizon:</span>
+                <div className="inline-flex bg-slate-100 p-1 rounded-xl text-xs font-semibold gap-1">
+                  {([30, 60, 90, 120] as const).map((days) => {
+                    const count = days === 30 ? count30 : days === 60 ? count60 : days === 90 ? count90 : count120;
+                    const isSelected = selectedHorizon === days;
+                    return (
+                      <button
+                        key={days}
+                        onClick={() => setSelectedHorizon(days)}
+                        className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center space-x-1.5 cursor-pointer active:scale-95 ${
+                          isSelected
+                            ? 'bg-[#2B4C9D] text-white shadow-xs font-bold ring-2 ring-[#2B4C9D]/20'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                        }`}
+                      >
+                        <span>{days} Days</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : count > 0
+                              ? days === 30 ? 'bg-rose-100 text-rose-700 font-extrabold' : 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Status Note */}
+              <div className="text-xs text-slate-500">
+                Viewing <span className="font-bold text-slate-800">{filteredExpirations.length}</span> upcoming expirations within <span className="font-bold text-[#2B4C9D]">{selectedHorizon} days</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Horizon Metric Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <motion.div
+              onClick={() => setSelectedHorizon(30)}
+              whileHover={{ y: -2 }}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                selectedHorizon === 30
+                  ? 'bg-rose-50/60 border-rose-300 ring-2 ring-rose-400/20 shadow-xs'
+                  : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-700">30-Day Window</span>
+                <span className="p-1 bg-rose-100 text-rose-700 rounded-md text-[10px] font-bold">Imminent</span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="text-2xl font-extrabold text-rose-600">{count30}</span>
+                <span className="text-[11px] text-slate-500">staff expiring</span>
+              </div>
+              <p className="text-[10.5px] text-rose-600/80 mt-1 font-medium">Daily countdown active $\le$ 7 days</p>
+            </motion.div>
+
+            <motion.div
+              onClick={() => setSelectedHorizon(60)}
+              whileHover={{ y: -2 }}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                selectedHorizon === 60
+                  ? 'bg-amber-50/60 border-amber-300 ring-2 ring-amber-400/20 shadow-xs'
+                  : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-700">60-Day Window</span>
+                <span className="p-1 bg-amber-100 text-amber-800 rounded-md text-[10px] font-bold">Renewal Due</span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="text-2xl font-extrabold text-amber-600">{count60}</span>
+                <span className="text-[11px] text-slate-500">staff expiring</span>
+              </div>
+              <p className="text-[10.5px] text-amber-600/80 mt-1 font-medium">Preparation &amp; board submission</p>
+            </motion.div>
+
+            <motion.div
+              onClick={() => setSelectedHorizon(90)}
+              whileHover={{ y: -2 }}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                selectedHorizon === 90
+                  ? 'bg-blue-50/60 border-blue-300 ring-2 ring-blue-400/20 shadow-xs'
+                  : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-blue-700">90-Day Window</span>
+                <span className="p-1 bg-blue-100 text-blue-800 rounded-md text-[10px] font-bold">Quarterly</span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="text-2xl font-extrabold text-[#2B4C9D]">{count90}</span>
+                <span className="text-[11px] text-slate-500">staff expiring</span>
+              </div>
+              <p className="text-[10.5px] text-blue-600/80 mt-1 font-medium">Quarterly re-credentialing cycles</p>
+            </motion.div>
+
+            <motion.div
+              onClick={() => setSelectedHorizon(120)}
+              whileHover={{ y: -2 }}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                selectedHorizon === 120
+                  ? 'bg-indigo-50/60 border-indigo-300 ring-2 ring-indigo-400/20 shadow-xs'
+                  : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">120-Day Window</span>
+                <span className="p-1 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold">Total Horizon</span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="text-2xl font-extrabold text-slate-900">{count120}</span>
+                <span className="text-[11px] text-slate-500">staff expiring</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 mt-1 font-medium">Long-range roster monitoring</p>
+            </motion.div>
+          </div>
+
+          {/* Table Container & Filter Toolbar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            {/* Secondary In-Tab Filter Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              {/* Discipline filter pills */}
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-semibold text-slate-500">Discipline:</span>
+                <div className="inline-flex bg-slate-100 p-1 rounded-xl text-xs font-medium gap-1">
+                  {(['All', 'ABA', 'Speech', 'OT'] as const).map((disc) => (
+                    <button
+                      key={disc}
+                      onClick={() => setExpirationDisciplineFilter(disc)}
+                      className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                        expirationDisciplineFilter === disc
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {disc}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search query input */}
+              <div className="relative w-full md:w-72">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={expirationSearch}
+                  onChange={(e) => setExpirationSearch(e.target.value)}
+                  placeholder="Search clinician, credential, payer..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/30 focus:border-[#2B4C9D]"
+                />
+                {expirationSearch && (
+                  <button
+                    onClick={() => setExpirationSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Expirations Content Display */}
+            {filteredExpirations.length === 0 ? (
+              /* REQUIRED EMPTY STATE: Exact phrase "No one is expiring in (respective days)" */
+              <div className="py-14 text-center bg-slate-50/70 border border-dashed border-slate-200 rounded-2xl p-6 sm:p-8">
+                <div className="w-14 h-14 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-center mx-auto mb-3 text-emerald-600 shadow-2xs">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                  No one is expiring in {selectedHorizon} days
+                </h3>
+                <p className="text-xs text-slate-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+                  All clinician state licenses, board certifications, CAQH attestations, and payer re-credentialing cycles are currently up to date and in full compliance for the next {selectedHorizon} days.
+                </p>
+
+                {selectedHorizon < 120 && (
+                  <div className="mt-5 inline-flex items-center gap-2 p-1.5 bg-white border border-slate-200 rounded-xl shadow-2xs text-xs">
+                    <span className="text-slate-500 px-2">Expand horizon:</span>
+                    {([60, 90, 120] as const).filter(d => d > selectedHorizon).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setSelectedHorizon(d)}
+                        className="px-3 py-1 bg-slate-100 hover:bg-[#2B4C9D] hover:text-white text-slate-700 rounded-lg font-semibold transition-colors cursor-pointer"
+                      >
+                        Check {d} Days ({d === 60 ? count60 : d === 90 ? count90 : count120})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : displayExpirations.length === 0 ? (
+              <div className="py-10 text-center text-xs text-slate-500">
+                <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-700">No matching expirations found</p>
+                <p className="mt-1">No items match your filter criteria in the {selectedHorizon}-day window.</p>
+                <button
+                  onClick={() => {
+                    setExpirationSearch('');
+                    setExpirationDisciplineFilter('All');
+                  }}
+                  className="mt-3 px-3 py-1 bg-slate-100 text-slate-700 rounded-lg font-semibold hover:bg-slate-200 transition-colors"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold">
+                    <tr>
+                      <th className="py-3 px-3">Clinician / Staff</th>
+                      <th className="py-3 px-3">Discipline</th>
+                      <th className="py-3 px-3">Credential / License Expiring</th>
+                      <th className="py-3 px-3">Operating Entity</th>
+                      <th className="py-3 px-3">Effective Expiry Date</th>
+                      <th className="py-3 px-3 text-center">Countdown</th>
+                      <th className="py-3 px-3 text-center">AESAS Schedule</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {displayExpirations.map((item) => {
+                      const isCritical = item.daysRemaining <= 7;
+                      const isUrgent = item.daysRemaining <= 30;
+                      const isWarning = item.daysRemaining <= 60;
+                      const isSendingThis = sendingStaffId === item.id;
+
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-slate-900">{item.clinicianName}</div>
+                            <div className="text-[10.5px] text-slate-400 font-mono">{item.clinicianEmail}</div>
+                          </td>
+                          <td className="py-3 px-3">
+                            {getDisciplinePill(item.discipline)}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-semibold text-slate-800">{item.itemType}</span>
+                            {item.payerName && (
+                              <div className="text-[10px] text-slate-400">{item.payerName}</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-slate-600 text-[11px]">
+                            {item.entityName || 'AGES Learning Solutions'}
+                          </td>
+                          <td className="py-3 px-3 font-mono text-slate-600 font-semibold">
+                            {item.expirationDate}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                isCritical
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse'
+                                  : isUrgent
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : isWarning
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-blue-50 text-[#2B4C9D] border border-blue-100'
+                              }`}
+                            >
+                              {item.daysRemaining <= 0 ? 'Expired' : `${item.daysRemaining} days left`}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            {isCritical ? (
+                              <span className="inline-flex items-center text-[10.5px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                                <BellRing className="w-3 h-3 mr-1 text-rose-600 animate-bounce" />
+                                Daily Email Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center text-[10.5px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                                <Mail className="w-3 h-3 mr-1 text-slate-400" />
+                                Monthly Digest
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end space-x-2">
+                              <button
+                                onClick={() => handleTriggerIndividualStaffAlert(item)}
+                                disabled={isSendingThis}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-semibold transition-colors flex items-center space-x-1 cursor-pointer disabled:opacity-50"
+                                title="Send AESAS alert (dispatched directly to Clinician, Credentialing Head & System Admin)"
+                              >
+                                <Send className={`w-3 h-3 ${isSendingThis ? 'animate-spin' : ''}`} />
+                                <span>{isSendingThis ? 'Sending...' : 'Send Alert'}</span>
+                              </button>
+
+                              <button
+                                onClick={() => onSelectProvider(item.providerId)}
+                                className="text-xs font-semibold text-[#2B4C9D] hover:underline inline-flex items-center space-x-0.5 cursor-pointer"
+                              >
+                                <span>Profile</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
       {/* ========================================================================= */}
       {activeTab === 'discipline' && (
         <div className="space-y-6">

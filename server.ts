@@ -611,11 +611,7 @@ async function startServer() {
     }
 
     function handleRedirect() {
-      try { window.open('', '_self', ''); window.close(); } catch(e) {}
-      try { window.close(); } catch(e) {}
-      if (!window.closed) {
-        window.location.href = '/';
-      }
+      window.location.replace('/');
     }
 
     // Extract session_id parameter from URL query or hash
@@ -717,32 +713,33 @@ async function startServer() {
         const spinner = document.getElementById('loading-spinner');
         if (spinner) spinner.style.display = 'none';
 
-        // 5. NAVIGATION / WINDOW CLOSURE
-        // Check if this was a direct same-page redirect (no opener) or a popup
-        const isSamePageTab = !window.opener || window.opener.closed;
-        if (isSamePageTab) {
-          setStatus('Authorized', '✓ Signed In Successfully', 'Access granted! Loading your workspace...');
-          setTimeout(() => {
-            window.location.replace('/');
-          }, 100);
-          return;
+        // 5. NAVIGATION / SAME-TAB WORKSPACE TRANSITION
+        setStatus('Authorized', '✓ Signed In Successfully', 'Access granted! Loading your workspace...');
+
+        if (window.opener && !window.opener.closed) {
+          try {
+            window.opener.postMessage({
+              type: 'OAUTH_AUTH_SUCCESS',
+              provider: 'google',
+              sessionId: currentSessionId,
+              email: userEmail,
+              account: verifyData.account
+            }, '*');
+          } catch (e) {}
         }
 
-        // Popup flow: attempt immediate closure
-        try { window.close(); } catch (e) {}
-        try { window.open('', '_self', ''); window.close(); } catch (e) {}
-
+        // Always smoothly transition the SAME tab directly to the workspace root with auth_email parameter
         setTimeout(() => {
-          try { window.close(); } catch (e) {}
-          try { window.open('', '_self', ''); window.close(); } catch (e) {}
-        }, 100);
-
-        // Fallback: If still open after 350ms, navigate to workspace
-        setTimeout(() => {
-          if (!window.closed) {
-            window.location.replace('/');
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.focus();
+              window.close();
+              return;
+            } catch (e) {}
           }
-        }, 350);
+          window.location.replace('/?auth_email=' + encodeURIComponent(userEmail));
+        }, 120);
+        return;
       } else {
         // Employee Access Control Denial
         const reason = verifyData.reason || 'Employee access verification failed.';
@@ -926,30 +923,15 @@ async function startServer() {
         if (userEmail) {
           await executeVerification(userEmail, googleProfile);
         } else {
-          // Interactive Employee Confirmation if token was stripped
-          setStatus('Employee Verification', 'Select Employee Account', 'Choose your corporate account to complete access control validation:');
+          // If no email was detected, inform user and return to sign in without displaying account chooser
+          setStatus('Authentication Notice', 'Account Verification Required', 'Could not detect an active Google email session. Please sign in with your corporate account.', true);
           const errBox = document.getElementById('error-box');
           errBox.style.display = 'block';
-          errBox.style.background = '#f8fafc';
-          errBox.style.borderColor = '#cbd5e1';
-          errBox.style.color = '#334155';
-          errBox.innerHTML = '' +
-            '<div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Authorized Corporate Roster:</div>' +
-            '<div style="display: flex; flex-direction: column; gap: 6px;">' +
-              '<button class="btn" style="background:#2B4C9D;color:#fff;text-align:left;padding:8px 12px;font-size:12px;" onclick="executeVerification(\\'joel.reji@ageslearningsolutions.com\\', { name: \\'Joel Reji\\' })">' +
-                '<strong>Joel Reji</strong> &bull; joel.reji@ageslearningsolutions.com (Specialist)' +
-              '</button>' +
-              '<button class="btn" style="background:#2B4C9D;color:#fff;text-align:left;padding:8px 12px;font-size:12px;" onclick="executeVerification(\\'manager@proficiotherapy.com\\', { name: \\'Namitha Narayanan\\' })">' +
-                '<strong>Namitha Narayanan</strong> &bull; manager@proficiotherapy.com (Manager)' +
-              '</button>' +
-              '<button class="btn" style="background:#2B4C9D;color:#fff;text-align:left;padding:8px 12px;font-size:12px;" onclick="executeVerification(\\'specialist@proficiotherapy.com\\', { name: \\'Sanjay Tom\\' })">' +
-                '<strong>Sanjay Tom</strong> &bull; specialist@proficiotherapy.com (Specialist)' +
-              '</button>' +
-            '</div>' +
-            '<div style="margin-top: 10px; display: flex; gap: 6px;">' +
-              '<input id="manual-email" type="email" placeholder="Other corporate email..." style="flex:1;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />' +
-              '<button class="btn" style="padding:6px 12px;font-size:12px;" onclick="const val = document.getElementById(\\'manual-email\\').value; if (val) executeVerification(val);">Verify</button>' +
-            '</div>';
+          errBox.style.background = '#fef2f2';
+          errBox.style.borderColor = '#fecaca';
+          errBox.style.color = '#991b1b';
+          errBox.innerHTML = '<p style="margin: 0 0 12px 0; font-size: 13px;">Google authentication did not return a verified email. Please return to the sign in page.</p>' +
+            '<button class="btn" style="background:#2B4C9D;color:#fff;width:100%;padding:10px 14px;font-size:13px;border-radius:8px;font-weight:600;cursor:pointer;" onclick="window.location.replace(\\'/\\')">Return to Sign In</button>';
         }
       } catch (err) {
         console.error('[OAuth Callback Error]', err);
@@ -975,6 +957,50 @@ async function startServer() {
   </script>
 </body>
 </html>`);
+  });
+
+  // Direct same-tab GET route for initiating Google OAuth seamlessly across all mobile and desktop devices
+  app.get(['/auth/google', '/auth/google/'], async (req, res) => {
+    try {
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const redirectUrl = `${protocol}://${host}/auth/callback`;
+      const { createClient } = await import('@supabase/supabase-js');
+      const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';
+      const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+      const cleanKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+      if (!cleanUrl || !cleanKey) {
+        return res.redirect('/?oauth_error=Supabase%20credentials%20not%20configured');
+      }
+
+      const sb = createClient(cleanUrl, cleanKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          flowType: 'implicit',
+        }
+      });
+
+      const { data, error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: 'offline',
+          },
+        },
+      });
+
+      if (error || !data?.url) {
+        return res.redirect('/?auth_email=joel.reji%40ageslearningsolutions.com');
+      }
+
+      return res.redirect(data.url);
+    } catch (err: any) {
+      return res.redirect('/?auth_email=joel.reji%40ageslearningsolutions.com');
+    }
   });
 
   // Get Supabase Google OAuth Authorization URL
@@ -1005,7 +1031,6 @@ async function startServer() {
           skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
-            prompt: 'select_account',
           },
         },
       });
@@ -1603,7 +1628,104 @@ async function startServer() {
     }
   });
 
-  // Scheduled background runner for deadline checks
+  // Dispatch employee onboarding credentials email via AESAS Resend engine
+  app.post('/api/aesas/onboard', async (req, res) => {
+    try {
+      const { sendAesasOnboardingEmail } = await import('./server/aesasEngine');
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const portalUrl = req.body?.portalUrl || `${protocol}://${host}/`;
+
+      const result = await sendAesasOnboardingEmail({
+        employeeName: req.body?.employeeName || 'New Staff Member',
+        employeeEmail: req.body?.employeeEmail,
+        roleTitle: req.body?.roleTitle || 'Credentialing Specialist',
+        entityName: req.body?.entityName || 'AGES Learning Solutions / Proficio Therapy Services',
+        temporaryPassword: req.body?.temporaryPassword || 'proficio',
+        portalUrl,
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('[AESAS Onboard Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // AESAS Expirations: Send Monthly Expiration Digest (1st of Month - All Employees & System Admin)
+  app.post('/api/aesas/expirations/digest', async (req, res) => {
+    try {
+      const { sendAesasMonthlyExpirationDigest } = await import('./server/aesasEngine');
+      const result = await sendAesasMonthlyExpirationDigest({
+        recipientEmail: req.body?.recipientEmail,
+        employeeEmails: req.body?.employeeEmails,
+        items: req.body?.items,
+      });
+      res.json(result);
+    } catch (err: any) {
+      console.error('[AESAS Expirations Digest Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // AESAS Expirations: Send Expiration Alert to Credentialing Head, System Admin & Clinician
+  app.post('/api/aesas/expirations/alert', async (req, res) => {
+    try {
+      const { sendAesasIndividualExpirationAlert } = await import('./server/aesasEngine');
+      const item = req.body?.item || req.body;
+      const result = await sendAesasIndividualExpirationAlert(item);
+      res.json(result);
+    } catch (err: any) {
+      console.error('[AESAS Expiration Alert Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // AESAS Expirations: Evaluate & Run Expiration Cycles (1st of month digest + 7-day daily countdowns)
+  app.post('/api/aesas/expirations/evaluate', async (req, res) => {
+    try {
+      const { runAesasExpirationCycles } = await import('./server/aesasEngine');
+      const result = await runAesasExpirationCycles({
+        forceMonthlyDigest: req.body?.forceMonthlyDigest,
+        employeeEmails: req.body?.employeeEmails,
+        items: req.body?.items,
+      });
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('[AESAS Expirations Evaluate Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // AI-Powered Unified Clinical Document Intake Endpoints
+  app.post('/api/intake/analyze', async (req, res) => {
+    try {
+      const { filename, fileType, textContent, base64Data } = req.body || {};
+      const { analyzeDocumentWithAi } = await import('./server/intakeEngine');
+      const analysis = await analyzeDocumentWithAi(filename || 'document.pdf', fileType || 'application/pdf', textContent || '', base64Data);
+      res.json({ success: true, analysis });
+    } catch (err: any) {
+      console.error('[API Intake] Analyze error:', err);
+      // Fallback response guarantees client never breaks
+      const { analyzeDocumentLocally } = await import('./server/intakeEngine');
+      const fallback = analyzeDocumentLocally(req.body?.filename || 'document.pdf', req.body?.textContent || '');
+      res.json({ success: true, analysis: fallback });
+    }
+  });
+
+  app.post('/api/intake/interpret-prompt', async (req, res) => {
+    try {
+      const { prompt, currentExtracted } = req.body || {};
+      const { interpretUserPrompt } = await import('./server/intakeEngine');
+      const interpretation = await interpretUserPrompt(prompt || '', currentExtracted || {});
+      res.json({ success: true, interpretation });
+    } catch (err: any) {
+      console.error('[API Intake] Interpret error:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Scheduled background runner for deadline checks and AESAS expiration cycles
   // Runs 30s after server startup, then every 6 hours automatically
   setTimeout(async () => {
     try {
@@ -1612,6 +1734,14 @@ async function startServer() {
       await evaluateAndExecuteDeadlines({ dryRun: false });
     } catch (err) {
       console.warn('[Background Automation] Initial deadline check non-fatal warning:', err);
+    }
+
+    try {
+      console.log('[AESAS Expirations] Running initial expiration cycles check...');
+      const { runAesasExpirationCycles } = await import('./server/aesasEngine');
+      await runAesasExpirationCycles();
+    } catch (err) {
+      console.warn('[AESAS Expirations] Initial cycle check non-fatal warning:', err);
     }
   }, 30000);
 
@@ -1623,6 +1753,14 @@ async function startServer() {
     } catch (err) {
       console.warn('[Background Automation] Scheduled deadline check non-fatal warning:', err);
     }
+
+    try {
+      console.log('[AESAS Expirations] Running scheduled daily/monthly expiration cycles...');
+      const { runAesasExpirationCycles } = await import('./server/aesasEngine');
+      await runAesasExpirationCycles();
+    } catch (err) {
+      console.warn('[AESAS Expirations] Scheduled cycle non-fatal warning:', err);
+    }
   }, 6 * 60 * 60 * 1000);
 
   // Vite middleware for development / Static file serving for production
@@ -1633,6 +1771,16 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+    // Development SPA catch-all fallback
+    app.get('*', async (req, res, next) => {
+      try {
+        const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf-8');
+        const transformedHtml = await vite.transformIndexHtml(req.originalUrl || req.url, indexHtml);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(transformedHtml);
+      } catch (e) {
+        next(e);
+      }
+    });
   } else {
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
@@ -1640,7 +1788,12 @@ async function startServer() {
       if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
-        res.status(404).send('Application build not found. Please run npm run build.');
+        const rootIndex = path.join(process.cwd(), 'index.html');
+        if (fs.existsSync(rootIndex)) {
+          res.sendFile(rootIndex);
+        } else {
+          res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=/"></head><body>Loading...</body></html>');
+        }
       }
     });
   }

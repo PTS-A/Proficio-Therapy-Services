@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { CredentialingProvider, useCredentialing } from './context/CredentialingContext';
 import { Header, ActiveTabType } from './components/layout/Header';
 import { ManagementDashboard } from './components/dashboard/ManagementDashboard';
@@ -8,7 +9,6 @@ import { ProviderMaster } from './components/providers/ProviderMaster';
 import { PayerMaster } from './components/payers/PayerMaster';
 import { EntityLocationMaster } from './components/entities/EntityLocationMaster';
 import { LocationsMaster } from './components/locations/LocationsMaster';
-import { LinkingContractingTracker } from './components/linking/LinkingContractingTracker';
 import { ReportsView } from './components/reports/ReportsView';
 import { NotificationDrawer } from './components/notifications/NotificationDrawer';
 import { NewApplicationModal } from './components/modals/NewApplicationModal';
@@ -25,6 +25,7 @@ import { ClinicalStaffHub } from './components/clinical/ClinicalStaffHub';
 import { ClinicalStaffPortal } from './components/clinical/ClinicalStaffPortal';
 import { CommentsRosterView } from './components/clinical/CommentsRosterView';
 import { AesasAlertsView } from './components/automations/AesasAlertsView';
+import { SmartDocumentIntakeHub } from './components/intake/SmartDocumentIntakeHub';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -93,7 +94,7 @@ const MainContent: React.FC = () => {
   };
 
   const handleNavigateToLinking = () => {
-    setActiveTab('linking');
+    setActiveTab('tracker');
   };
 
   const handleOpenAddProvider = () => {
@@ -112,18 +113,26 @@ const MainContent: React.FC = () => {
         onOpenNotificationDrawer={() => setIsNotificationOpen(true)}
       />
 
-      {/* Main Subpage Container */}
-      <main className="flex-1 w-full pb-12">
-        {activeTab === 'dashboard' && (
-          <ManagementDashboard
-            onSelectRecord={handleSelectRecord}
-            onSelectProvider={handleSelectProvider}
-            onNavigateToTracker={handleNavigateToTracker}
-            onNavigateToLinking={handleNavigateToLinking}
-            onNavigateToLocations={() => setActiveTab('locations')}
-            onOpenAddProvider={handleOpenAddProvider}
-          />
-        )}
+      {/* Main Subpage Container with Fluid Page Transitions */}
+      <main className="flex-1 w-full pb-12 overflow-x-hidden">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full"
+          >
+            {activeTab === 'dashboard' && (
+              <ManagementDashboard
+                onSelectRecord={handleSelectRecord}
+                onSelectProvider={handleSelectProvider}
+                onNavigateToTracker={handleNavigateToTracker}
+                onNavigateToLocations={() => setActiveTab('locations')}
+                onOpenAddProvider={handleOpenAddProvider}
+              />
+            )}
 
         {activeTab === 'tracker' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
@@ -139,6 +148,7 @@ const MainContent: React.FC = () => {
             <ClinicalStaffHub
               onSelectProviderId={(pId) => handleSelectProvider(pId)}
               onOpenNewApplication={() => setIsNewAppModalOpen(true)}
+              onNavigateToIntake={() => setActiveTab('document-intake')}
             />
           </div>
         )}
@@ -208,15 +218,16 @@ const MainContent: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'linking' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-            <LinkingContractingTracker onSelectRecord={handleSelectRecord} />
-          </div>
-        )}
-
         {activeTab === 'reports' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
             <ReportsView />
+          </div>
+        )}
+
+        {/* Dedicated Tab: AI-Powered Unified Clinical Document Intake Hub */}
+        {activeTab === 'document-intake' && (
+          <div className="pt-2">
+            <SmartDocumentIntakeHub />
           </div>
         )}
 
@@ -283,6 +294,8 @@ const MainContent: React.FC = () => {
             onBackToDashboard={() => setActiveTab('dashboard')}
           />
         )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Record Detail Workspace Modal */}

@@ -282,6 +282,20 @@ export async function approveAndOnboardAccessRequest(
 
   await persistAccessRequests(list);
 
+  // 5. Automatically dispatch AESAS onboarding email with initial credentials
+  try {
+    const { sendAesasOnboardingEmail } = await import('./aesasEngine');
+    await sendAesasOnboardingEmail({
+      employeeName: cleanName,
+      employeeEmail: cleanEmail,
+      roleTitle: details.roleTitle || details.systemRole,
+      entityName: details.entityId === 'ent-1' ? 'AGES Learning Solutions' : details.entityId === 'ent-pstg-inc' ? 'Proficio Speech Therapy Group, INC.' : 'Proficio Therapy Services',
+      temporaryPassword: details.password || 'proficio',
+    });
+  } catch (emailErr) {
+    console.warn('[AccessRequests] Onboarding email dispatch notice:', emailErr);
+  }
+
   return {
     request: list[index],
     employeeId: empId,

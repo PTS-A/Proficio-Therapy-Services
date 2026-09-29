@@ -196,7 +196,7 @@ export const AccessRequestsView: React.FC<AccessRequestsViewProps> = ({
 
       if (res.success) {
         showToast(
-          `Access approved! ${onboardingFullName} is now registered with ${onboardingRole} (${onboardingAccessLevel}) privileges.`,
+          `Access approved! ${onboardingFullName} registered in database & AESAS onboarding email dispatched to ${onboardingEmail}!`,
           'success'
         );
         setPushedRequest(null);

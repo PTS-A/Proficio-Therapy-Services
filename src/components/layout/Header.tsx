@@ -37,6 +37,7 @@ import {
   CheckCircle2,
   MessageSquare,
   BellRing,
+  Sparkles,
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -48,6 +49,7 @@ export type ActiveTabType =
   | 'locations' 
   | 'entities' 
   | 'reports' 
+  | 'document-intake'
   | 'users' 
   | 'new-user' 
   | 'import' 
@@ -112,12 +114,12 @@ export const Header: React.FC<HeaderProps> = ({
   // Primary operational tabs
   const coreNavItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
-    { id: 'linking' as const, label: 'Staff Linking', icon: Building2 },
     { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
   ];
 
   // Secondary operational tabs
   const secondaryNavItems = [
+    { id: 'document-intake' as const, label: 'Smart Intake', icon: Sparkles },
     { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
     { id: 'locations' as const, label: 'Locations', icon: MapPin },
     { id: 'comments-roster' as const, label: 'Comments Roster', icon: MessageSquare },
@@ -163,9 +165,9 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`h-9 flex items-center space-x-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+                    className={`h-9 flex items-center space-x-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer shrink-0 ${
                       isActive
-                        ? 'bg-blue-50 text-[#2B4C9D] border border-blue-200/80 shadow-2xs'
+                        ? 'bg-blue-50 text-[#2B4C9D] border border-blue-200/80 shadow-2xs font-bold'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
                     }`}
                   >
@@ -184,9 +186,9 @@ export const Header: React.FC<HeaderProps> = ({
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`h-9 flex items-center space-x-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+                      className={`h-9 flex items-center space-x-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer shrink-0 ${
                         isActive
-                          ? 'bg-blue-50 text-[#2B4C9D] border border-blue-200/80 shadow-2xs'
+                          ? 'bg-blue-50 text-[#2B4C9D] border border-blue-200/80 shadow-2xs font-bold'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
                       }`}
                     >

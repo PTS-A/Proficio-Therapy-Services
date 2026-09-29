@@ -16,7 +16,7 @@ VALUES ('ent-2', 'Proficio Speech Therapy Group INC', 'Proficio Speech Therapy',
 ON CONFLICT (id) DO UPDATE SET legal_name = EXCLUDED.legal_name, updated_at = NOW();
 
 INSERT INTO public.entities (id, legal_name, dba, ein, npi_type_2, taxonomy, ownership_details, primary_contact, email, phone, address, active)
-VALUES ('ent-3', 'Child''s Play Therapy Services PC', 'Child''s Play Therapy', '94-3321876', NULL, NULL, 'Clinical Services Partnership', 'Sarah Jenkins', 'info@childsplaytherapyservices.com', '(925) 555-0188', '8440 Brentwood Blvd, Suite C, Brentwood, CA 94513', true)
+VALUES ('ent-3', 'Child''s Play Therapy Services PC', 'Child''s Play Therapy', '94-3321876', NULL, NULL, 'Clinical Services Partnership', 'Clinical Director', 'info@childsplaytherapyservices.com', '(925) 555-0188', '8440 Brentwood Blvd, Suite C, Brentwood, CA 94513', true)
 ON CONFLICT (id) DO UPDATE SET legal_name = EXCLUDED.legal_name, updated_at = NOW();
 
 -- Locations (7)
@@ -155,7 +155,7 @@ VALUES ('acc-user-billing', 'billing@proficiotherapy.com', 'David Patel', 'David
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
 
 INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)
-VALUES ('acc-user-clinical', 'clinical@proficiotherapy.com', 'Sarah Jenkins, MS, OTR/L', 'Sarah Jenkins, MS, OTR/L', 'USER', 'Clinical Team', 'Clinical Team', 'Clinical Quality & Peer Review Supervisor', 'Clinical Supervision & Quality', '["Clinical documentation and verification support","License, board certification, and reference support"]'::jsonb, 'Active', true, false)
+VALUES ('acc-user-clinical', 'clinical@proficiotherapy.com', 'Clinical Quality & Peer Review Supervisor', 'Clinical Quality & Peer Review Supervisor', 'USER', 'Clinical Team', 'Clinical Team', 'Clinical Quality & Peer Review Supervisor', 'Clinical Supervision & Quality', '["Clinical documentation and verification support","License, board certification, and reference support"]'::jsonb, 'Active', true, false)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, full_name = EXCLUDED.full_name, system_role = EXCLUDED.system_role, role = EXCLUDED.role, updated_at = NOW();
 
 INSERT INTO public.users (id, email, name, full_name, access_level, system_role, role, role_title, department, permissions, status, is_active, is_super_admin)

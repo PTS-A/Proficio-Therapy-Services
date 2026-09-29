@@ -5,6 +5,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { safeStorage } from '../utils/safeStorage';
 
 // Safe public client configuration loaded from environment
 const rawSupabaseUrl = 
@@ -131,7 +132,8 @@ export type AuditAction =
   | 'GLOBAL_LOCKDOWN_DISABLED'
   | 'MFA_SOFTWARE_WIDE_ENABLED'
   | 'MFA_SOFTWARE_WIDE_DISABLED'
-  | 'SECURITY_INCIDENT_LOGGED';
+  | 'SECURITY_INCIDENT_LOGGED'
+  | 'ONBOARDING_EMAIL_SENT';
 
 export interface AuditLogEntry {
   id?: string;
@@ -267,9 +269,9 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
 
   // 3. Local session buffer
   try {
-    const existing = JSON.parse(localStorage.getItem('pts_audit_logs') || '[]');
+    const existing = JSON.parse(safeStorage.getItem('pts_audit_logs') || '[]');
     existing.unshift(auditRecord);
-    localStorage.setItem('pts_audit_logs', JSON.stringify(existing.slice(0, 500)));
+    safeStorage.setItem('pts_audit_logs', JSON.stringify(existing.slice(0, 500)));
   } catch {}
 }
 
@@ -641,21 +643,19 @@ export async function saveDocument(collectionName: string, docId: string, data: 
   // 1. Optimistic Local Cache Update
   try {
     const cacheKey = LOCAL_STORAGE_PREFIX + collectionName;
-    const existing: any[] = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+    const existing: any[] = JSON.parse(safeStorage.getItem(cacheKey) || '[]');
     const index = existing.findIndex((item) => item.id === docId);
     if (index >= 0) {
       existing[index] = { ...existing[index], ...data, id: docId };
     } else {
       existing.push({ ...data, id: docId });
     }
-    localStorage.setItem(cacheKey, JSON.stringify(existing));
+    safeStorage.setItem(cacheKey, JSON.stringify(existing));
     localChannel?.postMessage({ type: 'UPDATE', collection: collectionName, id: docId, data });
 
     // Immediately notify all in-app subscribers
     notifySubscribers(collectionName, existing);
-  } catch (err) {
-    console.warn('[Supabase LocalCache] Write notice:', err);
-  }
+  } catch {}
 
   // 2. Persist to Supabase if connected
   if (supabase) {
@@ -670,7 +670,7 @@ export async function saveDocument(collectionName: string, docId: string, data: 
             if (!provExists) {
               let cachedProvider: any = null;
               try {
-                const list: any[] = JSON.parse(localStorage.getItem('cred_providers') || '[]');
+                const list: any[] = JSON.parse(safeStorage.getItem('cred_providers') || '[]');
                 cachedProvider = list.find((p) => p.id === payload.provider_id);
               } catch {}
               await supabase.from('providers').upsert({
@@ -758,9 +758,9 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
   // 1. Local Cache Removal
   try {
     const cacheKey = LOCAL_STORAGE_PREFIX + collectionName;
-    const existing: any[] = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+    const existing: any[] = JSON.parse(safeStorage.getItem(cacheKey) || '[]');
     const filtered = existing.filter((item) => item.id !== docId);
-    localStorage.setItem(cacheKey, JSON.stringify(filtered));
+    safeStorage.setItem(cacheKey, JSON.stringify(filtered));
     localChannel?.postMessage({ type: 'DELETE', collection: collectionName, id: docId });
 
     // Immediately notify all in-app subscribers
@@ -812,14 +812,10 @@ export async function fetchCollection<T = any>(collectionName: string): Promise<
       if (error) throw error;
       if (data !== null && Array.isArray(data)) {
         const transformed = data.map((row) => fromPostgresRow(collectionName, row));
-        // Update local cache with exact database records
+        // Update local cache safely with in-memory fallback
         try {
-          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-            localStorage.setItem(LOCAL_STORAGE_PREFIX + collectionName, JSON.stringify(transformed));
-          }
-        } catch (cacheErr) {
-          console.warn(`[Supabase] Local cache write warning for ${collectionName}:`, cacheErr);
-        }
+          safeStorage.setItem(LOCAL_STORAGE_PREFIX + collectionName, JSON.stringify(transformed));
+        } catch {}
         updateSyncStatus({
           isSyncing: false,
           lastSyncedAt: new Date().toISOString(),
@@ -839,7 +835,7 @@ export async function fetchCollection<T = any>(collectionName: string): Promise<
 
   // Fallback to local cache only if Supabase call failed or not configured
   try {
-    const cached = localStorage.getItem(LOCAL_STORAGE_PREFIX + collectionName);
+    const cached = safeStorage.getItem(LOCAL_STORAGE_PREFIX + collectionName);
     if (cached) {
       return JSON.parse(cached) as T[];
     }
@@ -858,11 +854,11 @@ export async function saveBatch<T extends { id: string }>(collectionName: string
   // 1. Local Cache Batch Update
   try {
     const cacheKey = LOCAL_STORAGE_PREFIX + collectionName;
-    const existing: any[] = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+    const existing: any[] = JSON.parse(safeStorage.getItem(cacheKey) || '[]');
     const map = new Map(existing.map((item) => [item.id, item]));
     items.forEach((item) => map.set(item.id, item));
     const merged = Array.from(map.values());
-    localStorage.setItem(cacheKey, JSON.stringify(merged));
+    safeStorage.setItem(cacheKey, JSON.stringify(merged));
     notifySubscribers(collectionName, merged);
   } catch {}
 
@@ -937,13 +933,13 @@ export function subscribeToCollection<T = any>(
       });
   }
 
-  // 2. Active background polling heartbeat (every 10 seconds) to ensure sync even if WebSockets are throttled
+  // 2. Active background polling heartbeat (every 30 seconds) to ensure sync even if WebSockets are throttled
   const heartbeatInterval = setInterval(async () => {
     try {
       const freshData = await fetchCollection<T>(collectionName);
       onUpdate(freshData);
     } catch {}
-  }, 10000);
+  }, 30000);
 
   // 3. Tab focus, visibility, and network reconnection synchronization
   const handleFocusOrOnline = async () => {

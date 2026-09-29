@@ -1357,18 +1357,6 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
 
             {currentStep === 4 && createdResult && (
               <div className="flex items-center gap-2">
-                {onNavigateToLinking && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onNavigateToLinking();
-                    }}
-                    className="px-4 py-2 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-semibold rounded-xl transition-colors"
-                  >
-                    Go to Linking Tracker
-                  </button>
-                )}
                 {onNavigateToProviders && (
                   <button
                     type="button"

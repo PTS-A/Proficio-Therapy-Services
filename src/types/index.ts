@@ -436,6 +436,9 @@ export interface Provider {
   currentStatus?: string;
   notes?: string;
   active: boolean;
+  ownerAccountEmail?: string;
+  isDemo?: boolean;
+  isolatedFor?: string;
   createdAt: string;
   updatedAt: string;
 }

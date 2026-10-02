@@ -564,18 +564,18 @@ export const ReportsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Section 2: 4 Legal Entities Breakdown (Proficio Speech, Proficio Therapy, AGES, Child's Play) */}
+            {/* Section 2: 3 Operating Legal Entities Breakdown (Proficio Speech, AGES, Child's Play) */}
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <h2 className="text-xs font-black uppercase text-slate-500 tracking-wider">
-                  2. Legal Entity Breakdown (Proficio Speech, Proficio Therapy, AGES, &amp; Child&apos;s Play)
+                  2. Legal Entity Breakdown (Proficio Speech Therapy Group, AGES Learning Solutions, &amp; Child&apos;s Play Therapy)
                 </h2>
                 <span className="text-[11px] text-slate-400 font-medium">
                   Individually filtered reports &amp; official rosters
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* 1. Proficio Speech Therapy Group, INC. */}
                 {(() => {
                   const ent = entities.find(e => e.id === 'ent-pstg-inc') || entities.find(e => e.legalName.includes('Speech')) || {
@@ -660,91 +660,7 @@ export const ReportsView: React.FC = () => {
                   );
                 })()}
 
-                {/* 2. Proficio Therapy Services, LLC */}
-                {(() => {
-                  const ent = entities.find(e => e.id === 'ent-pts-llc') || entities.find(e => e.legalName.includes('Proficio Therapy')) || {
-                    id: 'ent-pts-llc',
-                    legalName: 'Proficio Therapy Services, LLC',
-                    dba: 'Proficio Therapy Services',
-                    ein: '991419393',
-                    npiType2: '1972321321',
-                    address: '1261 Travis Blvd, Suite 200, Fairfield, CA',
-                    active: true
-                  };
-                  const entRecords = records.filter(r => r.entityId === ent.id || r.discipline === 'ABA' || r.discipline === 'OT');
-                  const entStaff = providers.filter(p => p.primaryEntityId === ent.id || p.disciplines.includes('ABA') || p.disciplines.includes('OT'));
-                  const entApproved = entRecords.filter(r => ['Approved', 'Linked', 'Effective'].includes(r.stage)).length;
-
-                  return (
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3 flex flex-col justify-between hover:border-emerald-300 transition-colors">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
-                              <Building2 className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                                {ent.legalName}
-                              </h3>
-                              <p className="text-[11px] text-slate-400 font-medium">{ent.dba || 'Therapy Group'}</p>
-                            </div>
-                          </div>
-                          <span className="text-[11px] font-mono bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold shrink-0">
-                            NPI: {ent.npiType2 || '1972321321'}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                          <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                            <div className="text-slate-400 text-[10px] uppercase font-bold">Tax ID</div>
-                            <div className="font-mono font-bold text-slate-800 mt-0.5">{ent.ein || '991419393'}</div>
-                          </div>
-                          <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                            <div className="text-slate-400 text-[10px] uppercase font-bold">Clinical Staff</div>
-                            <div className="font-bold text-emerald-700 mt-0.5">{entStaff.length} Active</div>
-                          </div>
-                          <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                            <div className="text-slate-400 text-[10px] uppercase font-bold">Enrollments</div>
-                            <div className="font-bold text-slate-800 mt-0.5">{entRecords.length} Files</div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                          <span className="text-[11px] text-emerald-700 font-semibold flex items-center space-x-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{entApproved} Approved In-Network</span>
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-mono">Fairfield, CA</span>
-                        </div>
-                      </div>
-
-                      {/* Individual Download Actions */}
-                      <div className="pt-3 border-t border-slate-100 flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => downloadEntityRosterXls(ent, entRecords, providers, payers)}
-                          className="flex-1 py-1.5 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer transition-colors border border-emerald-200/60 shadow-2xs"
-                          title="Download official formatted spreadsheet with company logo"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Download Report (.xls)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadEntityRosterCsv(ent, entRecords, providers, payers)}
-                          className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 cursor-pointer transition-colors"
-                          title="Export raw data CSV"
-                        >
-                          <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
-                          <span>CSV</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* 3. AGES Learning Solutions LLC */}
+                {/* 2. AGES Learning Solutions LLC */}
                 {(() => {
                   const ent = entities.find(e => e.id === 'ent-1') || entities.find(e => e.dba?.toLowerCase().includes('ages') || e.legalName?.toLowerCase().includes('ages')) || {
                     id: 'ent-1',
@@ -1230,7 +1146,7 @@ export const ReportsView: React.FC = () => {
                   <span>Credentialing Quality &amp; W-9 Verification</span>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  100% of credentialing submissions for <strong>Proficio Speech Therapy Group, INC.</strong> (Tax ID 821221807) and <strong>Proficio Therapy Services, LLC</strong> (Tax ID 991419393) include verified W-9s, Certificate of Insurance (COI), and Type 2 NPI verification to prevent payer rejections.
+                  100% of credentialing submissions for <strong>Proficio Speech Therapy Group, INC.</strong> (Tax ID 821221807), <strong>AGES Learning Solutions LLC</strong>, and <strong>Child&apos;s Play Therapy Services PC</strong> include verified W-9s, Certificate of Insurance (COI), and Type 2 NPI verification to prevent payer rejections.
                 </p>
               </div>
 

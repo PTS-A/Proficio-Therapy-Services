@@ -85,6 +85,11 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>('ALL');
 
+  // Master Directory Filters (when viewing all entities)
+  const [masterSearchQuery, setMasterSearchQuery] = useState('');
+  const [masterEntityFilter, setMasterEntityFilter] = useState<string>('ALL');
+  const [masterDisciplineFilter, setMasterDisciplineFilter] = useState<string>('ALL');
+
   // Full Profile Card Modal state (for Manage Employees)
   const [selectedProfileEmployee, setSelectedProfileEmployee] = useState<Provider | null>(null);
 
@@ -161,12 +166,14 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
   // Active Entity Object
   const activeEntity = entities.find((e) => e.id === selectedEntityId);
 
-  // Helper to check provider entity affiliation
+  // Helper to check provider entity affiliation with ent-2/ent-pstg-inc normalization
   const isProviderInEntity = (p: Provider, entityId: string): boolean => {
+    const norm = (id?: string) => (id === 'ent-2' ? 'ent-pstg-inc' : id);
+    const target = norm(entityId);
     return (
-      p.primaryEntityId === entityId || 
-      p.entityIds?.includes(entityId) || 
-      (p as any).renderingEntityIds?.includes(entityId)
+      norm(p.primaryEntityId) === target || 
+      p.entityIds?.some((id) => norm(id) === target) || 
+      (p as any).renderingEntityIds?.some((id: string) => norm(id) === target)
     );
   };
 
@@ -674,11 +681,12 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
   };
 
   // =========================================================================
-  // VIEW 1: THREE ENTITIES SELECTION SCREEN (Initial State)
+  // VIEW: UNIFIED CLINICAL STAFF PORTAL (Overview + Master Directory OR Entity)
   // =========================================================================
-  if (!selectedEntityId) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {!selectedEntityId ? (
+        <div className="space-y-8">
         {/* Banner */}
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -826,19 +834,331 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
             })}
           </div>
         </div>
-      </div>
-    );
-  }
 
-  // =========================================================================
-  // VIEW 2: INSIDE AN ENTITY (Manage Employees OR Manage Insurances)
-  // =========================================================================
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* ========================================================================= */}
-      {/* VIEW 2A: ENTITY 2-PAGE PORTAL SELECTION (HUB)                            */}
-      {/* ========================================================================= */}
-      {entitySubView === 'hub' && (
+        {/* ========================================================================= */}
+        {/* MASTER CLINICAL STAFF DIRECTORY (ALL OPERATING ENTITIES)                  */}
+        {/* ========================================================================= */}
+        {(() => {
+          const masterList = (providers || []).filter((p) => {
+            const name = `${p.firstName || ''} ${p.lastName || ''} ${p.fullName || ''}`.toLowerCase();
+            const email = (p.email || '').toLowerCase();
+            if (['fake', 'placeholder', 'demo user', 'test provider', 'john doe', 'jane doe', 'new clinical', 'new.clinical', 'saha torres', 'sara torres'].some((f) => name.includes(f) || email.includes(f))) {
+              return false;
+            }
+            if (masterEntityFilter !== 'ALL') {
+              if (!isProviderInEntity(p, masterEntityFilter)) return false;
+            }
+            if (masterDisciplineFilter !== 'ALL') {
+              if (masterDisciplineFilter === 'BCBA') {
+                if (!isProviderBcba(p)) return false;
+              } else if (masterDisciplineFilter === 'RBT') {
+                if (!isProviderRbt(p)) return false;
+              } else {
+                const hasDisc = (p.disciplines && p.disciplines.includes(masterDisciplineFilter as any)) || (p as any).discipline === masterDisciplineFilter;
+                if (!hasDisc) return false;
+              }
+            }
+            if (masterSearchQuery.trim()) {
+              const q = masterSearchQuery.toLowerCase();
+              const matchName = `${p.firstName || ''} ${p.lastName || ''} ${p.fullName || ''}`.toLowerCase().includes(q);
+              const matchNpi = (p.npi || '').toLowerCase().includes(q);
+              const matchEmail = (p.email || '').toLowerCase().includes(q);
+              const matchCaqh = (p.caqhId || '').toLowerCase().includes(q);
+              const matchLic = (p.licenseNumber || '').toLowerCase().includes(q);
+              const matchType = (p.providerType || '').toLowerCase().includes(q);
+              if (!matchName && !matchNpi && !matchEmail && !matchCaqh && !matchLic && !matchType) return false;
+            }
+            return true;
+          });
+
+          return (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden space-y-4 p-6 sm:p-8">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 bg-blue-50 text-[#2B4C9D] rounded-xl">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                      Master Clinical Staff Directory
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-[#2B4C9D] border border-blue-200">
+                      {masterList.length} Active Clinicians
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Comprehensive enterprise roster of licensed practitioners, BCBAs, SLPs, and OTs across all organizations.
+                  </p>
+                </div>
+
+                {onOpenNewApplication && (
+                  <button
+                    type="button"
+                    onClick={onOpenNewApplication}
+                    className="px-4 py-2 bg-[#2B4C9D] hover:bg-[#1f3775] text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-xs cursor-pointer transition-all shrink-0 active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Add Clinical Staff</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Filter & Search Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3 flex-1">
+                  {/* Search */}
+                  <div className="relative min-w-[260px] flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={masterSearchQuery}
+                      onChange={(e) => setMasterSearchQuery(e.target.value)}
+                      placeholder="Search clinicians by name, NPI, CAQH ID, or license..."
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 text-slate-800"
+                    />
+                  </div>
+
+                  {/* Entity Filter */}
+                  <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
+                    <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <select
+                      value={masterEntityFilter}
+                      onChange={(e) => setMasterEntityFilter(e.target.value)}
+                      className="bg-transparent border-none text-slate-700 font-semibold focus:outline-none cursor-pointer text-xs"
+                    >
+                      <option value="ALL">All Operating Entities ({entities.length})</option>
+                      {entities.map((ent) => (
+                        <option key={ent.id} value={ent.id}>
+                          {ent.dba || ent.legalName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Discipline Filter */}
+                  <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                    {(['ALL', 'ABA', 'Speech', 'OT', 'BCBA', 'RBT'] as const).map((disc) => (
+                      <button
+                        key={disc}
+                        type="button"
+                        onClick={() => setMasterDisciplineFilter(disc)}
+                        className={`px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                          masterDisciplineFilter === disc
+                            ? 'bg-white text-slate-900 shadow-xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {disc}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(masterSearchQuery || masterEntityFilter !== 'ALL' || masterDisciplineFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMasterSearchQuery('');
+                      setMasterEntityFilter('ALL');
+                      setMasterDisciplineFilter('ALL');
+                    }}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer px-2 py-1"
+                  >
+                    Reset Filters
+                  </button>
+                )}
+              </div>
+
+              {/* Roster Table */}
+              <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-[11px] uppercase font-semibold">
+                      <th className="py-3 px-4">Clinician</th>
+                      <th className="py-3 px-3">Operating Entity</th>
+                      <th className="py-3 px-3">Discipline &amp; Role</th>
+                      <th className="py-3 px-3">NPI &amp; CAQH</th>
+                      <th className="py-3 px-3">State Licensure</th>
+                      <th className="py-3 px-3 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {masterList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                          No clinicians matched your search or filter criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      masterList.map((prov) => {
+                        const ent = entities.find(
+                          (e) =>
+                            e.id === prov.primaryEntityId ||
+                            prov.entityIds?.includes(e.id) ||
+                            (e.id === 'ent-pstg-inc' && prov.primaryEntityId === 'ent-2')
+                        );
+                        const isRbt = isProviderRbt(prov);
+                        const isBcba = isProviderBcba(prov);
+
+                        return (
+                          <tr key={prov.id} className="hover:bg-slate-50/70 transition-colors">
+                            {/* Clinician */}
+                            <td className="py-3 px-4">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-200 text-[#2B4C9D] font-bold flex items-center justify-center text-xs shrink-0">
+                                  {(prov.firstName || '').charAt(0)}{(prov.lastName || '').charAt(0)}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-slate-900 flex items-center space-x-1.5">
+                                    <span>{prov.firstName} {prov.lastName}</span>
+                                    {prov.credentials && (
+                                      <span className="text-[11px] font-medium text-slate-500">
+                                        ({prov.credentials})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 font-mono">
+                                    {prov.email || `${prov.firstName?.toLowerCase()}.${prov.lastName?.toLowerCase()}@proficiotherapy.com`}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Entity */}
+                            <td className="py-3 px-3">
+                              {ent ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedEntityId(ent.id);
+                                    setEntitySubView('hub');
+                                  }}
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-800 hover:bg-blue-50 hover:text-[#2B4C9D] transition-colors cursor-pointer border border-slate-200"
+                                  title={`Open ${ent.dba} portal`}
+                                >
+                                  <span className="truncate max-w-[130px]">{ent.dba || ent.legalName}</span>
+                                  <ChevronRight className="w-3 h-3 shrink-0" />
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+
+                            {/* Discipline & Role */}
+                            <td className="py-3 px-3">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap gap-1">
+                                  {(prov.disciplines || [(prov as any).discipline || 'ABA']).map((d) => (
+                                    <span
+                                      key={d}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                        d === 'ABA' ? 'bg-orange-50 text-[#E86424] border border-orange-200' :
+                                        d === 'Speech' ? 'bg-blue-50 text-[#2B4C9D] border border-blue-200' :
+                                        'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      }`}
+                                    >
+                                      {d}
+                                    </span>
+                                  ))}
+                                  {isRbt && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                      RBT
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-500 font-medium">
+                                  {prov.providerType || (isBcba ? 'BCBA' : isRbt ? 'RBT' : 'Clinician')}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* NPI & CAQH */}
+                            <td className="py-3 px-3">
+                              <div className="space-y-0.5">
+                                <div className="font-mono text-slate-800 font-semibold text-[11px]">
+                                  NPI: {prov.npi || '—'}
+                                </div>
+                                <div className="text-[11px] text-slate-500 font-mono">
+                                  CAQH: {prov.caqhId || '—'}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* State Licensure */}
+                            <td className="py-3 px-3">
+                              <div className="space-y-0.5">
+                                <div className="font-semibold text-slate-800 text-[11px] flex items-center space-x-1">
+                                  <span className="px-1 py-0.2 rounded bg-slate-100 text-[10px] font-bold text-slate-600">
+                                    {prov.licenseState || 'CA'}
+                                  </span>
+                                  <span className="font-mono">{prov.licenseNumber || '—'}</span>
+                                </div>
+                                {prov.licenseExpiration && (
+                                  <div className="text-[10px] text-slate-500">
+                                    Exp: {prov.licenseExpiration}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-3 px-3 text-center">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {prov.employmentStatus || 'Active'}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end space-x-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEmployeeProfile(prov)}
+                                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2B4C9D] rounded-lg text-xs font-bold transition-colors cursor-pointer border border-blue-200"
+                                >
+                                  360 Profile
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const targetEntId = prov.primaryEntityId || prov.entityIds?.[0] || 'ent-1';
+                                    setSelectedEntityId(targetEntId === 'ent-2' ? 'ent-pstg-inc' : targetEntId);
+                                    setSelectedInsuranceEmployeeId(prov.id);
+                                    setEntitySubView('manage_insurances');
+                                  }}
+                                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-200"
+                                >
+                                  Insurances
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteModalStaff(prov)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title={`Remove ${prov.firstName} ${prov.lastName}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    ) : (
+      <>
+        {/* ========================================================================= */}
+        {/* VIEW 2A: ENTITY 2-PAGE PORTAL SELECTION (HUB)                            */}
+        {/* ========================================================================= */}
+        {entitySubView === 'hub' && (
         <div className="space-y-6">
           {/* Top Banner with Entity Metadata & Back button */}
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-4">
@@ -1814,6 +2134,8 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
             </div>
           )}
         </div>
+      )}
+        </>
       )}
 
       {/* ========================================================================= */}

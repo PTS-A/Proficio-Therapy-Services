@@ -48,10 +48,27 @@ export const CommentsRosterView: React.FC = () => {
     return found?.dba || found?.legalName || 'AGES Group';
   };
 
+  // Helper to filter out any fake employee records
+  const isFakeEmployeeRecord = (item: any): boolean => {
+    if (!item) return true;
+    const name = `${item.firstName || ''} ${item.lastName || ''} ${item.name || ''} ${item.fullName || ''}`.toLowerCase().trim();
+    const email = (item.email || '').toLowerCase().trim();
+    const id = (item.id || '').toLowerCase().trim();
+    return [
+      'fake', 'placeholder', 'demo user', 'test provider', 'john doe', 'jane doe',
+      'new clinical', 'new.clinical', 'sarah jenkins', 'sarah.j', 'michael chang',
+      'amanda brooks', 'david rodriguez', 'saha torres', 'sara torres'
+    ].some((f) => name.includes(f) || email.includes(f)) || id.startsWith('fake-') || id === 'prv-1788608145700';
+  };
+
+  const authenticProviders = useMemo(() => {
+    return (providers || []).filter((p) => !isFakeEmployeeRecord(p));
+  }, [providers]);
+
   // Extract and flatten all comments across all providers
   const allComments: FlattenedComment[] = useMemo(() => {
     const list: FlattenedComment[] = [];
-    (providers || []).forEach((prov) => {
+    authenticProviders.forEach((prov) => {
       const pEntityId = prov.primaryEntityId || prov.entityIds?.[0] || 'ent-1';
       const pEntityName = getEntityName(pEntityId);
       const comments = prov.commentLogs || [];
@@ -75,18 +92,18 @@ export const CommentsRosterView: React.FC = () => {
       const timeB = new Date(b.timestamp).getTime();
       return isNaN(timeB) || isNaN(timeA) ? 0 : timeB - timeA;
     });
-  }, [providers, entities]);
+  }, [authenticProviders, entities]);
 
   // Providers filtered by selected entity for employee filter dropdown
   const entityFilteredProviders = useMemo(() => {
-    if (selectedEntityFilter === 'ALL') return providers;
-    return providers.filter(
+    if (selectedEntityFilter === 'ALL') return authenticProviders;
+    return authenticProviders.filter(
       (p) =>
         p.primaryEntityId === selectedEntityFilter ||
         p.entityIds?.includes(selectedEntityFilter) ||
         (p as any).renderingEntityIds?.includes(selectedEntityFilter)
     );
-  }, [providers, selectedEntityFilter]);
+  }, [authenticProviders, selectedEntityFilter]);
 
   // Filtered comments list
   const filteredComments = useMemo(() => {

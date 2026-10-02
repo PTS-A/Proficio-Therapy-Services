@@ -289,7 +289,7 @@ export async function approveAndOnboardAccessRequest(
       employeeName: cleanName,
       employeeEmail: cleanEmail,
       roleTitle: details.roleTitle || details.systemRole,
-      entityName: details.entityId === 'ent-1' ? 'AGES Learning Solutions' : details.entityId === 'ent-pstg-inc' ? 'Proficio Speech Therapy Group, INC.' : 'Proficio Therapy Services',
+      entityName: details.entityId === 'ent-1' ? 'AGES Learning Solutions' : details.entityId === 'ent-3' ? "Child's Play Therapy Services" : 'Proficio Speech Therapy Group, INC.',
       temporaryPassword: details.password || 'proficio',
     });
   } catch (emailErr) {

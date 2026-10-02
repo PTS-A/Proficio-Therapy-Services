@@ -22,7 +22,21 @@ export type ActiveTabType =
   | 'clinical-portal'
   | 'staff-approvals'
   | 'aesas'
-  | 'comments-roster';
+  | 'comments-roster'
+  | 'tickets'
+  | 'nemotron-edit'
+  | 'dbms-manager';
+
+/**
+ * Checks if the account is a Developer profile.
+ * Developer profile has full administrator accesses plus developer-exclusive tool suites.
+ */
+export const isDeveloper = (account: AppAccount | null | undefined): boolean => {
+  if (!account) return false;
+  if (account.systemRole === 'Developer') return true;
+  if (account.roleTitle?.toLowerCase().includes('dev') || account.email?.toLowerCase().includes('dev@')) return true;
+  return false;
+};
 
 /**
  * Checks if the account is a Super Admin.
@@ -30,6 +44,7 @@ export type ActiveTabType =
  */
 export const isSuperAdmin = (account: AppAccount | null | undefined): boolean => {
   if (!account) return false;
+  if (isDeveloper(account)) return true;
   if (account.isSuperAdmin === true) return true;
   if (account.systemRole === 'System Administrator') return true;
   if (
@@ -48,10 +63,19 @@ export const isSuperAdmin = (account: AppAccount | null | undefined): boolean =>
  */
 export const isAdminAccount = (account: AppAccount | null | undefined): boolean => {
   if (!account) return false;
+  if (isDeveloper(account)) return true;
   if (isSuperAdmin(account)) return true;
   if (account.accessLevel === 'ADMINISTRATOR') return true;
   if (account.systemRole === 'System Administrator') return true;
   return false;
+};
+
+export const canAccessDbmsManager = (account: AppAccount | null | undefined): boolean => {
+  return isAdminAccount(account) || isDeveloper(account);
+};
+
+export const canAccessNemotronEdit = (account: AppAccount | null | undefined): boolean => {
+  return isAdminAccount(account) || isDeveloper(account);
 };
 
 /**
@@ -101,8 +125,8 @@ export const canApproveApplications = (account: AppAccount | null | undefined): 
 export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTabType[] => {
   if (!account) return [];
 
-  // Super Admin / System Administrator has complete access
-  if (isSuperAdmin(account) || isAdminAccount(account)) {
+  // Super Admin / Developer / System Administrator has complete access
+  if (isSuperAdmin(account) || isAdminAccount(account) || isDeveloper(account)) {
     return [
       'dashboard',
       'tracker',
@@ -124,7 +148,10 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'clinical-portal',
       'staff-approvals',
       'aesas',
-      'comments-roster'
+      'comments-roster',
+      'tickets',
+      'nemotron-edit',
+      'dbms-manager'
     ];
   }
 
@@ -140,13 +167,13 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'payers',
         'entities',
         'reports',
-        'document-intake',
         'automations',
         'admin-dashboard',
         'staff-approvals',
         'clinical-portal',
         'aesas',
-        'comments-roster'
+        'comments-roster',
+        'tickets'
       ];
 
     case 'Credentialing Specialist':
@@ -156,11 +183,11 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'providers',
         'locations',
         'payers',
-        'document-intake',
         'staff-approvals',
         'clinical-portal',
         'aesas',
-        'comments-roster'
+        'comments-roster',
+        'tickets'
       ];
 
     case 'Billing and Claims':
@@ -169,9 +196,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'tracker',
         'payers',
         'reports',
-        'document-intake',
         'clinical-portal',
-        'comments-roster'
+        'comments-roster',
+        'tickets'
       ];
 
     case 'HR/Operations':
@@ -181,9 +208,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'locations',
         'entities',
         'tracker',
-        'document-intake',
         'clinical-portal',
-        'comments-roster'
+        'comments-roster',
+        'tickets'
       ];
 
     case 'Clinical Team':
@@ -192,9 +219,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'providers',
         'tracker',
         'reports',
-        'document-intake',
         'clinical-portal',
-        'comments-roster'
+        'comments-roster',
+        'tickets'
       ];
 
     case 'Leadership / Management':
@@ -205,7 +232,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'payers',
         'clinical-portal',
         'aesas',
-        'comments-roster'
+        'comments-roster',
+        'tickets'
       ];
 
     case 'Provider':
@@ -213,11 +241,12 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'dashboard',
         'providers',
         'tracker',
-        'clinical-portal'
+        'clinical-portal',
+        'tickets'
       ];
 
     default:
-      return ['dashboard', 'tracker', 'providers', 'clinical-portal', 'comments-roster'];
+      return ['dashboard', 'tracker', 'providers', 'clinical-portal', 'comments-roster', 'tickets'];
   }
 };
 
@@ -226,6 +255,9 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
  */
 export const canAccessTab = (account: AppAccount | null | undefined, tab: ActiveTabType): boolean => {
   if (!account) return false;
+  if (tab === 'document-intake' || tab === 'nemotron-edit' || tab === 'dbms-manager') {
+    return isAdminAccount(account) || isDeveloper(account);
+  }
   if (tab === 'access-requests' || tab === 'security-center' || tab === 'google-authenticator') {
     return isSuperAdmin(account) || isAdminAccount(account);
   }

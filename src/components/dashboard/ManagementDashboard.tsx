@@ -34,6 +34,7 @@ import {
   Check,
 } from 'lucide-react';
 import { Discipline, CredentialingStage } from '../../types';
+import { isAdminAccount, isDeveloper } from '../../utils/rbac';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ResponsiveContainer,
@@ -165,6 +166,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     locations, 
     users,
     accounts,
+    employees,
+    clinicalStaff,
     filters, 
     setFilters,
     currentAccount
@@ -189,11 +192,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       'john doe',
       'jane doe',
       'new clinical',
+      'new.clinical',
       'sarah jenkins',
       'sarah.j',
       'michael chang',
       'amanda brooks',
       'david rodriguez',
+      'saha torres',
+      'sara torres',
     ].some((f) => name.includes(f) || email.includes(f));
 
     if (isFake || id.startsWith('fake-') || id === 'prv-1788608145700' || id === 'emp-prv-1788608145700') {
@@ -202,29 +208,21 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     return false;
   };
 
-  // Compile active employee roster emails for organization-wide monthly digest (strictly authentic)
+  // Compile active employee roster emails for organization-wide monthly digest (strictly authentic from database)
   const rosterEmails = React.useMemo(() => {
     const set = new Set<string>();
-    set.add('joel.reji@ageslearningsolutions.com');
-    set.add('superadmin@proficiotherapy.com');
-    set.add('admin@proficiotherapy.com');
-    set.add('manager@proficiotherapy.com');
-    set.add('specialist@proficiotherapy.com');
-    set.add('hroperations@proficiotherapy.com');
-    set.add('clinical@proficiotherapy.com');
-    set.add('ashley.vanderbilt@ageslearningsolutions.com');
-    set.add('maya.patel@proficiotherapy.com');
-    set.add('lucas.moreno@childsplaytherapy.com');
-    set.add('kaitlyn.zimmerman@ageslearningsolutions.com');
-    set.add('jordan.taylor@proficiotherapy.com');
-    set.add('derrick.sterling@childsplaytherapy.com');
-    set.add('marcus.vance@ageslearning.com');
 
-    users?.forEach((u) => {
-      if (u?.email && !isFakeEmployeeRecord(u)) set.add(u.email.toLowerCase().trim());
+    employees?.forEach((e) => {
+      if (e?.email && !isFakeEmployeeRecord(e)) set.add(e.email.toLowerCase().trim());
+    });
+    clinicalStaff?.forEach((s) => {
+      if (s?.email && !isFakeEmployeeRecord(s)) set.add(s.email.toLowerCase().trim());
     });
     providers?.forEach((p) => {
       if (p?.email && !isFakeEmployeeRecord(p)) set.add(p.email.toLowerCase().trim());
+    });
+    users?.forEach((u) => {
+      if (u?.email && !isFakeEmployeeRecord(u)) set.add(u.email.toLowerCase().trim());
     });
     accounts?.forEach((a) => {
       if (a?.email && !isFakeEmployeeRecord(a)) set.add(a.email.toLowerCase().trim());
@@ -232,12 +230,73 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
 
     return Array.from(set).filter((e) => {
       if (!e || !e.includes('@')) return false;
-      return !['fake', 'placeholder', 'new.clinical', 'sarah.j', 'sarah.jenkins', 'michael.c', 'amanda.b', 'david.r'].some(f => e.includes(f));
+      return !['fake', 'placeholder', 'new.clinical', 'sarah.j', 'sarah.jenkins', 'michael.c', 'amanda.b', 'david.r', 'saha', 'torres'].some(f => e.includes(f));
     });
-  }, [users, providers, accounts]);
+  }, [employees, clinicalStaff, users, providers, accounts]);
 
-  // Upcoming Expirations Horizon State (30d, 60d, 90d, 120d)
-  const [selectedHorizon, setSelectedHorizon] = useState<30 | 60 | 90 | 120>(30);
+  // Programmed CC Email Roster State for AESAS
+  const [programmedCcRoster, setProgrammedCcRoster] = useState<string[]>([
+    'credentialing-head@proficiotherapy.com',
+    'admin@proficiotherapy.com',
+    'superadmin@proficiotherapy.com',
+    'manager@proficiotherapy.com',
+  ]);
+  const [isCcRosterModalOpen, setIsCcRosterModalOpen] = useState(false);
+  const [newCcRosterInput, setNewCcRosterInput] = useState('');
+  const [isSavingCcRoster, setIsSavingCcRoster] = useState(false);
+
+  // Load Programmed CC Roster from backend
+  React.useEffect(() => {
+    fetch('/api/aesas/cc-roster')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.ccRoster) && data.ccRoster.length > 0) {
+          setProgrammedCcRoster(data.ccRoster);
+        }
+      })
+      .catch((err) => console.warn('Could not fetch CC roster:', err));
+  }, []);
+
+  const handleSaveCcRoster = async (updatedRoster: string[]) => {
+    setIsSavingCcRoster(true);
+    try {
+      const res = await fetch('/api/aesas/cc-roster', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ccRoster: updatedRoster }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProgrammedCcRoster(data.ccRoster);
+      }
+    } catch (e) {
+      console.error('Failed to update CC roster:', e);
+    } finally {
+      setIsSavingCcRoster(false);
+    }
+  };
+
+  const handleAddCcRecipient = () => {
+    const email = newCcRosterInput.trim().toLowerCase();
+    if (!email || !email.includes('@')) return;
+    if (programmedCcRoster.includes(email)) {
+      setNewCcRosterInput('');
+      return;
+    }
+    const updated = [...programmedCcRoster, email];
+    setProgrammedCcRoster(updated);
+    setNewCcRosterInput('');
+    handleSaveCcRoster(updated);
+  };
+
+  const handleRemoveCcRecipient = (email: string) => {
+    const updated = programmedCcRoster.filter((e) => e.toLowerCase() !== email.toLowerCase());
+    setProgrammedCcRoster(updated);
+    handleSaveCcRoster(updated);
+  };
+
+  // Upcoming Expirations Horizon State (30d, 60d, 90d, 120d, or 'All')
+  const [selectedHorizon, setSelectedHorizon] = useState<30 | 60 | 90 | 120 | 'All'>(30);
   const [isSendingDigest, setIsSendingDigest] = useState(false);
   const [isEvaluatingCycles, setIsEvaluatingCycles] = useState(false);
   const [sendingStaffId, setSendingStaffId] = useState<string | null>(null);
@@ -245,6 +304,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   const [evalSuccessMsg, setEvalSuccessMsg] = useState<string | null>(null);
   const [staffAlertSuccessMsg, setStaffAlertSuccessMsg] = useState<string | null>(null);
   const [expirationDisciplineFilter, setExpirationDisciplineFilter] = useState<'All' | 'ABA' | 'Speech' | 'OT'>('All');
+  const [expirationEntityFilter, setExpirationEntityFilter] = useState<string>('All');
+  const [expirationCategoryFilter, setExpirationCategoryFilter] = useState<string>('All');
   const [expirationSearch, setExpirationSearch] = useState('');
 
   // Filter records based on selected discipline tab
@@ -252,7 +313,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     ? records 
     : records.filter(r => r.discipline === selectedDisciplineTab);
 
-  // Comprehensive Expiration Horizon Computations across Clinical Staff Manage Insurances & Credentials
+  // Comprehensive Expiration Horizon Computations across Clinical Staff for ALL 4 Entities
   const expirationItems = React.useMemo(() => {
     const list: Array<{
       id: string;
@@ -260,9 +321,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       clinicianName: string;
       clinicianEmail?: string;
       npi?: string;
-      entityName?: string;
+      entityId: string;
+      entityName: string;
       discipline: Discipline;
       itemType: string;
+      category: 'License' | 'Board Certification' | 'Payer Enrollment' | 'CAQH' | 'Document';
       payerName?: string;
       expirationDate: string;
       daysRemaining: number;
@@ -275,9 +338,15 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
 
     authenticProviders.forEach((p) => {
       const primaryDisc: Discipline = p.disciplines?.[0] || 'ABA';
-      const entity = entities.find(e => e.id === p.primaryEntityId || p.entityIds?.includes(e.id));
-      const entityName = entity?.dba || entity?.legalName || 'AGES Learning Solutions / Proficio';
-      const staffEmail = p.email || 'joel.reji@ageslearningsolutions.com';
+      const pEntityId = p.primaryEntityId || p.entityIds?.[0] || 'ent-1';
+      const entity = entities.find(e => 
+        e.id === pEntityId || 
+        p.entityIds?.includes(e.id) ||
+        (e.id === 'ent-pstg-inc' && pEntityId === 'ent-2') ||
+        (e.id === 'ent-2' && pEntityId === 'ent-pstg-inc')
+      );
+      const entityName = entity?.dba || entity?.legalName || 'Proficio / AGES';
+      const staffEmail = p.email || (p.firstName && p.lastName ? `${p.firstName.toLowerCase()}.${p.lastName.toLowerCase()}@proficiotherapy.com` : 'admin@proficiotherapy.com');
       const clinicianName = p.fullName || `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Clinical Staff Member';
 
       // 1. Clinical Staff Manage Insurances: Panel Enrollments (Effective & Expiration Dates)
@@ -292,9 +361,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               clinicianName,
               clinicianEmail: staffEmail,
               npi: p.npi,
+              entityId: pEntityId,
               entityName,
               discipline: primaryDisc,
-              itemType: `${enr.payerName || 'Insurance Panel'} — Validity & Panel Enrollment (${enr.status || enr.approvalStatus || 'In-Network'})`,
+              itemType: `${enr.payerName || 'Insurance Panel'} — Panel Enrollment (${enr.status || enr.approvalStatus || 'In-Network'})`,
+              category: 'Payer Enrollment',
               payerName: enr.payerName,
               expirationDate: targetExp,
               daysRemaining: diff,
@@ -312,9 +383,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           clinicianName,
           clinicianEmail: staffEmail,
           npi: p.npi,
+          entityId: pEntityId,
           entityName,
           discipline: primaryDisc,
           itemType: `${p.licenseState || 'State'} License #${p.licenseNumber || 'Active'}`,
+          category: 'License',
           expirationDate: p.licenseExpiration,
           daysRemaining: diff,
         });
@@ -329,9 +402,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           clinicianName,
           clinicianEmail: staffEmail,
           npi: p.npi,
+          entityId: pEntityId,
           entityName,
           discipline: 'ABA',
           itemType: `BCBA Board Certification #${p.bcbaCertificationNumber || 'Cert'}`,
+          category: 'Board Certification',
           expirationDate: p.bcbaExpiryDate,
           daysRemaining: diff,
         });
@@ -346,9 +421,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           clinicianName,
           clinicianEmail: staffEmail,
           npi: p.npi,
+          entityId: pEntityId,
           entityName,
           discipline: 'ABA',
           itemType: `RBT Certification #${p.rbtCertificationNumber || 'RBT'}`,
+          category: 'Board Certification',
           expirationDate: p.rbtExpiryDate,
           daysRemaining: diff,
         });
@@ -363,9 +440,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           clinicianName,
           clinicianEmail: staffEmail,
           npi: p.npi,
+          entityId: pEntityId,
           entityName,
           discipline: primaryDisc,
           itemType: `CAQH ProView Re-attestation (CAQH #${p.caqhId || 'CAQH'})`,
+          category: 'CAQH',
           expirationDate: p.nextAttestationDate,
           daysRemaining: diff,
         });
@@ -381,9 +460,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
             clinicianName,
             clinicianEmail: staffEmail,
             npi: p.npi,
+            entityId: pEntityId,
             entityName,
             discipline: primaryDisc,
             itemType: doc.type || doc.name || doc.fileName || 'Mandatory Credential Document',
+            category: 'Document',
             expirationDate: doc.expirationDate,
             daysRemaining: diff,
           });
@@ -396,7 +477,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       const prov = authenticProviders.find((p) => p.id === r.providerId);
       if (!prov) return;
       const payer = payers.find((py) => py.id === r.payerId);
-      const entity = entities.find(e => e.id === r.entityId);
+      const recEntityId = r.entityId || prov.primaryEntityId || 'ent-1';
+      const entity = entities.find(e => e.id === recEntityId);
       const targetDate = r.recredentialDueDate || r.expirationDate;
 
       if (targetDate) {
@@ -408,11 +490,13 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
             id: `rec-${r.id}`,
             providerId: r.providerId,
             clinicianName: prov.fullName || `${prov.firstName} ${prov.lastName}`.trim(),
-            clinicianEmail: prov.email || 'joel.reji@ageslearningsolutions.com',
+            clinicianEmail: prov.email || (prov.firstName && prov.lastName ? `${prov.firstName.toLowerCase()}.${prov.lastName.toLowerCase()}@proficiotherapy.com` : 'admin@proficiotherapy.com'),
             npi: prov.npi,
+            entityId: recEntityId,
             entityName: entity?.dba || entity?.legalName || 'AGES / Proficio',
             discipline: r.discipline || 'ABA',
             itemType: `${payer?.name || 'Insurance'} Panel Re-credentialing Cycle`,
+            category: 'Payer Enrollment',
             payerName: payer?.name,
             expirationDate: targetDate,
             daysRemaining: diff,
@@ -429,15 +513,25 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   const count90 = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 90).length;
   const count120 = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 120).length;
 
-  const filteredExpirations = expirationItems.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= selectedHorizon);
+  const filteredExpirations = expirationItems.filter(i => {
+    const matchesHorizon = selectedHorizon === 'All' ? true : (i.daysRemaining >= 0 && i.daysRemaining <= selectedHorizon);
+    const matchesEntity = expirationEntityFilter === 'All' || 
+      i.entityId === expirationEntityFilter ||
+      (expirationEntityFilter === 'ent-pstg-inc' && i.entityId === 'ent-2') ||
+      (expirationEntityFilter === 'ent-2' && i.entityId === 'ent-pstg-inc');
+    return matchesHorizon && matchesEntity;
+  });
+
   const displayExpirations = filteredExpirations.filter(i => {
     const matchesDiscipline = expirationDisciplineFilter === 'All' || i.discipline === expirationDisciplineFilter;
+    const matchesCategory = expirationCategoryFilter === 'All' || i.category === expirationCategoryFilter;
     const matchesSearch = !expirationSearch.trim() ||
       i.clinicianName.toLowerCase().includes(expirationSearch.toLowerCase()) ||
       i.itemType.toLowerCase().includes(expirationSearch.toLowerCase()) ||
       (i.payerName && i.payerName.toLowerCase().includes(expirationSearch.toLowerCase())) ||
-      (i.entityName && i.entityName.toLowerCase().includes(expirationSearch.toLowerCase()));
-    return matchesDiscipline && matchesSearch;
+      (i.entityName && i.entityName.toLowerCase().includes(expirationSearch.toLowerCase())) ||
+      (i.npi && i.npi.includes(expirationSearch));
+    return matchesDiscipline && matchesCategory && matchesSearch;
   });
 
   const handleTriggerMonthlyDigest = async () => {
@@ -448,12 +542,12 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientEmail: 'joel.reji@ageslearningsolutions.com',
+          recipientEmail: currentAccount?.email || 'admin@proficiotherapy.com',
           employeeEmails: rosterEmails,
           items: expirationItems.map((item) => ({
             id: item.id,
             employeeName: item.clinicianName,
-            employeeEmail: item.clinicianEmail || 'joel.reji@ageslearningsolutions.com',
+            employeeEmail: item.clinicianEmail || 'admin@proficiotherapy.com',
             discipline: item.discipline,
             credentialType: item.itemType,
             payerName: item.payerName,
@@ -466,7 +560,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       const data = await res.json();
       if (data.success) {
         setDigestSuccessMsg(
-          `AESAS Monthly Digest dispatched to All Employees (${data.recipientsCount || rosterEmails.length} staff), System Admin (superadmin@proficiotherapy.com), and Joel Reji (${data.count || expirationItems.length} records tracked).`
+          `AESAS Monthly Digest dispatched to Active Staff (${data.recipientsCount || rosterEmails.length}), System Administration, and Programmed CC Roster (${programmedCcRoster.length} recipients, ${data.count || expirationItems.length} records tracked).`
         );
         setTimeout(() => setDigestSuccessMsg(null), 7000);
       } else {
@@ -495,7 +589,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           items: expirationItems.map((item) => ({
             id: item.id,
             employeeName: item.clinicianName,
-            employeeEmail: item.clinicianEmail || 'joel.reji@ageslearningsolutions.com',
+            employeeEmail: item.clinicianEmail || 'admin@proficiotherapy.com',
             discipline: item.discipline,
             credentialType: item.itemType,
             payerName: item.payerName,
@@ -508,7 +602,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       const data = await res.json();
       if (data.success) {
         const count = data.dailyAlertsSent ?? 0;
-        setEvalSuccessMsg(`AESAS evaluated: ${count} daily countdown alert(s) dispatched to Credentialing Head, System Admin, and staff within 7 days.`);
+        setEvalSuccessMsg(`AESAS evaluated: ${count} daily countdown alert(s) dispatched to Programmed CC Roster and clinician within 7 days.`);
         setTimeout(() => setEvalSuccessMsg(null), 6000);
       }
     } catch (e: any) {
@@ -531,7 +625,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           item: {
             id: item.id,
             employeeName: item.clinicianName,
-            employeeEmail: item.clinicianEmail || 'joel.reji@ageslearningsolutions.com',
+            employeeEmail: item.clinicianEmail || 'admin@proficiotherapy.com',
             discipline: item.discipline,
             credentialType: item.itemType,
             payerName: item.payerName || 'State Licensing Board / Insurance Panel',
@@ -544,7 +638,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       const data = await res.json();
       if (data.success) {
         setStaffAlertSuccessMsg(
-          `Expiration alert successfully dispatched to ${item.clinicianName}, Credentialing Head (Namitha Narayanan), and System Admin.`
+          `Expiration alert successfully dispatched to ${item.clinicianName} and Programmed CC Roster (${programmedCcRoster.length} recipients).`
         );
         setTimeout(() => setStaffAlertSuccessMsg(null), 6000);
       } else {
@@ -1223,11 +1317,13 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {(entities || []).map((entity) => {
+                          const norm = (id?: string) => (id === 'ent-2' ? 'ent-pstg-inc' : id);
+                          const target = norm(entity.id);
                           const entityStaff = providers.filter(
                             (p) =>
-                              p.primaryEntityId === entity.id ||
-                              p.entityIds?.includes(entity.id) ||
-                              (p as any).renderingEntityIds?.includes(entity.id)
+                              norm(p.primaryEntityId) === target ||
+                              p.entityIds?.some((id) => norm(id) === target) ||
+                              (p as any).renderingEntityIds?.some((id: string) => norm(id) === target)
                           );
                           const abaCount = entityStaff.filter((p) => p.disciplines?.includes('ABA') || (p as any).discipline === 'ABA').length;
                           const speechCount = entityStaff.filter((p) => p.disciplines?.includes('Speech') || (p as any).discipline === 'Speech').length;
@@ -1324,28 +1420,30 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Action Buttons: 1st of Month Digest & Evaluator */}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleTriggerMonthlyDigest}
-                  disabled={isSendingDigest}
-                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all disabled:opacity-50 cursor-pointer active:scale-95"
-                  title="Dispatch 1st of month digest email to All Employees, System Admin, and Joel Reji via AESAS"
-                >
-                  <Send className={`w-3.5 h-3.5 ${isSendingDigest ? 'animate-spin' : ''}`} />
-                  <span>{isSendingDigest ? 'Sending Digest...' : 'Send Monthly Digest (All Staff & Admin)'}</span>
-                </button>
+              {/* Action Buttons: 1st of Month Digest and Evaluator (Admin Only) */}
+              {(isAdminAccount(currentAccount) || isDeveloper(currentAccount)) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleTriggerMonthlyDigest}
+                    disabled={isSendingDigest}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+                    title="Dispatch 1st of month digest email to active staff, system admin, and programmed CC roster via AESAS"
+                  >
+                    <Send className={`w-3.5 h-3.5 ${isSendingDigest ? 'animate-spin' : ''}`} />
+                    <span>{isSendingDigest ? 'Sending Digest...' : 'Send Monthly Digest'}</span>
+                  </button>
 
-                <button
-                  onClick={handleEvaluateExpirationCycles}
-                  disabled={isEvaluatingCycles}
-                  className="inline-flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition-all disabled:opacity-50 cursor-pointer active:scale-95"
-                  title="Evaluate mid-month quarter checks and trigger daily countdown alerts to Credentialing Head, System Admin, and Clinician"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isEvaluatingCycles ? 'animate-spin' : ''}`} />
-                  <span>{isEvaluatingCycles ? 'Evaluating...' : 'Run Cycle Evaluator'}</span>
-                </button>
-              </div>
+                  <button
+                    onClick={handleEvaluateExpirationCycles}
+                    disabled={isEvaluatingCycles}
+                    className="inline-flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+                    title="Evaluate mid-month quarter checks and trigger daily countdown alerts to Programmed CC Roster and clinician"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isEvaluatingCycles ? 'animate-spin' : ''}`} />
+                    <span>{isEvaluatingCycles ? 'Evaluating...' : 'Run Cycle Evaluator'}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Notification alert banners */}
@@ -1400,24 +1498,24 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 <div>
                   <span className="font-bold text-[#2B4C9D]">Automated Email Routing &amp; Schedule (AESAS):</span>
                   <div className="text-slate-600 mt-0.5 space-y-0.5">
-                    <div>&bull; <strong>Monthly Digest (1st of month):</strong> Broadcast to <strong>All Employees</strong>, <strong>System Admin</strong>, and <strong>Joel Reji</strong>.</div>
-                    <div>&bull; <strong>Expiration Alerts (&le; 7 days):</strong> Delivered directly to <strong>Credentialing Head</strong> (Namitha Narayanan), <strong>System Admin</strong>, and <strong>Clinician</strong>.</div>
+                    <div>&bull; <strong>Monthly Digest (1st of month):</strong> Broadcast to <strong>All Active Staff</strong>, <strong>System Administration</strong>, and <strong>Programmed CC Roster</strong> ({programmedCcRoster.length} recipients).</div>
+                    <div>&bull; <strong>Expiration Alerts (&le; 7 days):</strong> Delivered directly to <strong>Credentialing Head</strong>, <strong>System Admin</strong>, <strong>Programmed CC Roster</strong>, and <strong>Affected Clinician</strong>.</div>
                   </div>
                 </div>
               </div>
               <div className="flex items-center space-x-2 shrink-0 text-[11px] text-slate-500 font-medium self-end md:self-center">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Next digest: 1st of month to All Employees &amp; Admin</span>
+                <span>Surveillance active for All 4 Entities</span>
               </div>
             </div>
 
-            {/* Horizon Filter Buttons: 30 Days, 60 Days, 90 Days, 120 Days */}
+            {/* Horizon Filter Buttons: 30 Days, 60 Days, 90 Days, 120 Days, All Horizons */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Select Horizon:</span>
                 <div className="inline-flex bg-slate-100 p-1 rounded-xl text-xs font-semibold gap-1">
-                  {([30, 60, 90, 120] as const).map((days) => {
-                    const count = days === 30 ? count30 : days === 60 ? count60 : days === 90 ? count90 : count120;
+                  {([30, 60, 90, 120, 'All'] as const).map((days) => {
+                    const count = days === 30 ? count30 : days === 60 ? count60 : days === 90 ? count90 : days === 120 ? count120 : expirationItems.length;
                     const isSelected = selectedHorizon === days;
                     return (
                       <button
@@ -1429,7 +1527,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                             : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                         }`}
                       >
-                        <span>{days} Days</span>
+                        <span>{days === 'All' ? 'All Horizons' : `${days} Days`}</span>
                         <span
                           className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                             isSelected
@@ -1449,7 +1547,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
 
               {/* Status Note */}
               <div className="text-xs text-slate-500">
-                Viewing <span className="font-bold text-slate-800">{filteredExpirations.length}</span> upcoming expirations within <span className="font-bold text-[#2B4C9D]">{selectedHorizon} days</span>
+                Viewing <span className="font-bold text-slate-800">{filteredExpirations.length}</span> upcoming expirations within <span className="font-bold text-[#2B4C9D]">{selectedHorizon === 'All' ? 'all horizons' : `${selectedHorizon} days`}</span>
               </div>
             </div>
           </div>
@@ -1540,41 +1638,76 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           {/* Table Container & Filter Toolbar */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
             {/* Secondary In-Tab Filter Bar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              {/* Discipline filter pills */}
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-semibold text-slate-500">Discipline:</span>
-                <div className="inline-flex bg-slate-100 p-1 rounded-xl text-xs font-medium gap-1">
-                  {(['All', 'ABA', 'Speech', 'OT'] as const).map((disc) => (
-                    <button
-                      key={disc}
-                      onClick={() => setExpirationDisciplineFilter(disc)}
-                      className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                        expirationDisciplineFilter === disc
-                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {disc}
-                    </button>
-                  ))}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              {/* Left filter controls: Entity, Credential Type, Discipline */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* 1. Entity Filter */}
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-semibold text-slate-500">Entity:</span>
+                  <select
+                    value={expirationEntityFilter}
+                    onChange={(e) => setExpirationEntityFilter(e.target.value)}
+                    className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 cursor-pointer"
+                  >
+                    <option value="All">All 3 Operating Entities</option>
+                    <option value="ent-1">AGES Learning Solutions</option>
+                    <option value="ent-pstg-inc">Proficio Speech Therapy Group</option>
+                    <option value="ent-3">Child's Play Therapy</option>
+                  </select>
+                </div>
+
+                {/* 2. Credential Type Filter */}
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-semibold text-slate-500">Credential:</span>
+                  <select
+                    value={expirationCategoryFilter}
+                    onChange={(e) => setExpirationCategoryFilter(e.target.value)}
+                    className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 cursor-pointer"
+                  >
+                    <option value="All">All Types</option>
+                    <option value="License">State Licenses</option>
+                    <option value="Board Certification">Board Certifications</option>
+                    <option value="Payer Enrollment">Insurance Panel Enrollments</option>
+                    <option value="CAQH">CAQH Re-attestations</option>
+                    <option value="Document">Compliance Documents</option>
+                  </select>
+                </div>
+
+                {/* 3. Discipline filter pills */}
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-semibold text-slate-500">Discipline:</span>
+                  <div className="inline-flex bg-slate-100 p-1 rounded-xl text-xs font-medium gap-1">
+                    {(['All', 'ABA', 'Speech', 'OT'] as const).map((disc) => (
+                      <button
+                        key={disc}
+                        onClick={() => setExpirationDisciplineFilter(disc)}
+                        className={`px-2.5 py-0.5 rounded-lg transition-colors cursor-pointer ${
+                          expirationDisciplineFilter === disc
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {disc}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Search query input */}
-              <div className="relative w-full md:w-72">
+              <div className="relative w-full lg:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={expirationSearch}
                   onChange={(e) => setExpirationSearch(e.target.value)}
                   placeholder="Search clinician, credential, payer..."
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/30 focus:border-[#2B4C9D]"
+                  className="w-full pl-8 pr-3 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/30 focus:border-[#2B4C9D]"
                 />
                 {expirationSearch && (
                   <button
                     onClick={() => setExpirationSearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
                   >
                     &times;
                   </button>
@@ -2164,6 +2297,122 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Programmed CC Roster Management Modal */}
+      {isCcRosterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2.5 bg-blue-50 text-[#2B4C9D] rounded-2xl">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Program CC Roster for Expiration Alerts
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Auto-CC distribution for monthly digests &amp; daily countdowns
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCcRosterModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Emails programmed on this roster are automatically carbon-copied whenever an expiration warning is dispatched to a clinical staff member, during the 1st of month organization-wide digest, and on daily 7-day urgent countdown cycles.
+            </p>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700">
+                Active Programmed CC Recipients ({programmedCcRoster.length}):
+              </label>
+              <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 bg-slate-50 border border-slate-200 rounded-2xl">
+                {programmedCcRoster.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-slate-400">No CC emails programmed.</div>
+                ) : (
+                  programmedCcRoster.map((email) => (
+                    <div
+                      key={email}
+                      className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs text-xs"
+                    >
+                      <span className="font-mono text-slate-800 font-medium">{email}</span>
+                      <button
+                        onClick={() => handleRemoveCcRecipient(email)}
+                        disabled={isSavingCcRoster}
+                        className="text-slate-400 hover:text-rose-600 text-xs font-bold transition-colors cursor-pointer px-1.5 py-0.5"
+                        title="Remove recipient"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Add new email input */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Add Compliance / Specialist Email:</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={newCcRosterInput}
+                  onChange={(e) => setNewCcRosterInput(e.target.value)}
+                  placeholder="e.g. credentialing-head@proficiotherapy.com"
+                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/30"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCcRecipient();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCcRecipient}
+                  disabled={isSavingCcRoster || !newCcRosterInput.trim()}
+                  className="px-4 py-2 bg-[#2B4C9D] hover:bg-[#1f3775] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const defaultRoster = [
+                    'credentialing-head@proficiotherapy.com',
+                    'admin@proficiotherapy.com',
+                    'superadmin@proficiotherapy.com',
+                    'manager@proficiotherapy.com',
+                  ];
+                  setProgrammedCcRoster(defaultRoster);
+                  handleSaveCcRoster(defaultRoster);
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+              >
+                Reset to Corporate Roles
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCcRosterModalOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

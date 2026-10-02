@@ -17,10 +17,13 @@ export const supabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(
 
 // Only public anon/publishable keys are permitted in client-side code.
 // Server secrets (service-role keys) must NEVER be referenced or exposed here.
+const DEFAULT_SUPABASE_ANON_KEY = 
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYWlvdGFjaGVxanZmYmFueHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzA1MzYsImV4cCI6MjEwNDUwNjUzNn0.zrfm1xEZhxmmwkDQ8H87MY1vBwIg5NMZiaIgj-K6urI';
+
 const supabaseAnonKey = 
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ||
   (typeof process !== 'undefined' && process.env && (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)) ||
-  '';
+  DEFAULT_SUPABASE_ANON_KEY;
 
 export let isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http'));
 
@@ -178,6 +181,10 @@ const COLLECTION_TO_TABLE: Record<string, TableMapping> = {
   stage_configs: { table: 'stage_configs' },
   system_config: { table: 'system_config' },
   audit_logs: { table: 'audit_logs' },
+  tickets: { table: 'system_tickets' },
+  system_tickets: { table: 'system_tickets' },
+  savepoints: { table: 'system_savepoints' },
+  system_savepoints: { table: 'system_savepoints' },
 };
 
 // Local storage cache keys for zero-downtime fallback
@@ -380,6 +387,13 @@ const TABLE_COLUMNS: Record<string, string[]> = {
     'id', 'actor_id', 'actor_email', 'action', 'table_name', 'record_id', 'old_values',
     'new_values', 'ip_address', 'user_agent', 'created_at'
   ],
+  system_tickets: [
+    'id', 'title', 'description', 'category', 'priority', 'status', 'submitted_by_name',
+    'submitted_by_email', 'assigned_to', 'resolution_notes', 'created_at', 'updated_at'
+  ],
+  system_savepoints: [
+    'id', 'name', 'description', 'created_by', 'savepoint_type', 'snapshot_data', 'created_at'
+  ],
 };
 
 function camelToSnake(str: string): string {
@@ -404,6 +418,14 @@ function toPostgresRow(collectionName: string, item: any): any {
       id: item.id,
       config_data: item,
       updated_at: new Date().toISOString(),
+    };
+  }
+
+  if (tableName === 'system_tickets' || tableName === 'system_savepoints') {
+    return {
+      ...item,
+      updated_at: item.updated_at || new Date().toISOString(),
+      created_at: item.created_at || new Date().toISOString(),
     };
   }
 
@@ -439,13 +461,24 @@ function toPostgresRow(collectionName: string, item: any): any {
     };
   }
 
+  const dateColumns = new Set([
+    'license_expiration', 'start_date', 'caqh_reattestation_date', 'intake_date', 
+    'submission_date', 'approval_date', 'effective_date', 'expiration_date', 
+    'recredential_due_date', 'w9_date', 'last_attestation_date', 'next_attestation_date',
+    'location_effective_date', 'recredentialing_date'
+  ]);
+
   // Map each property to snake_case if valid in the target schema
   for (const [key, val] of Object.entries(item)) {
     const snake = camelToSnake(key);
+    let finalVal = val;
+    if (dateColumns.has(snake) && (val === '' || val === null || val === undefined)) {
+      finalVal = null;
+    }
     if (validCols.has(snake)) {
-      mapped[snake] = val;
+      mapped[snake] = finalVal;
     } else if (validCols.has(key)) {
-      mapped[key] = val;
+      mapped[key] = finalVal;
     }
   }
 
@@ -553,15 +586,24 @@ function fromPostgresRow(collectionName: string, row: any): any {
     if (row.contract_info.notes && !result.notes) result.notes = row.contract_info.notes;
   }
 
-  if (tableName === 'providers') {
+  if (tableName === 'providers' || tableName === 'clinical_staff') {
     if (!result.primaryEntityId) {
-      result.primaryEntityId = row.contract_info?.primaryEntityId || (Array.isArray(result.entityIds) && result.entityIds[0]) || 'ent-1';
+      result.primaryEntityId = row.contract_info?.primaryEntityId || (Array.isArray(result.entityIds) && result.entityIds[0]) || (Array.isArray(result.entity_ids) && result.entity_ids[0]) || 'ent-1';
+    }
+    // Normalize legacy ent-2 alias to canonical ent-pstg-inc (Proficio Speech Therapy Group)
+    if (result.primaryEntityId === 'ent-2') {
+      result.primaryEntityId = 'ent-pstg-inc';
     }
     if (!result.primaryLocationId) {
       result.primaryLocationId = row.contract_info?.primaryLocationId || (Array.isArray(result.locationIds) && result.locationIds[0]) || '';
     }
     if (!result.entityIds || !Array.isArray(result.entityIds) || result.entityIds.length === 0) {
       result.entityIds = [result.primaryEntityId];
+    } else {
+      result.entityIds = result.entityIds.map((id: string) => (id === 'ent-2' ? 'ent-pstg-inc' : id));
+      if (result.primaryEntityId && !result.entityIds.includes(result.primaryEntityId)) {
+        result.entityIds.push(result.primaryEntityId);
+      }
     }
     if (!result.locationIds || !Array.isArray(result.locationIds) || result.locationIds.length === 0) {
       result.locationIds = result.primaryLocationId ? [result.primaryLocationId] : [];
@@ -583,6 +625,12 @@ function fromPostgresRow(collectionName: string, row: any): any {
   if (tableName === 'entities') {
     result.name = row.legal_name || row.name || result.legalName || result.dba || '';
     result.legalName = row.legal_name || row.name || result.legalName || result.name || '';
+  }
+
+  if (tableName === 'providers' || tableName === 'clinical_staff') {
+    if (!result.fullName && (result.firstName || result.lastName)) {
+      result.fullName = [result.firstName, result.lastName].filter(Boolean).join(' ');
+    }
   }
 
   return result;
@@ -804,6 +852,10 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
  */
 export async function fetchCollection<T = any>(collectionName: string): Promise<T[]> {
   const mapping = COLLECTION_TO_TABLE[collectionName] || { table: collectionName };
+
+  if (!supabase) {
+    await ensureSupabaseClient();
+  }
 
   if (supabase) {
     try {

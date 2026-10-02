@@ -26,6 +26,9 @@ import { ClinicalStaffPortal } from './components/clinical/ClinicalStaffPortal';
 import { CommentsRosterView } from './components/clinical/CommentsRosterView';
 import { AesasAlertsView } from './components/automations/AesasAlertsView';
 import { SmartDocumentIntakeHub } from './components/intake/SmartDocumentIntakeHub';
+import { DbmsManagerView } from './components/admin/DbmsManagerView';
+import { TicketManagementView } from './components/dev/TicketManagementView';
+import { NemotronEditSystemView } from './components/dev/NemotronEditSystemView';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -293,6 +296,27 @@ const MainContent: React.FC = () => {
           <GoogleAuthenticatorView
             onBackToDashboard={() => setActiveTab('dashboard')}
           />
+        )}
+
+        {/* Dedicated Tab: Supabase Live DBMS Manager (DEV / ADMIN) */}
+        {activeTab === 'dbms-manager' && (
+          <div className="pt-2">
+            <DbmsManagerView />
+          </div>
+        )}
+
+        {/* Dedicated Tab: Ticket Management (All Employees Can Submit, Dev/Admin Manages) */}
+        {activeTab === 'tickets' && (
+          <div className="pt-2">
+            <TicketManagementView />
+          </div>
+        )}
+
+        {/* Dedicated Tab: NVIDIA Nemotron Edit System (DEV Profile / Admin) */}
+        {activeTab === 'nemotron-edit' && (
+          <div className="pt-2">
+            <NemotronEditSystemView />
+          </div>
         )}
           </motion.div>
         </AnimatePresence>

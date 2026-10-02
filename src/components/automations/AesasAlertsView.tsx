@@ -19,6 +19,7 @@ import {
   Info
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
+import { isAdminAccount, isDeveloper } from '../../utils/rbac';
 
 interface AesasStatus {
   service: string;
@@ -62,10 +63,19 @@ interface AesasQueueItem {
 
 export const AesasAlertsView: React.FC = () => {
   const { currentAccount, addToast } = useCredentialing();
+  const isDevOrAdmin = isDeveloper(currentAccount) || isAdminAccount(currentAccount);
 
   const [status, setStatus] = useState<AesasStatus | null>(null);
   const [templates, setTemplates] = useState<AesasTemplate[]>([]);
   const [queue, setQueue] = useState<AesasQueueItem[]>([]);
+  const [ccRoster, setCcRoster] = useState<string[]>([
+    'credentialing-head@proficiotherapy.com',
+    'admin@proficiotherapy.com',
+    'superadmin@proficiotherapy.com',
+    'manager@proficiotherapy.com',
+  ]);
+  const [newCcEmail, setNewCcEmail] = useState('');
+  const [isSavingCc, setIsSavingCc] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -82,19 +92,64 @@ export const AesasAlertsView: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [resStatus, resTemplates, resQueue] = await Promise.all([
+      const [resStatus, resTemplates, resQueue, resCc] = await Promise.all([
         fetch('/api/aesas/status').then((r) => r.json()).catch(() => null),
         fetch('/api/aesas/templates').then((r) => r.json()).catch(() => ({ templates: [] })),
         fetch('/api/aesas/queue').then((r) => r.json()).catch(() => ({ queue: [] })),
+        fetch('/api/aesas/cc-roster').then((r) => r.json()).catch(() => null),
       ]);
 
       if (resStatus) setStatus(resStatus);
       if (resTemplates?.templates) setTemplates(resTemplates.templates);
       if (resQueue?.queue) setQueue(resQueue.queue);
+      if (resCc?.ccRoster && Array.isArray(resCc.ccRoster)) setCcRoster(resCc.ccRoster);
     } catch (err) {
       console.warn('Failed to load AESAS data:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddCcEmail = async () => {
+    const emailToAdd = newCcEmail.trim().toLowerCase();
+    if (!emailToAdd || !emailToAdd.includes('@')) {
+      addToast('Please enter a valid email address.', 'error');
+      return;
+    }
+    if (ccRoster.includes(emailToAdd)) {
+      addToast('Email is already on the CC roster.', 'info');
+      return;
+    }
+    const updated = [...ccRoster, emailToAdd];
+    setCcRoster(updated);
+    setNewCcEmail('');
+    await persistCcRoster(updated);
+  };
+
+  const handleRemoveCcEmail = async (emailToRemove: string) => {
+    const updated = ccRoster.filter(e => e.toLowerCase() !== emailToRemove.toLowerCase());
+    setCcRoster(updated);
+    await persistCcRoster(updated);
+  };
+
+  const persistCcRoster = async (roster: string[]) => {
+    setIsSavingCc(true);
+    try {
+      const res = await fetch('/api/aesas/cc-roster', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ccRoster: roster }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast('Programmed CC roster updated successfully.', 'success');
+      } else {
+        addToast('Notice: CC roster updated locally.', 'info');
+      }
+    } catch (err) {
+      addToast('Notice: CC roster updated locally.', 'info');
+    } finally {
+      setIsSavingCc(false);
     }
   };
 
@@ -124,7 +179,7 @@ export const AesasAlertsView: React.FC = () => {
       const res = await fetch('/api/aesas/expirations/digest', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        addToast('AESAS Monthly Expirations Digest dispatched to joel.reji@ageslearningsolutions.com via Resend!', 'success');
+        addToast('AESAS Monthly Expirations Digest dispatched to all active staff and programmed CC roster via Resend!', 'success');
         await loadData();
       } else {
         addToast(data.error || 'Failed to dispatch digest', 'error');
@@ -233,24 +288,28 @@ export const AesasAlertsView: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
 
-          <button
-            onClick={handleTriggerMonthlyDigest}
-            disabled={isProcessing}
-            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
-            title="Dispatches the 1st of month expiration digest to Joel Reji via AESAS"
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Send Monthly Digest</span>
-          </button>
+          {isDevOrAdmin && (
+            <>
+              <button
+                onClick={handleTriggerMonthlyDigest}
+                disabled={isProcessing}
+                className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
+                title="Dispatches the 1st of month expiration digest via AESAS"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Send Monthly Digest</span>
+              </button>
 
-          <button
-            onClick={handleProcessQueue}
-            disabled={isProcessing}
-            className="px-4 py-2.5 bg-[#2B4C9D] hover:bg-[#1f3775] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
-          >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>{isProcessing ? 'Processing Queue...' : 'Dispatch Queue Now'}</span>
-          </button>
+              <button
+                onClick={handleProcessQueue}
+                disabled={isProcessing}
+                className="px-4 py-2.5 bg-[#2B4C9D] hover:bg-[#1f3775] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>{isProcessing ? 'Processing Queue...' : 'Dispatch Queue Now'}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -311,8 +370,9 @@ export const AesasAlertsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid: Templates and Live Test Trigger */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Grid: Templates and Live Test Trigger (Admin & Dev Profile Only) */}
+      {isDevOrAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Live Test Trigger Form (5 cols) */}
         <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -402,8 +462,73 @@ export const AesasAlertsView: React.FC = () => {
           </form>
         </div>
 
-        {/* Templates Overview (7 cols) */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        {/* Templates & CC Roster Overview (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Programmed CC Roster Card */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <Mail className="w-4 h-4 text-[#2B4C9D]" />
+                <h2 className="text-sm font-bold text-slate-900">
+                  Programmed CC Distribution Roster ({ccRoster.length} Active)
+                </h2>
+              </div>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                Auto-CC on Alerts &amp; Digests
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              These verified email addresses are automatically carbon-copied on all AESAS monthly expiration digests, daily 7-day countdown notices, and individual re-credentialing alerts.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {ccRoster.map((email) => (
+                <span
+                  key={email}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-xs font-medium text-[#2B4C9D]"
+                >
+                  <span>{email}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCcEmail(email)}
+                    disabled={isSavingCc}
+                    className="text-blue-400 hover:text-rose-600 transition-colors cursor-pointer text-xs ml-0.5 font-bold"
+                    title="Remove from CC roster"
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="email"
+                value={newCcEmail}
+                onChange={(e) => setNewCcEmail(e.target.value)}
+                placeholder="Add compliance email (e.g. lead@proficiotherapy.com)..."
+                className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 font-medium"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCcEmail();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddCcEmail}
+                disabled={isSavingCc || !newCcEmail.trim()}
+                className="px-3.5 py-1.5 bg-[#2B4C9D] hover:bg-[#1f3775] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                Add to CC
+              </button>
+            </div>
+          </div>
+
+          {/* Templates Overview */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center space-x-2">
               <Layers className="w-4 h-4 text-[#2B4C9D]" />
@@ -435,6 +560,8 @@ export const AesasAlertsView: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
+  )}
 
       {/* Scheduled Alert Queue Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">

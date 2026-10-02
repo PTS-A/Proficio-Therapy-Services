@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
  * AGES / Proficio Credentialing & Payer Enrollment Management System
  * Comprehensive User Manual & Technical Architecture Guide PDF Generator
  */
-export function generateUserManualPdf(userEmail: string = 'joel.reji@ageslearningsolutions.com'): void {
+export function generateUserManualPdf(userEmail: string = 'admin@proficiotherapy.com'): void {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -766,7 +766,7 @@ export function generateUserManualPdf(userEmail: string = 'joel.reji@ageslearnin
 
   addCallout(
     'NEED OPERATIONAL SUPPORT OR HAVE QUESTIONS?',
-    'For software questions, credentialing template updates, or permission changes, contact Joel Reji (joel.reji@ageslearningsolutions.com) or the Credentialing Operations Management Office.',
+    'For software questions, credentialing template updates, or permission changes, contact System Administration (admin@proficiotherapy.com) or the Credentialing Operations Management Office.',
     'info'
   );
 

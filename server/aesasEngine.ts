@@ -55,13 +55,38 @@ export const SYSTEM_ADMIN_EMAILS = [
   'admin@proficiotherapy.com',
 ];
 
-export const PRIMARY_ADMIN_EMAIL = 'joel.reji@ageslearningsolutions.com';
-export const VERIFIED_SANDBOX_EMAIL = 'joel.reji@ageslearningsolutions.com';
+export const PRIMARY_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@proficiotherapy.com';
+export const VERIFIED_SANDBOX_EMAIL = process.env.SANDBOX_EMAIL || 'admin@proficiotherapy.com';
 
 let aesasConfig: AesasGlobalConfig = {
   globalSentToEmail: 'credentialing-alerts@proficiotherapy.com',
-  globalCcRoster: ['credentialing-head@proficiotherapy.com', 'manager@proficiotherapy.com', 'superadmin@proficiotherapy.com', 'admin@proficiotherapy.com'],
+  globalCcRoster: [
+    'credentialing-head@proficiotherapy.com',
+    'admin@proficiotherapy.com',
+    'superadmin@proficiotherapy.com',
+    'manager@proficiotherapy.com',
+  ],
   fromEmail: process.env.RESEND_FROM_EMAIL || 'Proficio Credentialing <onboarding@resend.dev>',
+};
+
+export const getProgrammedCcRoster = (): string[] => {
+  if (Array.isArray(aesasConfig.globalCcRoster) && aesasConfig.globalCcRoster.length > 0) {
+    return aesasConfig.globalCcRoster;
+  }
+  return [
+    'credentialing-head@proficiotherapy.com',
+    'admin@proficiotherapy.com',
+    'superadmin@proficiotherapy.com',
+    'manager@proficiotherapy.com',
+  ];
+};
+
+export const updateProgrammedCcRoster = (roster: string[]): string[] => {
+  const cleaned = (roster || [])
+    .map((e) => (typeof e === 'string' ? e.trim().toLowerCase() : ''))
+    .filter((e) => e && e.includes('@'));
+  aesasConfig.globalCcRoster = cleaned.length > 0 ? cleaned : getProgrammedCcRoster();
+  return aesasConfig.globalCcRoster;
 };
 
 let aesasTemplates: AesasTemplate[] = [
@@ -70,11 +95,11 @@ let aesasTemplates: AesasTemplate[] = [
     name: '1. Onboarding to System',
     code: 'onboarding',
     to: '{employee_email}',
-    cc: 'admin@proficiotherapy.com, credentialing-lead@proficiotherapy.com',
-    subject: 'Welcome to Proficio Credentialing Hub — Your Access Credentials & Setup Notice',
+    cc: '',
+    subject: 'Welcome to Proficio & AGES Credentialing Hub — Your Access Credentials & Setup Notice',
     body: `Dear {employee_name},
 
-Welcome to the Proficio Therapy Services & AGES Learning Solutions Credentialing Network.
+Welcome to the AGES Learning Solutions & Proficio Speech Therapy Group Credentialing Network.
 
 Your administrative staff profile has been provisioned:
 • Access Portal: https://proficiotherapy.com/login
@@ -89,8 +114,8 @@ Upon your first authentication, you are required by organizational security poli
 If you encounter any questions or require additional authorization, please contact your credentialing administrator immediately.
 
 Best regards,
-Proficio Credentialing Operations & Systems Governance`,
-    description: 'Dispatched when a credentialing lead or head employee is provisioned in the system. Contains initial credentials and first-login password update reminder.',
+Credentialing Operations & Systems Governance`,
+    description: 'Dispatched when a credentialing lead or employee is provisioned in the system. Contains initial credentials and first-login password update reminder. Note: Excluded from CC Roster.',
     updatedAt: new Date().toISOString(),
   },
   {
@@ -264,11 +289,14 @@ export const isFakeEmployeeRecord = (item: any): boolean => {
     'john doe',
     'jane doe',
     'new clinical',
+    'new.clinical',
     'sarah jenkins',
     'sarah.j',
     'michael chang',
     'amanda brooks',
     'david rodriguez',
+    'saha torres',
+    'sara torres',
   ].some((f) => name.includes(f) || email.includes(f));
 
   if (isFake || id.startsWith('fake-') || id === 'prv-1788608145700' || id === 'emp-prv-1788608145700') {
@@ -559,6 +587,17 @@ export const sendAesasEmail = async (params: {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 
+  // Automatically attach Programmed CC Roster to EVERY email EXCEPT employee onboarding
+  if (params.templateCode !== 'onboarding' && params.templateCode !== 'onboarding_welcome') {
+    const progCc = getProgrammedCcRoster();
+    progCc.forEach((ccEmail) => {
+      const formatted = ccEmail.trim().toLowerCase();
+      if (formatted && !cleanCc.includes(formatted) && !cleanTo.includes(formatted)) {
+        cleanCc.push(formatted);
+      }
+    });
+  }
+
   const formattedHtml = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
       <div style="border-bottom: 2px solid #2B4C9D; padding-bottom: 16px; margin-bottom: 20px;">
@@ -573,16 +612,15 @@ export const sendAesasEmail = async (params: {
     </div>
   `;
 
-  const fromAddress = 'Proficio Credentialing <onboarding@resend.dev>';
-  const includesVerifiedSandbox = cleanTo.includes(VERIFIED_SANDBOX_EMAIL) || cleanCc.includes(VERIFIED_SANDBOX_EMAIL);
+  const fromAddress = rawFrom || 'Proficio Credentialing <onboarding@resend.dev>';
 
-  if (isResendConfigured && includesVerifiedSandbox) {
+  if (isResendConfigured && cleanTo.length > 0) {
     try {
       const resend = new Resend(apiKey);
-      // In sandbox mode, dispatch to verified sandbox recipient, representing the full broadcast
       const result = await safeResendSend(resend, {
         from: fromAddress,
-        to: [VERIFIED_SANDBOX_EMAIL],
+        to: cleanTo,
+        cc: cleanCc.length > 0 ? cleanCc : undefined,
         subject: params.subject,
         text: params.body,
         html: formattedHtml,
@@ -598,12 +636,12 @@ export const sendAesasEmail = async (params: {
           templateCode: params.templateCode,
           status: 'sent',
           simulated: false,
-          note: `Live Resend dispatch delivered to ${VERIFIED_SANDBOX_EMAIL}. Broadcast roster recorded across ${cleanTo.length} recipients (All Employees & System Admin).`,
+          note: `Live Resend dispatch delivered to ${cleanTo.join(', ')} with CC: ${cleanCc.join(', ') || 'None'}.`,
           sentAt: new Date().toISOString(),
           metadata: params.metadata,
         };
         aesasExecutionLogs.unshift(logEntry);
-        console.log(`[AESAS Engine] Successfully sent live email via Resend to ${VERIFIED_SANDBOX_EMAIL} (Roster: ${cleanTo.join(', ')}). ID: ${result.data.id}`);
+        console.log(`[AESAS Engine] Successfully sent live email via Resend to ${cleanTo.join(', ')}. ID: ${result.data.id}`);
         return { success: true, resendId: result.data.id, simulated: false };
       } else {
         const errMsg = result.error?.message || 'Resend delivery failed';
@@ -617,7 +655,7 @@ export const sendAesasEmail = async (params: {
           templateCode: params.templateCode,
           status: 'simulated',
           simulated: true,
-          note: `Resend Sandbox Mode: ${errMsg}. Handled in verified simulation.`,
+          note: `Resend sandbox dispatch recorded to ${cleanTo.join(', ')}. Status: ${errMsg}`,
           sentAt: new Date().toISOString(),
           metadata: params.metadata,
         };
@@ -687,7 +725,7 @@ export const triggerAesasReminderNow = async (reminderId: string): Promise<{ suc
     .replace(/{responsible_email}/g, item.recipientEmail)
     .replace(/{responsible_person}/g, item.responsiblePerson || 'Credentialing Specialist')
     .replace(/{days_pending}/g, String((item.consecutiveDays || 0) * 1 + 1))
-    .replace(/{entity_name}/g, item.entityId === 'ent-1' ? 'AGES Learning Solutions' : item.entityId === 'ent-pstg-inc' ? 'Proficio Speech Therapy Group, INC.' : item.entityId === 'ent-pts-llc' ? 'Proficio Therapy Services, LLC' : item.entityId === 'ent-3' ? "Child's Play Therapy Services" : 'Healthcare Practice')
+    .replace(/{entity_name}/g, item.entityId === 'ent-1' ? 'AGES Learning Solutions' : item.entityId === 'ent-pstg-inc' ? 'Proficio Speech Therapy Group, INC.' : item.entityId === 'ent-3' ? "Child's Play Therapy Services" : 'Proficio Speech Therapy Group, INC.')
     .replace(/{location_name}/g, 'Primary Center');
 
   const result = await sendAesasEmail({
@@ -810,7 +848,7 @@ export const sendAesasOnboardingEmail = async (params: {
 
   const res = await sendAesasEmail({
     to: params.employeeEmail,
-    cc: aesasConfig.globalCcRoster.join(', '),
+    cc: '', // Onboarding emails are strictly confidential and excluded from CC roster per security governance
     subject: renderedSubject,
     body: renderedBody,
     templateCode: 'onboarding',
@@ -844,7 +882,7 @@ export interface ExpirationAdvisoryItem {
 }
 
 /**
- * Dispatches monthly expiration digest to All Employees, System Admin, and Joel Reji (1st of every month)
+ * Dispatches monthly expiration digest to All Employees and System Admin (1st of every month)
  */
 export const sendAesasMonthlyExpirationDigest = async (options?: {
   recipientEmail?: string;
@@ -887,7 +925,7 @@ export const sendAesasMonthlyExpirationDigest = async (options?: {
   ).map((e) => e.toLowerCase().trim()).filter(Boolean);
 
   const primaryTo = allRecipients.join(', ');
-  const ccList = CREDENTIALING_HEAD_EMAILS.join(', ');
+  const ccList = getProgrammedCcRoster().join(', ');
 
   const now = new Date();
   const monthName = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -917,11 +955,11 @@ export const sendAesasMonthlyExpirationDigest = async (options?: {
 
   const emailBodyText = `
 AESAS MONTHLY CREDENTIAL EXPIRATIONS DIGEST — ${monthName}
-ORGANIZATION-WIDE BROADCAST: Delivered to All Employees, System Administration, and Joel Reji
+ORGANIZATION-WIDE BROADCAST: Delivered to All Employees, System Administration, and Programmed CC Roster
 
 Distribution Roster:
-• To: All Employees (${allRecipients.length} members), System Administration (${SYSTEM_ADMIN_EMAILS.join(', ')}), Joel Reji (${PRIMARY_ADMIN_EMAIL})
-• CC: Credentialing Head (${ccList})
+• To: All Employees (${allRecipients.length} members), System Administration (${SYSTEM_ADMIN_EMAILS.join(', ')})
+• CC Roster: ${ccList}
 
 Summary of upcoming credential and license expirations across clinical roster:
 • Expiring in 30 Days: ${within30.length} staff
@@ -954,16 +992,16 @@ Proficio Therapy Services & AGES Learning Solutions
       <div style="background-color: #f1f5f9; border-left: 4px solid #2B4C9D; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
         <div style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">ORGANIZATION-WIDE BROADCAST:</div>
         <div style="font-size: 12px; color: #475569; line-height: 1.5;">
-          <strong>Delivered To:</strong> All Employees (${allRecipients.length} team members), System Administration (<code>superadmin@proficiotherapy.com</code>, <code>admin@proficiotherapy.com</code>), and Joel Reji (<code>${PRIMARY_ADMIN_EMAIL}</code>)<br/>
-          <strong>CC:</strong> Credentialing Head (<code>${ccList}</code>)
+          <strong>Delivered To:</strong> All Employees (${allRecipients.length} team members) and System Administration (<code>superadmin@proficiotherapy.com</code>, <code>admin@proficiotherapy.com</code>)<br/>
+          <strong>Programmed CC Roster:</strong> <code>${ccList}</code>
         </div>
       </div>
 
       <p style="font-size: 14px; color: #334155; margin: 0 0 16px;">
-        Dear <strong>All Employees</strong>, <strong>System Administrators</strong>, and <strong>Joel Reji</strong>,
+        Dear <strong>All Employees</strong> and <strong>System Administrators</strong>,
       </p>
       <p style="font-size: 13px; color: #475569; margin: 0 0 20px; line-height: 1.5;">
-        This is your automated monthly compliance digest for <strong>${monthName}</strong> detailing all clinical staff state licenses, board certifications, and insurance payer panel re-credentialing deadlines within the upcoming 120-day horizon across AGES Learning Solutions and Proficio Therapy Services.
+        This is your automated monthly compliance digest for <strong>${monthName}</strong> detailing all clinical staff state licenses, board certifications, and insurance payer panel re-credentialing deadlines within the upcoming 120-day horizon across operating clinical entities.
       </p>
 
       <!-- Metrics Summary Cards -->
@@ -1052,24 +1090,23 @@ export const sendAesasDailyCountdownAlert = async (item: ExpirationAdvisoryItem)
 }> => {
   const clinicianRecipient = item.employeeEmail || VERIFIED_SANDBOX_EMAIL;
 
+  const programmedCc = getProgrammedCcRoster();
   const ccRoster = [
+    ...programmedCc,
     ...CREDENTIALING_HEAD_EMAILS,
     ...SYSTEM_ADMIN_EMAILS,
-    PRIMARY_ADMIN_EMAIL,
-  ].filter((e, idx, arr) => arr.indexOf(e) === idx && e !== clinicianRecipient.toLowerCase()).join(', ');
+  ].filter((e, idx, arr) => arr.indexOf(e) === idx && e.toLowerCase() !== clinicianRecipient.toLowerCase()).join(', ');
 
   const subject = `[URGENT: ${item.daysRemaining} DAYS REMAINING] Expiration Alert — ${item.employeeName} (${item.credentialType})`;
 
   const body = `CRITICAL DAILY EXPIRATION NOTICE:
 
-Attention: Credentialing Head (Namitha Narayanan & Lead), System Administrator, and Clinician (${item.employeeName})
+Attention: Credentialing Head, System Administrator, and Clinician (${item.employeeName})
 
 ROUTING NOTICE:
 This urgent expiration notice has been dispatched directly to:
-• Credentialing Head: ${CREDENTIALING_HEAD_EMAILS.join(', ')}
-• System Administration: ${SYSTEM_ADMIN_EMAILS.join(', ')}
 • Affected Clinician: ${clinicianRecipient}
-• Primary Administrator: ${PRIMARY_ADMIN_EMAIL}
+• Programmed CC Roster: ${ccRoster}
 
 This is an automated AESAS alert notifying all compliance stakeholders that the following credential will expire in ${item.daysRemaining} DAY(S):
 
@@ -1128,24 +1165,23 @@ export const sendAesasIndividualExpirationAlert = async (item: ExpirationAdvisor
 }> => {
   const clinicianRecipient = item.employeeEmail || VERIFIED_SANDBOX_EMAIL;
 
+  const programmedCc = getProgrammedCcRoster();
   const ccRoster = [
+    ...programmedCc,
     ...CREDENTIALING_HEAD_EMAILS,
     ...SYSTEM_ADMIN_EMAILS,
-    PRIMARY_ADMIN_EMAIL,
   ].filter((e, idx, arr) => arr.indexOf(e) === idx && e !== clinicianRecipient.toLowerCase()).join(', ');
 
   const subject = `[AESAS EXPIRATION ALERT: ${item.daysRemaining} DAYS LEFT] ${item.employeeName} — ${item.credentialType}`;
 
   const body = `CREDENTIAL EXPIRATION ADVISORY NOTICE:
 
-Attention: Credentialing Head (Namitha Narayanan & Lead), System Administrator, and Clinician (${item.employeeName})
+Attention: Credentialing Head, System Administrator, and Clinician (${item.employeeName})
 
 ROUTING NOTICE:
 This expiration advisory has been dispatched directly to:
-• Credentialing Head: ${CREDENTIALING_HEAD_EMAILS.join(', ')}
-• System Administration: ${SYSTEM_ADMIN_EMAILS.join(', ')}
 • Affected Clinician: ${clinicianRecipient}
-• Primary Administrator: ${PRIMARY_ADMIN_EMAIL}
+• Programmed CC Roster: ${ccRoster}
 
 Credential Details:
 • Clinician / Employee: ${item.employeeName}

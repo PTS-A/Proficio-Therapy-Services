@@ -8,7 +8,41 @@ export type SystemRole =
   | 'Clinical Team'
   | 'Billing and Claims'
   | 'Leadership / Management'
-  | 'System Administrator';
+  | 'System Administrator'
+  | 'Developer';
+
+export interface SystemTicket {
+  id: string;
+  title: string;
+  description: string;
+  category: 'Credentialing Issue' | 'Bug Report' | 'Payer Integration' | 'Access Request' | 'Data Discrepancy' | 'Feature Request' | 'Other';
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
+  submittedByName: string;
+  submittedByEmail: string;
+  assignedTo?: string;
+  resolutionNotes?: string;
+  affectedEntityId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SystemSavepoint {
+  id: string;
+  name: string;
+  description: string;
+  createdBy: string;
+  savepointType: 'Automatic Pre-Edit' | 'Manual Backup' | 'System Snapshot';
+  snapshotData: {
+    providersCount: number;
+    staffCount: number;
+    entitiesCount: number;
+    recordsCount: number;
+    timestamp: string;
+    dataDump?: any;
+  };
+  createdAt: string;
+}
 
 export type UserRole = 
   | 'Specialist' 
@@ -163,13 +197,14 @@ export interface Employee {
   notes?: string;
   isDemo?: boolean; // Legacy flag for demo data isolation
   ownerAccountEmail?: string;
-  createdAt: string;
-  updatedAt: string;
+  migratedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ClinicalStaff {
   id: string; // Unique Clinical Staff ID (e.g. "CS-2026-001")
-  employeeId?: string; // Reference to Employee
+  employeeId?: string | null; // Reference to Employee
   providerId?: string; // Reference to Provider
   firstName: string;
   lastName: string;
@@ -197,13 +232,15 @@ export interface ClinicalStaff {
   isUtah?: boolean;
   utahLicenseNumber?: string;
   primaryLocationId?: string;
-  locationIds: string[];
+  locationIds?: string[];
   entityIds: string[];
+  primaryEntityId?: string;
   caqhId?: string;
   paveStatus?: PAVEStatus;
   status: 'Active' | 'In Credentialing' | 'Pending Documents' | 'On Leave' | 'Inactive';
-  createdAt: string;
-  updatedAt: string;
+  rawData?: any;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ApplicationDocument {
@@ -371,9 +408,10 @@ export interface ProviderPayerEnrollment {
 export interface Provider {
   id: string;
   // 1. Basic Information
-  npi: string;
+  npi?: string | null;
   firstName: string;
   lastName: string;
+  fullName?: string;
   credentials: string; // e.g. "MS, BCBA, LBA"
   disciplines: Discipline[];
   providerType: ProviderType;
@@ -383,9 +421,9 @@ export interface Provider {
   contactAddress?: string;
   licenseNumber: string;
   licenseState: string;
-  licenseExpiration: string;
-  taxonomy: string;
-  specialty: string;
+  licenseExpiration?: string;
+  taxonomy?: string;
+  specialty?: string;
   region?: string;
   bcbaCertificationNumber?: string;
   bcbaEffectiveDate?: string;
@@ -402,45 +440,45 @@ export interface Provider {
   entityIds: string[]; // Legal entities provider works under
   primaryEntityId?: string;
   dba?: string;
-  employmentStatus: EmploymentStatus;
+  employmentStatus?: EmploymentStatus;
   contractStatus?: 'W-2 Full-Time' | 'W-2 Part-Time' | '1099 Contractor' | 'Independent Consultant' | string;
-  startDate: string;
+  startDate?: string;
   groupAffiliation?: string;
   renderingProviderInfo?: string;
 
   // 3. Location Information
   primaryLocationId?: string;
-  locationIds: string[]; // Locations provider renders services at
+  locationIds?: string[]; // Locations provider renders services at
   additionalLocationIds?: string[];
   serviceTypes?: ServiceType[];
   locationEffectiveDate?: string;
   
   // 4. Credentialing Information
-  caqhId: string;
-  caqhStatus: CAQHStatus;
+  caqhId?: string;
+  caqhStatus?: CAQHStatus;
   lastAttestationDate?: string;
   nextAttestationDate?: string;
-  paveStatus: PAVEStatus;
+  paveStatus?: PAVEStatus;
   medicaidId?: string;
-  npiVerified: boolean;
+  npiVerified?: boolean;
   npiVerificationDate?: string;
-  nppesRecordMatch: boolean;
+  nppesRecordMatch?: boolean;
   effectiveDate?: string;
   recredentialingDate?: string;
   contractInfo?: ProviderContractInfo;
   payerEnrollments?: ProviderPayerEnrollment[];
   
-  documents: DocumentItem[];
+  documents?: DocumentItem[];
   documentLinks?: Array<{ id: string; title: string; url: string; category?: string; uploadedAt?: string }>;
   commentLogs?: ProviderCommentLog[];
   currentStatus?: string;
   notes?: string;
-  active: boolean;
+  active?: boolean;
   ownerAccountEmail?: string;
   isDemo?: boolean;
   isolatedFor?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type PayerType = 

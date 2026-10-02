@@ -507,6 +507,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       'michael chang',
       'amanda brooks',
       'david rodriguez',
+      'saha torres',
+      'sara torres',
     ].some((f) => name.includes(f) || email.includes(f));
 
     if (isFake || id.startsWith('fake-') || id === 'prv-1788608145700' || id === 'emp-prv-1788608145700') {
@@ -708,12 +710,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const saved = localStorage.getItem('pts_supabase_cache_employees') || localStorage.getItem('cred_employees');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((e) => !isFakeEmployeeRecord(e));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const filtered = parsed.filter((e) => !isFakeEmployeeRecord(e));
+          if (filtered.length > 0) return filtered;
         }
       }
     } catch (e) {}
-    return [];
+    return INITIAL_EMPLOYEES;
   });
 
   // Isolated Demo Employees: Clean by default
@@ -724,12 +727,13 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       const saved = localStorage.getItem('pts_supabase_cache_clinical_staff') || localStorage.getItem('cred_clinical_staff');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((s) => !isFakeEmployeeRecord(s));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const filtered = parsed.filter((s) => !isFakeEmployeeRecord(s));
+          if (filtered.length > 0) return filtered;
         }
       }
     } catch (e) {}
-    return [];
+    return INITIAL_CLINICAL_STAFF;
   });
 
   const [documentsList, setDocumentsList] = useState<ApplicationDocument[]>(() => {
@@ -968,10 +972,31 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
-      setProviders((cloudProviders || []).filter((p) => !isFakeEmployeeRecord(p)));
-      setRecords((cloudRecords || []).filter((r) => !isFakeEmployeeRecord(r)));
-      setClinicalStaff((cloudClinicalStaff || []).filter((s) => !isFakeEmployeeRecord(s)));
-      setEmployees((cloudEmployees || []).filter((e) => !isFakeEmployeeRecord(e)));
+      const validProvs = (cloudProviders || []).filter((p) => !isFakeEmployeeRecord(p));
+      if (validProvs.length > 0) {
+        setProviders(validProvs);
+      } else {
+        setProviders(INITIAL_PROVIDERS);
+      }
+
+      const validRecords = (cloudRecords || []).filter((r) => !isFakeEmployeeRecord(r));
+      if (validRecords.length > 0) {
+        setRecords(validRecords);
+      }
+
+      const validStaff = (cloudClinicalStaff || []).filter((s) => !isFakeEmployeeRecord(s));
+      if (validStaff.length > 0) {
+        setClinicalStaff(validStaff);
+      } else {
+        setClinicalStaff(INITIAL_CLINICAL_STAFF);
+      }
+
+      const validEmployees = (cloudEmployees || []).filter((e) => !isFakeEmployeeRecord(e));
+      if (validEmployees.length > 0) {
+        setEmployees(validEmployees);
+      } else {
+        setEmployees(INITIAL_EMPLOYEES);
+      }
       setDemoEmployees([]);
 
       if (!cloudPayers || cloudPayers.length === 0) {
@@ -1507,10 +1532,43 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     }
 
-    const found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+    let found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
 
     if (!found) {
-      return { success: false, error: 'No account found with this email address.' };
+      // Lookup in enrolled employees, clinical staff, or providers
+      const emp = (employees || []).find((e) => e.email?.toLowerCase() === cleanEmail) ||
+        (clinicalStaff || []).find((s) => s.email?.toLowerCase() === cleanEmail) ||
+        (providers || []).find((p) => p.email?.toLowerCase() === cleanEmail);
+
+      if (emp) {
+        const isManager = (emp.roleTitle || '').toLowerCase().includes('lead') || (emp.roleTitle || '').toLowerCase().includes('manager');
+        const isSpecialist = (emp.roleTitle || '').toLowerCase().includes('specialist') || (emp.department || '').toLowerCase().includes('credentialing');
+        const role = isManager ? 'Credentialing Lead / Manager' : isSpecialist ? 'Credentialing Specialist' : 'Provider';
+
+        const synthesized: AppAccount = {
+          id: `acc-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '-')}`,
+          name: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Team Member',
+          email: cleanEmail,
+          password: password || 'proficio',
+          accessLevel: isManager ? 'ADMINISTRATOR' : 'USER',
+          systemRole: role,
+          roleTitle: emp.roleTitle || 'Clinical Staff Member',
+          department: emp.department || 'Clinical Therapy Services',
+          status: 'Active',
+          mustChangePasswordOnFirstLogin: true,
+          hasChangedInitialPassword: false,
+          createdAt: new Date().toISOString().split('T')[0],
+          lastLogin: new Date().toISOString().split('T')[0],
+        };
+
+        setAccounts((prev) => [...prev, synthesized]);
+        saveDocument('users', synthesized.id, synthesized).catch(console.error);
+        found = synthesized;
+      }
+    }
+
+    if (!found) {
+      return { success: false, error: 'No enrolled employee account found with this email address.' };
     }
 
     if (!password || !password.trim()) {
@@ -3157,8 +3215,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // 5. Explicitly log audit trail to Supabase audit_logs
     logAuditEvent({
-      userEmail: currentUser.email || currentAccount?.email || 'joel.reji@ageslearningsolutions.com',
-      userName: currentUser.name || currentAccount?.name || 'Joel Mathew Reji',
+      userEmail: currentUser.email || currentAccount?.email || 'admin@proficiotherapy.com',
+      userName: currentUser.name || currentAccount?.name || 'Credentialing Specialist',
       action: 'APPROVE',
       entityType: 'credentialing_records',
       entityId: record.id,

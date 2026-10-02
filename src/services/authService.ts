@@ -366,10 +366,10 @@ export async function initiateGoogleSignIn(options?: {
 
 /**
  * Authenticates directly with the authoritative 10-step Employee Access Control backend
- * for an approved corporate identity (e.g. Joel Reji).
+ * for an approved corporate administrator identity.
  */
 export async function authenticateCorporateGoogleUser(
-  email: string = 'joel.reji@ageslearningsolutions.com'
+  email: string = 'superadmin@proficiotherapy.com'
 ): Promise<{ success: boolean; account?: AppAccount; error?: string; step?: number; stepName?: string; code?: string; denial?: VerificationResponse }> {
   const result = await verifyEmployeeWithServer(email);
   if (!result.authorized || !result.account) {

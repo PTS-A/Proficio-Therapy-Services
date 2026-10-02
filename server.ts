@@ -390,9 +390,9 @@ async function startServer() {
     const userEmail = (req.headers['x-user-email'] as string || req.query.email as string || '').trim().toLowerCase();
 
     const isAuthorized =
-      userEmail === 'joel.reji@ageslearningsolutions.com' ||
-      userEmail === 'superadmin@proficiotherapy.com' ||
       userEmail.endsWith('@ageslearningsolutions.com') ||
+      userEmail.endsWith('@childsplaytherapyservices.com') ||
+      userEmail.endsWith('@childsplaytherapy.com') ||
       userEmail.endsWith('@proficiotherapy.com');
 
     if (!isAuthorized) {
@@ -994,12 +994,12 @@ async function startServer() {
       });
 
       if (error || !data?.url) {
-        return res.redirect('/?auth_email=joel.reji%40ageslearningsolutions.com');
+        return res.redirect('/?auth_error=' + encodeURIComponent(error?.message || 'OAuth initialization failed'));
       }
 
       return res.redirect(data.url);
     } catch (err: any) {
-      return res.redirect('/?auth_email=joel.reji%40ageslearningsolutions.com');
+      return res.redirect('/?auth_error=' + encodeURIComponent(err.message || 'OAuth error'));
     }
   });
 
@@ -1526,6 +1526,28 @@ async function startServer() {
       res.json({ success: true, config: updated });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get programmed CC roster
+  app.get('/api/aesas/cc-roster', async (req, res) => {
+    try {
+      const { getProgrammedCcRoster } = await import('./server/aesasEngine');
+      res.json({ success: true, ccRoster: getProgrammedCcRoster() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Update programmed CC roster
+  app.put('/api/aesas/cc-roster', async (req, res) => {
+    try {
+      const { updateProgrammedCcRoster } = await import('./server/aesasEngine');
+      const ccRoster = req.body?.ccRoster || [];
+      const updated = updateProgrammedCcRoster(ccRoster);
+      res.json({ success: true, ccRoster: updated });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

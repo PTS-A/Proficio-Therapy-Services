@@ -8,7 +8,8 @@ import {
   canManageUsers, 
   canPerformBulkImport, 
   canEditSystemSettings,
-  isDeveloper
+  isDeveloper,
+  isAdminAccount
 } from '../../utils/rbac';
 import { 
   Building2, 
@@ -70,7 +71,8 @@ export type ActiveTabType =
   | 'comments-roster'
   | 'tickets'
   | 'dbms-manager'
-  | 'nemotron-edit';
+  | 'nemotron-edit'
+  | 'developer';
 
 interface HeaderProps {
   activeTab: ActiveTabType;
@@ -125,19 +127,22 @@ export const Header: React.FC<HeaderProps> = ({
   const coreNavItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
     { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
+    ...(isAdminAccount(currentAccount)
+      ? [{ id: 'admin-dashboard' as const, label: 'Admin Hub', icon: ShieldCheck }]
+      : []),
+    ...(isDeveloper(currentAccount)
+      ? [{ id: 'developer' as const, label: 'Developer', icon: Terminal }]
+      : []),
   ];
 
-  // Secondary operational tabs
+  // Secondary operational tabs (standard features only, no dev features)
   const secondaryNavItems = [
     { id: 'document-intake' as const, label: 'Smart Intake', icon: Sparkles },
     { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
     { id: 'locations' as const, label: 'Locations', icon: MapPin },
     { id: 'comments-roster' as const, label: 'Comments Roster', icon: MessageSquare },
-    { id: 'tickets' as const, label: 'Tickets', icon: Ticket },
     { id: 'aesas' as const, label: 'AESAS Alerts', icon: BellRing },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
-    { id: 'dbms-manager' as const, label: 'DBMS Manager', icon: Database },
-    { id: 'nemotron-edit' as const, label: 'Nemotron AI Edit', icon: Cpu },
   ];
 
   // All navigation items for mobile drawer
@@ -344,7 +349,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
 
                   {/* ELEGANT ADMIN DASHBOARD BUTTON UNDERNEATH PROFILE */}
-                  {(isSuperAdmin(currentAccount) || isAdmin || canManageUsers(currentAccount)) && (
+                  {canAccessTab(currentAccount, 'admin-dashboard') && (
                     <div className="p-2 border-b border-slate-100 bg-slate-50/70">
                       <button
                         onClick={() => {
@@ -397,112 +402,27 @@ export const Header: React.FC<HeaderProps> = ({
                       <span className="text-[10px] text-slate-400">Self-service</span>
                     </button>
 
-                    {/* DEV PROFILE TOOLS & DIRECT ACCESS */}
-                    {(isDeveloper(currentAccount) || isSuperAdmin(currentAccount)) && (
-                      <>
+                    {/* DEVELOPER CENTER — RESTRICTED TO DEVELOPER PROFILE ONLY */}
+                    {isDeveloper(currentAccount) && (
+                      <div className="pt-1 border-t border-slate-100">
                         <button
                           onClick={() => {
                             setUserMenuOpen(false);
-                            setActiveTab('dbms-manager');
+                            setActiveTab('developer');
                           }}
                           className={`w-full flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer ${
-                            activeTab === 'dbms-manager' 
-                              ? 'bg-emerald-50 text-emerald-800 font-bold' 
+                            activeTab === 'developer' 
+                              ? 'bg-purple-50 text-purple-900 font-bold' 
                               : 'hover:bg-slate-50 text-slate-700'
                           }`}
                         >
                           <div className="flex items-center space-x-2">
-                            <Database className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span className="text-xs font-semibold">DBMS Manager (Supabase)</span>
+                            <Terminal className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span className="text-xs font-semibold">Developer Center</span>
                           </div>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">DEV</span>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">DEV ONLY</span>
                         </button>
-
-                        <button
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            setActiveTab('nemotron-edit');
-                          }}
-                          className={`w-full flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer ${
-                            activeTab === 'nemotron-edit' 
-                              ? 'bg-purple-50 text-purple-800 font-bold' 
-                              : 'hover:bg-slate-50 text-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <Cpu className="w-4 h-4 text-purple-600 shrink-0" />
-                            <span className="text-xs font-semibold">Nemotron AI Edit System</span>
-                          </div>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">AI</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            setActiveTab('tickets');
-                          }}
-                          className={`w-full flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer ${
-                            activeTab === 'tickets' 
-                              ? 'bg-blue-50 text-[#2B4C9D] font-bold' 
-                              : 'hover:bg-slate-50 text-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <Ticket className="w-4 h-4 text-blue-600 shrink-0" />
-                            <span className="text-xs font-semibold">Ticket Management</span>
-                          </div>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-[#2B4C9D]">DEV</span>
-                        </button>
-
-                        <div className="pt-1 border-t border-slate-100">
-                          {currentAccount?.systemRole !== 'Developer' ? (
-                            <button
-                              onClick={() => {
-                                const devAcc = accounts.find(a => a.systemRole === 'Developer') || {
-                                  id: 'acc-user-developer',
-                                  name: 'Lead System Developer',
-                                  email: 'dev@proficiotherapy.com',
-                                  systemRole: 'Developer',
-                                  roleTitle: 'Lead Platform & Infrastructure Developer',
-                                  department: 'System Architecture & Engineering',
-                                  accessLevel: 'ADMINISTRATOR' as const,
-                                  status: 'Active' as const,
-                                  createdAt: '2026-01-01',
-                                  permissions: ['Full Developer Privileges'],
-                                };
-                                setCurrentAccount(devAcc);
-                                localStorage.setItem('cred_current_account', JSON.stringify(devAcc));
-                                setUserMenuOpen(false);
-                              }}
-                              className="w-full flex items-center justify-between p-2 rounded-xl bg-amber-50/70 hover:bg-amber-100/80 text-amber-900 transition-colors cursor-pointer text-left"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <Terminal className="w-4 h-4 text-amber-600 shrink-0" />
-                                <span className="text-xs font-bold">Switch to Dev Profile</span>
-                              </div>
-                              <span className="text-[10px] text-amber-700 font-semibold">All Access</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                const adminAcc = accounts.find(a => a.systemRole === 'System Administrator') || accounts[0];
-                                if (adminAcc) {
-                                  setCurrentAccount(adminAcc);
-                                  localStorage.setItem('cred_current_account', JSON.stringify(adminAcc));
-                                }
-                                setUserMenuOpen(false);
-                              }}
-                              className="w-full flex items-center justify-between p-2 rounded-xl bg-indigo-50/70 hover:bg-indigo-100/80 text-[#2B4C9D] transition-colors cursor-pointer text-left"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <ShieldCheck className="w-4 h-4 text-[#2B4C9D] shrink-0" />
-                                <span className="text-xs font-bold">Switch to Admin Profile</span>
-                              </div>
-                              <span className="text-[10px] text-indigo-600 font-semibold">Admin</span>
-                            </button>
-                          )}
-                        </div>
-                      </>
+                      </div>
                     )}
                   </div>
 

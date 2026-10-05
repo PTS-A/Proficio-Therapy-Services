@@ -28,7 +28,7 @@ const RAW_SEED_ACCOUNTS: Array<Omit<AppAccount, 'password' | 'isSuperAdmin'>> = 
     department: 'IT Governance & Operations',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     createdAt: '2026-01-01',
-    lastLogin: '2026-09-24',
+    lastLogin: '2026-10-04',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
     mustChangePasswordOnFirstLogin: false,
@@ -50,7 +50,7 @@ const RAW_SEED_ACCOUNTS: Array<Omit<AppAccount, 'password' | 'isSuperAdmin'>> = 
     department: 'System Architecture & Engineering',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     createdAt: '2026-01-01',
-    lastLogin: '2026-10-01',
+    lastLogin: '2026-10-04',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
     mustChangePasswordOnFirstLogin: false,
@@ -58,48 +58,23 @@ const RAW_SEED_ACCOUNTS: Array<Omit<AppAccount, 'password' | 'isSuperAdmin'>> = 
     permissions: [
       'Full Developer Privileges (Database Manager, Ticket Management, Nemotron System Editor)',
       'Manage users, roles, and permissions',
-      'Configure workflow stages, SLAs, notification templates, payer requirements',
-      'Manage integrations (email, Power BI dataset)',
-      'Manage security credentials, audit logs, and account lifecycle (Super Admin)',
     ],
   },
   {
-    id: 'acc-superadmin-corp',
-    name: 'Super Administrator',
-    email: 'superadmin@proficiotherapy.com',
-    accessLevel: 'ADMINISTRATOR',
-    systemRole: 'System Administrator',
-    roleTitle: 'Chief Information & Security Officer',
-    department: 'Information Security & Administration',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    createdAt: '2026-01-01',
-    lastLogin: '2026-08-26',
-    status: 'Active',
-    assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    mustChangePasswordOnFirstLogin: false,
-    hasChangedInitialPassword: true,
-    permissions: [
-      'Manage users, roles, and permissions',
-      'Configure workflow stages, SLAs, notification templates, payer requirements',
-      'Manage integrations (email, Power BI dataset)',
-      'Manage security credentials, audit logs, and account lifecycle (Super Admin)',
-    ],
-  },
-  {
-    id: 'acc-admin-namitha',
-    name: 'Namitha Narayanan',
-    email: 'manager@proficiotherapy.com',
+    id: 'acc-cred-lead',
+    name: 'Centralized Credentialing Lead',
+    email: 'credentialing@ageslearningsolutions.com',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'Credentialing Lead / Manager',
     roleTitle: 'Credentialing Operations Manager',
     department: 'Centralized Credentialing Hub',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     createdAt: '2026-01-10',
-    lastLogin: '2026-08-26',
+    lastLogin: '2026-10-04',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    mustChangePasswordOnFirstLogin: true,
-    hasChangedInitialPassword: false,
+    mustChangePasswordOnFirstLogin: false,
+    hasChangedInitialPassword: true,
     permissions: [
       'Work allocation and quality control',
       'Escalations and payer issue resolution',
@@ -108,67 +83,85 @@ const RAW_SEED_ACCOUNTS: Array<Omit<AppAccount, 'password' | 'isSuperAdmin'>> = 
     ],
   },
   {
-    id: 'acc-user-sanjay',
-    name: 'Sanjay Tom',
-    email: 'specialist@proficiotherapy.com',
+    id: 'acc-cred-specialist',
+    name: 'Centralized Credentialing Specialist',
+    email: 'specialist@ageslearningsolutions.com',
     accessLevel: 'USER',
     systemRole: 'Credentialing Specialist',
-    roleTitle: 'Senior Credentialing Specialist',
-    department: 'Proficio Therapy Credentialing Hub',
+    roleTitle: 'Credentialing Specialist',
+    department: 'Centralized Credentialing Hub',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     createdAt: '2026-01-15',
-    lastLogin: '2026-08-25',
+    lastLogin: '2026-10-04',
     status: 'Active',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    mustChangePasswordOnFirstLogin: true,
-    hasChangedInitialPassword: false,
+    mustChangePasswordOnFirstLogin: false,
+    hasChangedInitialPassword: true,
     permissions: [
       'Provider intake and document verification',
       'CAQH, NPI coordination, PAVE, Medicaid enrollment',
       'Payer applications and follow-ups',
-      'Additional documentation and application corrections',
-      'Approval and effective-date tracking',
       'Updating credentialing records and monthly reporting',
     ],
   },
   {
-    id: 'acc-user-hr',
-    name: 'Marcus Vance',
-    email: 'hroperations@proficiotherapy.com',
+    id: 'acc-erica-bustos',
+    name: 'Erica Bustos',
+    email: 'erica.bustos@ageslearningsolutions.com',
     accessLevel: 'USER',
-    systemRole: 'HR/Operations',
-    roleTitle: 'People & Clinical Staffing Operations Lead',
-    department: 'Human Resources & Staffing Operations',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    createdAt: '2026-01-25',
-    lastLogin: '2026-08-21',
+    systemRole: 'Provider',
+    roleTitle: 'BCBA Clinical Supervisor',
+    department: 'Clinical Services - ABA',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-01-20',
+    lastLogin: '2026-10-02',
     status: 'Active',
-    assignedDisciplines: ['ABA', 'Speech', 'OT'],
-    mustChangePasswordOnFirstLogin: true,
-    hasChangedInitialPassword: false,
+    assignedDisciplines: ['ABA'],
+    mustChangePasswordOnFirstLogin: false,
+    hasChangedInitialPassword: true,
     permissions: [
-      'Provider onboarding information (start date, location, group assignment)',
-      'Coordination with credentialing on new-hire timelines',
+      'Self-service clinician profile management',
+      'Submit change requests and document updates',
     ],
   },
   {
-    id: 'acc-user-clinical',
-    name: 'Clinical Quality Supervisor',
-    email: 'clinical@proficiotherapy.com',
+    id: 'acc-lauren-pourreau',
+    name: 'Lauren Pourreau',
+    email: 'laurens.slp@proficiotherapy.com',
     accessLevel: 'USER',
-    systemRole: 'Clinical Team',
-    roleTitle: 'Clinical Quality & Peer Review Supervisor',
-    department: 'Clinical Supervision & Quality',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    createdAt: '2026-02-01',
-    lastLogin: '2026-08-22',
+    systemRole: 'Provider',
+    roleTitle: 'Speech-Language Pathologist (SLP)',
+    department: 'Proficio Speech Therapy Group',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-01-20',
+    lastLogin: '2026-10-02',
     status: 'Active',
-    assignedDisciplines: ['OT', 'ABA'],
-    mustChangePasswordOnFirstLogin: true,
-    hasChangedInitialPassword: false,
+    assignedDisciplines: ['Speech'],
+    mustChangePasswordOnFirstLogin: false,
+    hasChangedInitialPassword: true,
     permissions: [
-      'Clinical documentation and verification support',
-      'License, board certification, and reference support',
+      'Self-service clinician profile management',
+      'Submit change requests and document updates',
+    ],
+  },
+  {
+    id: 'acc-alyssa-barker',
+    name: 'Alyssa Barker',
+    email: 'alyssa.barker@childsplaytherapyservices.com',
+    accessLevel: 'USER',
+    systemRole: 'Provider',
+    roleTitle: 'Occupational Therapist (OTR/L)',
+    department: 'Child\'s Play Therapy Services',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    createdAt: '2026-01-20',
+    lastLogin: '2026-10-02',
+    status: 'Active',
+    assignedDisciplines: ['OT'],
+    mustChangePasswordOnFirstLogin: false,
+    hasChangedInitialPassword: true,
+    permissions: [
+      'Self-service clinician profile management',
+      'Submit change requests and document updates',
     ],
   },
 ];
@@ -190,51 +183,60 @@ export const INITIAL_USERS: User[] = [
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
   {
-    id: 'usr-1',
-    name: 'Sanjay Tom',
-    email: 'sanjay.tom@ageslearningsolutions.com',
-    role: 'Specialist',
+    id: 'usr-cred-lead',
+    name: 'Centralized Credentialing Lead',
+    email: 'credentialing@ageslearningsolutions.com',
+    role: 'Manager' as any,
+    accessLevel: 'ADMINISTRATOR',
+    assignedDisciplines: ['ABA', 'Speech', 'OT'],
+  },
+  {
+    id: 'usr-cred-spec',
+    name: 'Centralized Credentialing Specialist',
+    email: 'specialist@ageslearningsolutions.com',
+    role: 'Specialist' as any,
     accessLevel: 'USER',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],
   },
   {
-    id: 'usr-2',
-    name: 'Namitha Narayanan',
-    email: 'namitha.narayanan@ageslearningsolutions.com',
-    role: 'Manager',
-    accessLevel: 'ADMINISTRATOR',
-    assignedDisciplines: ['ABA', 'Speech', 'OT'],
-  },
-  {
-    id: 'usr-3',
-    name: 'Marcus Vance',
-    email: 'marcus.vance@leadership.org',
-    role: 'Leadership',
-    accessLevel: 'ADMINISTRATOR',
-    assignedDisciplines: ['ABA', 'Speech', 'OT'],
-  },
-  {
-    id: 'usr-4',
-    name: 'Elena Rostova',
-    email: 'elena.rostova@proficiotherapy.com',
-    role: 'Specialist',
+    id: 'usr-pstg-spec',
+    name: 'Proficio Credentialing Specialist',
+    email: 'info@proficiotherapy.com',
+    role: 'Specialist' as any,
     accessLevel: 'USER',
     assignedDisciplines: ['Speech', 'OT'],
   },
   {
-    id: 'usr-5',
-    name: 'Elena Rostova',
-    email: 'elena.rostova@childsplaytherapy.com',
-    role: 'Specialist',
+    id: 'usr-cpts-spec',
+    name: 'Child\'s Play Credentialing Coordinator',
+    email: 'info@childsplaytherapyservices.com',
+    role: 'Specialist' as any,
     accessLevel: 'USER',
-    assignedDisciplines: ['ABA', 'Speech', 'OT'],
+    assignedDisciplines: ['Speech', 'OT', 'ABA'],
   },
   {
-    id: 'usr-6',
-    name: 'David Chen',
-    email: 'david.chen@ageslearningsolutions.com',
-    role: 'Operations',
+    id: 'usr-erica-bustos',
+    name: 'Erica Bustos',
+    email: 'erica.bustos@ageslearningsolutions.com',
+    role: 'Clinical' as any,
     accessLevel: 'USER',
+    assignedDisciplines: ['ABA'],
+  },
+  {
+    id: 'usr-lauren-pourreau',
+    name: 'Lauren Pourreau',
+    email: 'laurens.slp@proficiotherapy.com',
+    role: 'Clinical' as any,
+    accessLevel: 'USER',
+    assignedDisciplines: ['Speech'],
+  },
+  {
+    id: 'usr-alyssa-barker',
+    name: 'Alyssa Barker',
+    email: 'alyssa.barker@childsplaytherapyservices.com',
+    role: 'Clinical' as any,
+    accessLevel: 'USER',
+    assignedDisciplines: ['OT'],
   },
 ];
 
@@ -251,7 +253,7 @@ export const INITIAL_LEGAL_ENTITIES: LegalEntity[] = [
     generalLiabilityExpiry: '2027-02-01',
     workersCompPolicy: 'WC-48201-CA',
     workersCompExpiry: '2027-03-15',
-    primaryContact: 'Namitha Narayanan',
+    primaryContact: 'Centralized Credentialing Lead',
     email: 'credentialing@ageslearningsolutions.com',
     phone: '(408) 555-0192',
     address: '2105 S Bascom Ave, Suite 150, San Jose, CA 95124',
@@ -12035,10 +12037,79 @@ export const INITIAL_PROVIDERS: Provider[] = [
       "taxonomy": "235Z00000X",
       "licenseNumber": "41835"
     }
+  },
+  {
+    "id": "prv-sheel-mehata",
+    "firstName": "Sheel",
+    "lastName": "Mehata",
+    "fullName": "Sheel Mehata",
+    "credentials": "OTR/L",
+    "disciplines": [
+      "OT"
+    ],
+    "providerType": "OTR/L",
+    "email": "",
+    "phone": "",
+    "npi": "1306146907",
+    "licenseNumber": "",
+    "licenseState": "CA",
+    "licenseExpiration": "",
+    "caqhId": "16487278",
+    "caqhStatus": "Attested",
+    "paveStatus": "Not Started",
+    "npiVerified": true,
+    "nppesRecordMatch": true,
+    "entityIds": [
+      "ent-pstg-inc"
+    ],
+    "primaryEntityId": "ent-pstg-inc",
+    "locationIds": [
+      "loc-1"
+    ],
+    "primaryLocationId": "loc-1",
+    "payerEnrollments": [
+      {
+        "payerId": "pyr-aetna",
+        "payerName": "Aetna",
+        "status": "In Progress"
+      },
+      {
+        "payerId": "pyr-cigna",
+        "payerName": "Cigna / ASH",
+        "status": "Pending"
+      },
+      {
+        "payerId": "pyr-blue-shield-ca",
+        "payerName": "Blue Shield of CA",
+        "status": "Pending"
+      },
+      {
+        "payerId": "pyr-anthem-ca",
+        "payerName": "Anthem Blue Cross",
+        "status": "In Progress"
+      },
+      {
+        "payerId": "pyr-ash",
+        "payerName": "American Specialty Health (ASH)",
+        "status": "In Progress"
+      },
+      {
+        "payerId": "pyr-vhp",
+        "payerName": "Valley Health Plan",
+        "status": "Pending"
+      }
+    ],
+    "active": true,
+    "isDemo": false,
+    "contractInfo": {
+      "dob": "1985-04-16",
+      "taxonomy": "225X00000X",
+      "licenseNumber": ""
+    }
   }
 ];
 
-export const INITIAL_CREDENTIALING_RECORDS: CredentialingRecord[] = [];
+export { INITIAL_CREDENTIALING_RECORDS } from './initialRecords';
 
 export const INITIAL_NOTIFICATIONS: SystemNotification[] = [];
 
@@ -14456,6 +14527,22 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     "officeLocationId": "loc-2",
     "entityId": "ent-3",
     "notes": "License: 41835. CAQH: 16856264. Org: Child's Play Therapy Services.",
+    "isDemo": false
+  },
+  {
+    "id": "emp-prv-sheel-mehata",
+    "firstName": "Sheel",
+    "lastName": "Mehata",
+    "fullName": "Sheel Mehata",
+    "email": "",
+    "phone": "",
+    "department": "Clinical Services - Occupational Therapy",
+    "roleTitle": "Occupational Therapist (OTR/L)",
+    "employmentStatus": "Full-Time",
+    "startDate": "",
+    "officeLocationId": "loc-1",
+    "entityId": "ent-pstg-inc",
+    "notes": "Onboarded from Matrix. CAQH: 16487278. NPI: 1306146907. Emp-360 data to be completed by credentialing staff.",
     "isDemo": false
   }
 ];
@@ -30211,6 +30298,95 @@ export const INITIAL_CLINICAL_STAFF: ClinicalStaff[] = [
         "dob": "1985-07-03",
         "taxonomy": "235Z00000X",
         "licenseNumber": "41835"
+      }
+    }
+  },
+  {
+    "id": "cs-prv-sheel-mehata",
+    "employeeId": "emp-prv-sheel-mehata",
+    "providerId": "prv-sheel-mehata",
+    "firstName": "Sheel",
+    "lastName": "Mehata",
+    "fullName": "Sheel Mehata",
+    "credentials": "OTR/L",
+    "disciplines": [
+      "OT"
+    ],
+    "providerType": "OTR/L",
+    "licenseNumber": "",
+    "licenseState": "CA",
+    "licenseExpiration": "",
+    "npi": "1306146907",
+    "taxonomy": "225X00000X",
+    "specialty": "Occupational Therapy",
+    "locationIds": [
+      "loc-1"
+    ],
+    "primaryLocationId": "loc-1",
+    "entityIds": [
+      "ent-pstg-inc"
+    ],
+    "primaryEntityId": "ent-pstg-inc",
+    "status": "Active",
+    "isDemo": false,
+    "rawData": {
+      "id": "prv-sheel-mehata",
+      "firstName": "Sheel",
+      "lastName": "Mehata",
+      "fullName": "Sheel Mehata",
+      "credentials": "OTR/L",
+      "disciplines": [
+        "OT"
+      ],
+      "providerType": "OTR/L",
+      "npi": "1306146907",
+      "caqhId": "16487278",
+      "entityIds": [
+        "ent-pstg-inc"
+      ],
+      "primaryEntityId": "ent-pstg-inc",
+      "locationIds": [
+        "loc-1"
+      ],
+      "primaryLocationId": "loc-1",
+      "payerEnrollments": [
+        {
+          "payerId": "pyr-aetna",
+          "payerName": "Aetna",
+          "status": "In Progress"
+        },
+        {
+          "payerId": "pyr-cigna",
+          "payerName": "Cigna / ASH",
+          "status": "Pending"
+        },
+        {
+          "payerId": "pyr-blue-shield-ca",
+          "payerName": "Blue Shield of CA",
+          "status": "Pending"
+        },
+        {
+          "payerId": "pyr-anthem-ca",
+          "payerName": "Anthem Blue Cross",
+          "status": "In Progress"
+        },
+        {
+          "payerId": "pyr-ash",
+          "payerName": "American Specialty Health (ASH)",
+          "status": "In Progress"
+        },
+        {
+          "payerId": "pyr-vhp",
+          "payerName": "Valley Health Plan",
+          "status": "Pending"
+        }
+      ],
+      "active": true,
+      "isDemo": false,
+      "contractInfo": {
+        "dob": "1985-04-16",
+        "taxonomy": "225X00000X",
+        "licenseNumber": ""
       }
     }
   }

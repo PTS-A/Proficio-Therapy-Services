@@ -5,14 +5,14 @@ import {
   UserCheck, 
   Settings, 
   Mail, 
-  Database, 
   Key, 
   CheckCircle2, 
   Clock, 
   AlertTriangle, 
   Layers, 
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { NewUserView } from './NewUserView';
@@ -25,15 +25,10 @@ import { SystemConfigView } from './SystemConfigView';
 import { StaffApprovalsView } from './StaffApprovalsView';
 import { AdminInsuranceManager } from './AdminInsuranceManager';
 import { CcRosterAdminView } from './CcRosterAdminView';
-import { DbmsManagerView } from './DbmsManagerView';
-import { TicketManagementView } from '../dev/TicketManagementView';
-import { Ticket } from 'lucide-react';
 
 export type AdminSubSection = 
   | 'overview'
   | 'cc-roster'
-  | 'dbms'
-  | 'tickets'
   | 'approvals'
   | 'users'
   | 'access-requests'
@@ -85,20 +80,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       icon: Mail,
       count: null,
       description: 'Configure auto-CC on all system emails (excluding onboarding)',
-    },
-    {
-      id: 'dbms' as const,
-      label: 'DBMS Manager (Supabase)',
-      icon: Database,
-      count: null,
-      description: 'Direct live database inspector, editor, and table manager',
-    },
-    {
-      id: 'tickets' as const,
-      label: 'Ticket Management',
-      icon: Ticket,
-      count: null,
-      description: 'Review and manage staff issue tickets & bug reports',
     },
     {
       id: 'approvals' as const,
@@ -155,7 +136,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     {
       id: 'import' as const,
       label: 'Spreadsheet Ingestion',
-      icon: Database,
+      icon: FileSpreadsheet,
       count: null,
       description: 'Bulk CSV / Excel clinical staff and roster import',
     },
@@ -329,14 +310,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {activeSection === 'cc-roster' && (
           <CcRosterAdminView />
-        )}
-
-        {activeSection === 'dbms' && (
-          <DbmsManagerView />
-        )}
-
-        {activeSection === 'tickets' && (
-          <TicketManagementView />
         )}
 
         {activeSection === 'approvals' && (

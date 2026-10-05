@@ -25,7 +25,8 @@ export type ActiveTabType =
   | 'comments-roster'
   | 'tickets'
   | 'nemotron-edit'
-  | 'dbms-manager';
+  | 'dbms-manager'
+  | 'developer';
 
 /**
  * Checks if the account is a Developer profile.
@@ -33,6 +34,8 @@ export type ActiveTabType =
  */
 export const isDeveloper = (account: AppAccount | null | undefined): boolean => {
   if (!account) return false;
+  if (account.canAccessDev === true) return true;
+  if (account.canAccessDev === false) return false;
   if (account.systemRole === 'Developer') return true;
   if (account.roleTitle?.toLowerCase().includes('dev') || account.email?.toLowerCase().includes('dev@')) return true;
   return false;
@@ -63,11 +66,31 @@ export const isSuperAdmin = (account: AppAccount | null | undefined): boolean =>
  */
 export const isAdminAccount = (account: AppAccount | null | undefined): boolean => {
   if (!account) return false;
+  if (account.canAccessAdmin === true) return true;
+  if (account.canAccessAdmin === false && !isSuperAdmin(account)) return false;
   if (isDeveloper(account)) return true;
   if (isSuperAdmin(account)) return true;
   if (account.accessLevel === 'ADMINISTRATOR') return true;
   if (account.systemRole === 'System Administrator') return true;
   return false;
+};
+
+/**
+ * Verifies if an account has permission to edit clinical & credentialing data.
+ * Respects canEditData (View-Only vs Can Edit) configured during onboarding.
+ */
+export const canUserEdit = (account: AppAccount | null | undefined): boolean => {
+  if (!account) return false;
+  if (isSuperAdmin(account) || isDeveloper(account)) return true;
+  if (typeof account.canEditData === 'boolean') {
+    return account.canEditData;
+  }
+  return (
+    account.accessLevel === 'ADMINISTRATOR' ||
+    account.systemRole === 'Credentialing Lead / Manager' ||
+    account.systemRole === 'Credentialing Specialist' ||
+    account.systemRole === 'HR/Operations'
+  );
 };
 
 export const canAccessDbmsManager = (account: AppAccount | null | undefined): boolean => {
@@ -119,14 +142,76 @@ export const canApproveApplications = (account: AppAccount | null | undefined): 
 };
 
 /**
+ * Checks if an account has permission to view clinical staff data for a specific entity.
+ * Supports granular entity-to-entity access controls configured during onboarding.
+ */
+export const canViewEntity = (account: AppAccount | null | undefined, entityId: string): boolean => {
+  if (!account) return false;
+  if (isSuperAdmin(account) || isDeveloper(account)) return true;
+  if (!account.assignedEntities || account.assignedEntities.length === 0) return true;
+  const norm = (id: string) => (id === 'ent-2' ? 'ent-pstg-inc' : id);
+  return account.assignedEntities.some((id) => norm(id) === norm(entityId));
+};
+
+/**
+ * Checks if an account has permission to view a specific clinician provider.
+ * Enforces entity-entity visibility constraints.
+ */
+export const canViewProvider = (account: AppAccount | null | undefined, provider: { primaryEntityId?: string; entityIds?: string[] }): boolean => {
+  if (!account) return false;
+  if (isSuperAdmin(account) || isDeveloper(account)) return true;
+  if (!account.assignedEntities || account.assignedEntities.length === 0) return true;
+  const norm = (id?: string) => (id === 'ent-2' ? 'ent-pstg-inc' : id || '');
+  const userEntities = new Set(account.assignedEntities.map(norm));
+  if (provider.primaryEntityId && userEntities.has(norm(provider.primaryEntityId))) return true;
+  if (provider.entityIds?.some((id) => userEntities.has(norm(id)))) return true;
+  return false;
+};
+
+/**
  * Returns the exact list of allowed navigation tabs for a given system role.
  * Ensures strict constraints so accounts cannot view or navigate to unassigned sections.
  */
 export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTabType[] => {
   if (!account) return [];
+  const role: SystemRole = account.systemRole || 'Credentialing Specialist';
 
-  // Super Admin / Developer / System Administrator has complete access
-  if (isSuperAdmin(account) || isAdminAccount(account) || isDeveloper(account)) {
+  // If explicit granular allowedTabs are configured, strictly honor them
+  if (Array.isArray(account.allowedTabs) && account.allowedTabs.length > 0 && !isSuperAdmin(account)) {
+    const customTabs = [...account.allowedTabs] as ActiveTabType[];
+    if (account.canAccessAdmin && !customTabs.includes('admin-dashboard')) {
+      customTabs.push('admin-dashboard');
+    }
+    if (account.canAccessDev) {
+      if (!customTabs.includes('dbms-manager')) customTabs.push('dbms-manager');
+      if (!customTabs.includes('nemotron-edit')) customTabs.push('nemotron-edit');
+    }
+    return customTabs;
+  }
+
+  // Developer Profile: Access to engineering tools and Developer Center
+  if (role === 'Developer' || isDeveloper(account)) {
+    return [
+      'developer',
+      'dashboard',
+      'tracker',
+      'providers',
+      'locations',
+      'payers',
+      'entities',
+      'reports',
+      'document-intake',
+      'clinical-portal',
+      'aesas',
+      'comments-roster',
+      'tickets',
+      'nemotron-edit',
+      'dbms-manager',
+    ];
+  }
+
+  // Super Admin / System Administrator: Full administrative and clinical governance (no dev items)
+  if (isSuperAdmin(account) || isAdminAccount(account)) {
     return [
       'dashboard',
       'tracker',
@@ -149,13 +234,8 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'staff-approvals',
       'aesas',
       'comments-roster',
-      'tickets',
-      'nemotron-edit',
-      'dbms-manager'
     ];
   }
-
-  const role: SystemRole = account.systemRole || 'Credentialing Specialist';
 
   switch (role) {
     case 'Credentialing Lead / Manager':
@@ -172,8 +252,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'staff-approvals',
         'clinical-portal',
         'aesas',
-        'comments-roster',
-        'tickets'
+        'comments-roster'
       ];
 
     case 'Credentialing Specialist':
@@ -186,8 +265,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'staff-approvals',
         'clinical-portal',
         'aesas',
-        'comments-roster',
-        'tickets'
+        'comments-roster'
       ];
 
     case 'Billing and Claims':
@@ -197,8 +275,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'payers',
         'reports',
         'clinical-portal',
-        'comments-roster',
-        'tickets'
+        'comments-roster'
       ];
 
     case 'HR/Operations':
@@ -209,8 +286,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'entities',
         'tracker',
         'clinical-portal',
-        'comments-roster',
-        'tickets'
+        'comments-roster'
       ];
 
     case 'Clinical Team':
@@ -220,8 +296,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'tracker',
         'reports',
         'clinical-portal',
-        'comments-roster',
-        'tickets'
+        'comments-roster'
       ];
 
     case 'Leadership / Management':
@@ -232,8 +307,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'payers',
         'clinical-portal',
         'aesas',
-        'comments-roster',
-        'tickets'
+        'comments-roster'
       ];
 
     case 'Provider':
@@ -241,12 +315,11 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
         'dashboard',
         'providers',
         'tracker',
-        'clinical-portal',
-        'tickets'
+        'clinical-portal'
       ];
 
     default:
-      return ['dashboard', 'tracker', 'providers', 'clinical-portal', 'comments-roster', 'tickets'];
+      return ['dashboard', 'tracker', 'providers', 'clinical-portal', 'comments-roster'];
   }
 };
 
@@ -255,20 +328,43 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
  */
 export const canAccessTab = (account: AppAccount | null | undefined, tab: ActiveTabType): boolean => {
   if (!account) return false;
-  if (tab === 'document-intake' || tab === 'nemotron-edit' || tab === 'dbms-manager') {
-    return isAdminAccount(account) || isDeveloper(account);
+
+  // 1. Dev Tools Access Control (Dev Tab only, not accessible by anyone other than dev)
+  if (tab === 'developer' || tab === 'dbms-manager' || tab === 'nemotron-edit' || tab === 'tickets') {
+    if (account.canAccessDev === true) return true;
+    if (account.canAccessDev === false) return false;
+    return isDeveloper(account) || isSuperAdmin(account);
   }
+
+  // 2. Admin Dashboard Access Control (canAccessAdmin tick box)
+  if (tab === 'admin-dashboard') {
+    if (account.canAccessAdmin === true) return true;
+    if (account.canAccessAdmin === false) return false;
+    return isSuperAdmin(account) || isAdminAccount(account) || account.systemRole === 'Credentialing Lead / Manager';
+  }
+
+  // 3. Super Admin Only Governance Tabs
   if (tab === 'access-requests' || tab === 'security-center' || tab === 'google-authenticator') {
+    if (account.canAccessAdmin === false) return false;
     return isSuperAdmin(account) || isAdminAccount(account);
   }
-  if (tab === 'admin-dashboard') {
-    return isSuperAdmin(account) || isAdminAccount(account) || account.systemRole === 'Credentialing Lead / Manager';
+
+  // 4. Granular Page Permissions (what pages they can view tick boxes)
+  if (Array.isArray(account.allowedTabs) && account.allowedTabs.length > 0) {
+    if (account.allowedTabs.includes(tab)) return true;
+    if (tab === 'users' && account.allowedTabs.includes('new-user')) return true;
+    if (tab === 'new-user' && account.allowedTabs.includes('users')) return true;
+    return false;
+  }
+
+  // 5. Default Role-Based Access Mapping
+  if (tab === 'document-intake') {
+    return isAdminAccount(account) || isDeveloper(account);
   }
   if (tab === 'staff-approvals') {
     return isSuperAdmin(account) || isAdminAccount(account) || account.systemRole === 'Credentialing Lead / Manager' || account.systemRole === 'Credentialing Specialist';
   }
   if (tab === 'aesas') {
-    // Accessible and editable by all credentialing employees like head and lead and System administrator only
     const isHeadOrLead = (account.roleTitle && /head|lead|director|manager/i.test(account.roleTitle)) ||
       account.systemRole === 'Credentialing Lead / Manager' ||
       account.systemRole === 'Leadership / Management';

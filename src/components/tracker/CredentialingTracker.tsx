@@ -60,6 +60,12 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
 
   const filteredRecords = getFilteredRecords();
 
+  // Status Category Totals for Quick-Switch Tabs
+  const approvedTotalCount = records.filter(r => ['Approved', 'Linked', 'Effective'].includes(r.stage)).length;
+  const pendingTotalCount = records.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending', 'Payer Review', 'Application Submitted', 'Resubmitted'].includes(r.stage) && !r.isOverdue).length;
+  const requiringActionTotalCount = records.filter(r => ['Action Required', 'Additional Documents Requested', 'Correction Required', 'Overdue', 'Recredentialing Due'].includes(r.stage) || r.isOverdue).length;
+  const overdueTotalCount = records.filter(r => r.isOverdue || r.stage === 'Overdue').length;
+
   const STAGES: CredentialingStage[] = stageConfigs?.map((s) => s.name) || [
     'Intake',
     'Documents Pending',
@@ -283,6 +289,98 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
           </div>
         </div>
 
+        {/* Primary Status Category Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, statusCategory: 'All', stage: 'All', isOverdueOnly: false, needsActionOnly: false }))}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
+              filters.statusCategory === 'All' && !filters.isOverdueOnly && !filters.needsActionOnly
+                ? 'bg-[#2B4C9D] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <span>All Applications</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              filters.statusCategory === 'All' && !filters.isOverdueOnly && !filters.needsActionOnly ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {records.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, statusCategory: 'Approved', stage: 'All', isOverdueOnly: false, needsActionOnly: false }))}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
+              filters.statusCategory === 'Approved'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Approved</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              filters.statusCategory === 'Approved' ? 'bg-white/20 text-white' : 'bg-emerald-200 text-emerald-900'
+            }`}>
+              {approvedTotalCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, statusCategory: 'Pending', stage: 'All', isOverdueOnly: false, needsActionOnly: false }))}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
+              filters.statusCategory === 'Pending'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Pending</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              filters.statusCategory === 'Pending' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-900'
+            }`}>
+              {pendingTotalCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, statusCategory: 'Requiring Action', stage: 'All', isOverdueOnly: false, needsActionOnly: false }))}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
+              filters.statusCategory === 'Requiring Action'
+                ? 'bg-orange-600 text-white shadow-xs'
+                : 'bg-orange-50 text-orange-800 border border-orange-200 hover:bg-orange-100'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Requiring Action</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              filters.statusCategory === 'Requiring Action' ? 'bg-white/20 text-white' : 'bg-orange-200 text-orange-900'
+            }`}>
+              {requiringActionTotalCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, statusCategory: 'Overdue', stage: 'All', isOverdueOnly: true, needsActionOnly: false }))}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
+              filters.statusCategory === 'Overdue' || filters.isOverdueOnly
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Overdue</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              filters.statusCategory === 'Overdue' || filters.isOverdueOnly ? 'bg-white/20 text-white' : 'bg-rose-200 text-rose-900'
+            }`}>
+              {overdueTotalCount}
+            </span>
+          </button>
+        </div>
+
         {/* Filter Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 pt-2 border-t border-slate-100 text-xs">
           {/* Free text search */}
@@ -404,6 +502,7 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
               filters.payerId !== 'All' ||
               filters.stage !== 'All' ||
               filters.entityId !== 'All' ||
+              filters.statusCategory !== 'All' ||
               filters.isOverdueOnly ||
               filters.needsActionOnly ||
               filters.linkingPendingOnly) && (
@@ -680,11 +779,13 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
           {[
             { id: 'intake', title: '1. Intake & Prep', stages: ['Intake', 'Documents Pending', 'Documents Complete', 'Application Preparation'] },
             { id: 'submitted', title: '2. Submitted / Payer Review', stages: ['Application Submitted', 'Payer Review', 'Resubmitted'] },
-            { id: 'action', title: '3. Action Required / RFI', stages: ['Additional Documents Requested', 'Correction Required'] },
-            { id: 'linking', title: '4. Linking Pending', stages: ['Approved', 'Linking Pending'] },
+            { id: 'action', title: '3. Action Required / RFI', stages: ['Additional Documents Requested', 'Correction Required', 'Action Required', 'Overdue', 'Recredentialing Due'] },
+            { id: 'linking', title: '4. Approved & Linking', stages: ['Approved', 'Linking Pending'] },
             { id: 'effective', title: '5. Linked & Effective', stages: ['Linked', 'Effective'] },
           ].map((column) => {
-            const colRecords = filteredRecords.filter((r) => column.stages.includes(r.stage));
+            const colRecords = filteredRecords.filter((r) => 
+              column.stages.includes(r.stage) || (column.id === 'action' && (r.isOverdue || r.stage === 'Overdue'))
+            );
 
             return (
               <div key={column.id} className="bg-slate-100/70 p-3 rounded-2xl border border-slate-200 flex flex-col max-h-[750px]">

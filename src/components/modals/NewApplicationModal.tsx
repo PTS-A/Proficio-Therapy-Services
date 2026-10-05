@@ -233,7 +233,7 @@ export const NewApplicationModal: React.FC<NewApplicationModalProps> = ({
     const commentItem: TempCommentItem = {
       id: `com-tmp-${Date.now()}`,
       commentText: newCommentText.trim(),
-      authorName: currentAccount?.name || currentUser.name || 'Sanjay Tom',
+      authorName: currentAccount?.name || currentUser.name || 'Centralized Credentialing Specialist',
       authorRole: currentAccount?.systemRole || currentUser.role || 'Credentialing Specialist',
       dateCreated: now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       timeCreated: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),

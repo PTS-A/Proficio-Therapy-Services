@@ -171,7 +171,7 @@ Please ensure all updated CAQH attestations, current malpractice COI, and update
 
 RECIPIENT ROUTING:
 Dispatched simultaneously to:
-• Credentialing Head (Namitha Narayanan & Lead)
+• Credentialing Head (Centralized Credentialing Lead)
 • System Administrator (superadmin@proficiotherapy.com, admin@proficiotherapy.com)
 • Clinician Staff & Credentialing Operations
 
@@ -510,23 +510,14 @@ export async function getAllEmployeeEmails(): Promise<string[]> {
 
   // 3. Fallback active company staff roster (Strictly authentic staff)
   const fallbackRoster = [
-    'specialist@proficiotherapy.com',
-    'hroperations@proficiotherapy.com',
-    'clinical@proficiotherapy.com',
-    'sanjay.tom@ageslearningsolutions.com',
-    'namitha.narayanan@ageslearningsolutions.com',
-    'marcus.vance@leadership.org',
-    'elena.rostova@proficiotherapy.com',
-    'david.chen@ageslearningsolutions.com',
-    'provider@proficiotherapy.com',
-    'leadership@proficiotherapy.com',
-    'ashley.vanderbilt@ageslearningsolutions.com',
-    'maya.patel@proficiotherapy.com',
-    'lucas.moreno@childsplaytherapy.com',
-    'kaitlyn.zimmerman@ageslearningsolutions.com',
-    'jordan.taylor@proficiotherapy.com',
-    'derrick.sterling@childsplaytherapy.com',
-    'marcus.vance@ageslearning.com',
+    'credentialing@ageslearningsolutions.com',
+    'specialist@ageslearningsolutions.com',
+    'joel.reji@ageslearningsolutions.com',
+    'erica.bustos@ageslearningsolutions.com',
+    'laurens.slp@proficiotherapy.com',
+    'alyssa.barker@childsplaytherapyservices.com',
+    'info@proficiotherapy.com',
+    'info@childsplaytherapyservices.com',
   ];
   fallbackRoster.forEach((e) => emailSet.add(e.toLowerCase()));
 

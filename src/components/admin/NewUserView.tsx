@@ -83,11 +83,66 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
   const [assignedDisciplines, setAssignedDisciplines] = useState<Discipline[]>(['ABA', 'Speech', 'OT']);
   const [assignedEntities, setAssignedEntities] = useState<string[]>(entities.map(e => e.id));
 
+  // Granular Onboarding Permissions (Tick Boxes)
+  // 1. Whose clinical staff data they can see [entity-entity control] -> assignedEntities
+  // 2. What pages they can view -> allowedTabs
+  // 3. Can they use the admin dashboard -> canAccessAdmin
+  // 4. Can they use the dev dashboard -> canAccessDev
+  // 5. Can they only view or can they also edit those data -> canEditData
+  const [allowedTabs, setAllowedTabs] = useState<string[]>([
+    'dashboard', 'tracker', 'providers', 'locations', 'payers', 'staff-approvals', 'clinical-portal', 'aesas', 'comments-roster', 'tickets'
+  ]);
+  const [canAccessAdmin, setCanAccessAdmin] = useState<boolean>(false);
+  const [canAccessDev, setCanAccessDev] = useState<boolean>(false);
+  const [canEditData, setCanEditData] = useState<boolean>(true);
+
   const [deleteTargetUser, setDeleteTargetUser] = useState<AppAccount | null>(null);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isDeletingUser, setIsDeletingUser] = useState(false);
 
   const isCurrentSuperAdmin = isSuperAdmin(currentAccount);
+
+  // Default pages resolver per role
+  const getDefaultPagesForRole = (role: SystemRole): string[] => {
+    switch (role) {
+      case 'Credentialing Lead / Manager':
+        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities', 'reports', 'automations', 'admin-dashboard', 'staff-approvals', 'clinical-portal', 'aesas', 'comments-roster', 'tickets'];
+      case 'Credentialing Specialist':
+        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'staff-approvals', 'clinical-portal', 'aesas', 'comments-roster', 'tickets'];
+      case 'Billing and Claims':
+        return ['dashboard', 'tracker', 'payers', 'reports', 'clinical-portal', 'comments-roster', 'tickets'];
+      case 'HR/Operations':
+        return ['dashboard', 'providers', 'locations', 'entities', 'tracker', 'clinical-portal', 'comments-roster', 'tickets'];
+      case 'Clinical Team':
+        return ['dashboard', 'providers', 'tracker', 'reports', 'clinical-portal', 'comments-roster', 'tickets'];
+      case 'Leadership / Management':
+        return ['dashboard', 'reports', 'tracker', 'payers', 'clinical-portal', 'aesas', 'comments-roster', 'tickets'];
+      case 'Developer':
+        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities', 'reports', 'document-intake', 'admin-dashboard', 'clinical-portal', 'staff-approvals', 'aesas', 'comments-roster', 'tickets', 'dbms-manager', 'nemotron-edit'];
+      case 'System Administrator':
+        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities', 'reports', 'document-intake', 'admin-dashboard', 'clinical-portal', 'staff-approvals', 'aesas', 'comments-roster', 'tickets', 'dbms-manager', 'nemotron-edit'];
+      case 'Provider':
+        return ['dashboard', 'providers', 'tracker', 'clinical-portal', 'tickets'];
+      default:
+        return ['dashboard', 'tracker', 'providers', 'clinical-portal', 'comments-roster', 'tickets'];
+    }
+  };
+
+  // Available navigable pages for what pages they can view tick boxes
+  const ALL_PAGES_OPTIONS: Array<{ id: string; label: string; description: string }> = [
+    { id: 'dashboard', label: 'Management Dashboard', description: 'Real-time KPIs, expirations, turnaround times & operational metrics' },
+    { id: 'providers', label: 'Clinical Staff Portal', description: 'Clinician profiles, licenses, 360 cards, and insurance panels' },
+    { id: 'tracker', label: 'Credentialing Tracker', description: 'Pipeline stages, payer application statuses, and tracking grid' },
+    { id: 'payers', label: 'Payer Master & Panels', description: 'Health plans, provider networks, requirements, and turnaround benchmarks' },
+    { id: 'locations', label: 'Clinic Locations', description: 'Physical practice locations, service facilities & location NPIs' },
+    { id: 'entities', label: 'Operating Legal Entities', description: 'Entity Tax IDs, corporate registrations & organizational hierarchy' },
+    { id: 'reports', label: 'Reports & Analytics', description: 'Executive summaries, compliance audits, and legal entity breakdown' },
+    { id: 'document-intake', label: 'AI Document Intake Hub', description: 'Automated document ingestion, OCR & clinician extraction' },
+    { id: 'aesas', label: 'Deadline Automations / AESAS', description: 'Automated email alerts, 30/60/90-day SLA reminders & delivery logs' },
+    { id: 'staff-approvals', label: 'Clinical Staff Approvals', description: 'Review and approve clinician documentation & license updates' },
+    { id: 'comments-roster', label: 'Roster Notes & Comments', description: 'Internal team collaboration, clinician activity logs & notes' },
+    { id: 'tickets', label: 'Staff Tickets & Bugs', description: 'Submit bug reports, technical support tickets & issue tracking' },
+  ];
 
   // Selected role configuration
   const currentRoleDef = SYSTEM_ROLES.find(r => r.id === selectedRole) || SYSTEM_ROLES[0];
@@ -107,6 +162,18 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
         else if (roleId === 'System Administrator') setDepartment('IT & Compliance Governance');
         else setDepartment('Proficio Therapy Credentialing Hub');
       }
+
+      // Automatically adjust granular settings to match role defaults (admin can still override via tick boxes)
+      const defaultPages = getDefaultPagesForRole(roleId);
+      setAllowedTabs(defaultPages);
+
+      const isAdminRole = roleId === 'System Administrator' || roleId === 'Credentialing Lead / Manager' || def.defaultAccessLevel === 'ADMINISTRATOR';
+      const isDevRole = roleId === 'Developer' || roleId === 'System Administrator';
+      setCanAccessAdmin(isAdminRole);
+      setCanAccessDev(isDevRole);
+
+      const canEditByDefault = roleId === 'Credentialing Specialist' || roleId === 'Credentialing Lead / Manager' || roleId === 'System Administrator' || roleId === 'HR/Operations';
+      setCanEditData(canEditByDefault);
     }
   };
 
@@ -119,6 +186,12 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
   const toggleEntity = (entityId: string) => {
     setAssignedEntities(prev =>
       prev.includes(entityId) ? prev.filter(id => id !== entityId) : [...prev, entityId]
+    );
+  };
+
+  const togglePage = (pageId: string) => {
+    setAllowedTabs(prev =>
+      prev.includes(pageId) ? prev.filter(id => id !== pageId) : [...prev, pageId]
     );
   };
 
@@ -135,6 +208,10 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     setDepartment('Proficio Therapy Credentialing Hub');
     setAssignedDisciplines(['ABA', 'Speech', 'OT']);
     setAssignedEntities(entities.map(e => e.id));
+    setAllowedTabs(['dashboard', 'tracker', 'providers', 'locations', 'payers', 'staff-approvals', 'clinical-portal', 'aesas', 'comments-roster', 'tickets']);
+    setCanAccessAdmin(false);
+    setCanAccessDev(false);
+    setCanEditData(true);
     setActiveSubTab('create');
   };
 
@@ -146,11 +223,16 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     setPassword(acc.password || '');
     setMustChangePasswordOnFirstLogin(acc.mustChangePasswordOnFirstLogin ?? true);
     const matchedRole = SYSTEM_ROLES.find(r => r.id === acc.systemRole || r.title === acc.roleTitle) || SYSTEM_ROLES[0];
-    setSelectedRole((acc.systemRole as SystemRole) || matchedRole.id);
+    const roleId = (acc.systemRole as SystemRole) || matchedRole.id;
+    setSelectedRole(roleId);
     setAccessLevel(acc.accessLevel);
     setDepartment(acc.department || 'Proficio Therapy Credentialing Hub');
     setAssignedDisciplines(acc.assignedDisciplines || ['ABA', 'Speech', 'OT']);
-    setAssignedEntities(acc.assignedEntities || entities.map(e => e.id));
+    setAssignedEntities(acc.assignedEntities && acc.assignedEntities.length > 0 ? acc.assignedEntities : entities.map(e => e.id));
+    setAllowedTabs(acc.allowedTabs && acc.allowedTabs.length > 0 ? acc.allowedTabs : getDefaultPagesForRole(roleId));
+    setCanAccessAdmin(acc.canAccessAdmin ?? (acc.accessLevel === 'ADMINISTRATOR' || acc.systemRole === 'System Administrator' || acc.systemRole === 'Credentialing Lead / Manager'));
+    setCanAccessDev(acc.canAccessDev ?? (acc.systemRole === 'Developer' || acc.email?.toLowerCase().includes('dev@')));
+    setCanEditData(acc.canEditData ?? (acc.accessLevel === 'ADMINISTRATOR' || roleId === 'Credentialing Specialist' || roleId === 'Credentialing Lead / Manager' || roleId === 'HR/Operations'));
     setActiveSubTab('create');
   };
 
@@ -167,25 +249,44 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
       return;
     }
 
+    if (assignedEntities.length === 0) {
+      showToast('Please select at least one operating entity under Clinical Staff Data Visibility.', 'error');
+      return;
+    }
+
     // Access capabilities are programmed directly within the role configuration in code
     const programmedPermissions = [...currentRoleDef.responsibilities];
+
+    // Ensure admin tab is kept in sync if admin access is granted
+    let finalAllowedTabs = [...allowedTabs];
+    if (canAccessAdmin && !finalAllowedTabs.includes('admin-dashboard')) {
+      finalAllowedTabs.push('admin-dashboard');
+    }
+    if (canAccessDev) {
+      if (!finalAllowedTabs.includes('dbms-manager')) finalAllowedTabs.push('dbms-manager');
+      if (!finalAllowedTabs.includes('nemotron-edit')) finalAllowedTabs.push('nemotron-edit');
+    }
 
     if (editingAccountId) {
       updateAccount(editingAccountId, {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: password.trim() || 'proficio',
-        accessLevel,
+        accessLevel: canAccessAdmin ? 'ADMINISTRATOR' : accessLevel,
         systemRole: selectedRole,
         roleTitle: currentRoleDef.title,
         department: department.trim(),
         assignedDisciplines,
         assignedEntities,
+        allowedTabs: finalAllowedTabs,
+        canAccessAdmin,
+        canAccessDev,
+        canEditData,
         permissions: programmedPermissions,
         mustChangePasswordOnFirstLogin,
         status: 'Active'
       });
-      showToast(`User login for ${name} (${selectedRole}) updated successfully.`, 'success');
+      showToast(`User login for ${name} (${selectedRole}) updated with configured access policies.`, 'success');
       setIsEditing(false);
       setEditingAccountId(null);
       setActiveSubTab('roster');
@@ -194,12 +295,16 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: password.trim() || 'proficio',
-        accessLevel,
+        accessLevel: canAccessAdmin ? 'ADMINISTRATOR' : accessLevel,
         systemRole: selectedRole,
         roleTitle: currentRoleDef.title,
         department: department.trim(),
         assignedDisciplines,
         assignedEntities,
+        allowedTabs: finalAllowedTabs,
+        canAccessAdmin,
+        canAccessDev,
+        canEditData,
         permissions: programmedPermissions,
         mustChangePasswordOnFirstLogin,
         status: 'Active'
@@ -563,7 +668,10 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setAccessLevel('ADMINISTRATOR')}
+                  onClick={() => {
+                    setAccessLevel('ADMINISTRATOR');
+                    setCanAccessAdmin(true);
+                  }}
                   className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                     accessLevel === 'ADMINISTRATOR'
                       ? 'border-[#2B4C9D] bg-indigo-50/70 text-[#2B4C9D] ring-1 ring-[#2B4C9D]'
@@ -581,7 +689,10 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
 
                 <button
                   type="button"
-                  onClick={() => setAccessLevel('USER')}
+                  onClick={() => {
+                    setAccessLevel('USER');
+                    setCanAccessAdmin(false);
+                  }}
                   className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                     accessLevel === 'USER'
                       ? 'border-[#2B4C9D] bg-indigo-50/70 text-[#2B4C9D] ring-1 ring-[#2B4C9D]'
@@ -596,6 +707,295 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                     Scoped operational access according to assigned system role profile.
                   </p>
                 </button>
+              </div>
+            </div>
+
+            {/* ========================================================= */}
+            {/* 4. GRANULAR ONBOARDING PERMISSION CONTROLS (TICK BOXES) */}
+            {/* ========================================================= */}
+            <div className="space-y-6 pt-4 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                    <Sliders className="w-4 h-4 text-[#2B4C9D]" />
+                    <span>4. Granular Onboarding Access Policies (Tick Box Controls)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Precisely control what clinical staff data, pages, dashboards, and edit capabilities this employee can use.
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-[#2B4C9D] border border-indigo-200 self-start sm:self-auto">
+                  Configurable RBAC
+                </span>
+              </div>
+
+              {/* 4A. WHOSE CLINICAL STAFF DATA THEY CAN SEE [ENTITY-ENTITY CONTROL] */}
+              <div className="p-4 sm:p-5 bg-slate-50/90 rounded-2xl border border-slate-200/90 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-[#2B4C9D]" />
+                      <span>A. Clinical Staff Data Visibility [Entity-to-Entity Access Control]</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Check which operating entities' clinical staff data, licenses, and credentialing records this employee can see:
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setAssignedEntities(entities.map(e => e.id))}
+                      className="text-[#2B4C9D] hover:underline font-semibold text-[11px] cursor-pointer"
+                    >
+                      Select All 3 Entities
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setAssignedEntities([])}
+                      className="text-slate-500 hover:underline font-semibold text-[11px] cursor-pointer"
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  {entities.map((entity) => {
+                    const isChecked = assignedEntities.includes(entity.id);
+                    const nameLower = (entity.legalName || entity.dba || '').toLowerCase();
+                    const isAges = entity.id === 'ent-1' || nameLower.includes('ages');
+                    const isPstg = entity.id === 'ent-pstg-inc' || nameLower.includes('speech');
+                    const isChild = entity.id === 'ent-3' || nameLower.includes('child');
+
+                    return (
+                      <label
+                        key={entity.id}
+                        className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all cursor-pointer select-none ${
+                          isChecked
+                            ? 'border-[#2B4C9D] bg-white ring-2 ring-[#2B4C9D]/10 shadow-xs'
+                            : 'border-slate-200 bg-white/50 hover:bg-white text-slate-500'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleEntity(entity.id)}
+                            className="mt-1 w-4 h-4 text-[#2B4C9D] rounded border-slate-300 focus:ring-[#2B4C9D] cursor-pointer"
+                          />
+                          <div className="space-y-1">
+                            <span className="text-xs font-bold text-slate-900 block leading-tight">
+                              {entity.dba || entity.legalName}
+                            </span>
+                            <p className="text-[10px] text-slate-500">
+                              {entity.legalName} &bull; TIN: {entity.taxId || '82-1221807'}
+                            </p>
+                            <div className="pt-1">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                                isAges ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                isPstg ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}>
+                                {isAges ? 'ABA & Autism' : isPstg ? 'Speech Therapy' : 'OT & Speech'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                {assignedEntities.length === 0 && (
+                  <p className="text-[11px] text-rose-600 font-semibold flex items-center space-x-1 pt-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Warning: At least one operating entity must be checked so the employee can view clinical staff.</span>
+                  </p>
+                )}
+              </div>
+
+              {/* 4B. WHAT PAGES THEY CAN VIEW */}
+              <div className="p-4 sm:p-5 bg-slate-50/90 rounded-2xl border border-slate-200/90 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <Layers className="w-3.5 h-3.5 text-[#2B4C9D]" />
+                      <span>B. Page &amp; Navigation Permissions [What Pages They Can View]</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Check each page and module this employee is permitted to view in their navigation header:
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setAllowedTabs(ALL_PAGES_OPTIONS.map(p => p.id))}
+                      className="text-[#2B4C9D] hover:underline font-semibold text-[11px] cursor-pointer"
+                    >
+                      Select All Pages
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setAllowedTabs(getDefaultPagesForRole(selectedRole))}
+                      className="text-[#2B4C9D] hover:underline font-semibold text-[11px] cursor-pointer"
+                    >
+                      Role Default ({getDefaultPagesForRole(selectedRole).length})
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setAllowedTabs([])}
+                      className="text-slate-500 hover:underline font-semibold text-[11px] cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                  {ALL_PAGES_OPTIONS.map((page) => {
+                    const isChecked = allowedTabs.includes(page.id);
+                    return (
+                      <label
+                        key={page.id}
+                        className={`p-3 rounded-xl border flex items-start space-x-2.5 transition-all cursor-pointer select-none ${
+                          isChecked
+                            ? 'border-[#2B4C9D] bg-white ring-1 ring-[#2B4C9D]/15 shadow-2xs'
+                            : 'border-slate-200 bg-white/60 hover:bg-white text-slate-500'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => togglePage(page.id)}
+                          className="mt-0.5 w-4 h-4 text-[#2B4C9D] rounded border-slate-300 focus:ring-[#2B4C9D] cursor-pointer shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-slate-900 block truncate">{page.label}</span>
+                          <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{page.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4C & 4D: CAN THEY USE ADMIN DASHBOARD & DEV DASHBOARD */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Admin Dashboard Tick Box */}
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  canAccessAdmin ? 'border-indigo-400 bg-indigo-50/60 ring-1 ring-indigo-300' : 'border-slate-200 bg-slate-50/80'
+                }`}>
+                  <label className="flex items-start space-x-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canAccessAdmin}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setCanAccessAdmin(val);
+                        if (val) {
+                          setAccessLevel('ADMINISTRATOR');
+                          if (!allowedTabs.includes('admin-dashboard')) {
+                            setAllowedTabs(prev => [...prev, 'admin-dashboard']);
+                          }
+                        }
+                      }}
+                      className="mt-1 w-4 h-4 text-[#2B4C9D] rounded border-slate-300 focus:ring-[#2B4C9D] cursor-pointer shrink-0"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1.5 font-bold text-xs text-slate-900">
+                          <ShieldCheck className="w-4 h-4 text-[#2B4C9D]" />
+                          <span>Can they use the Admin Dashboard</span>
+                        </div>
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded ${
+                          canAccessAdmin ? 'bg-indigo-200 text-indigo-950 font-bold' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {canAccessAdmin ? 'AUTHORIZED' : 'LOCKED'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-1 leading-snug">
+                        When checked, allows employee to enter the Admin Dashboard, manage users &amp; roles, approve access requests, and review audit telemetry.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Dev Dashboard Tick Box */}
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  canAccessDev ? 'border-purple-400 bg-purple-50/60 ring-1 ring-purple-300' : 'border-slate-200 bg-slate-50/80'
+                }`}>
+                  <label className="flex items-start space-x-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canAccessDev}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setCanAccessDev(val);
+                        if (val) {
+                          setAllowedTabs(prev => {
+                            const next = [...prev];
+                            if (!next.includes('dbms-manager')) next.push('dbms-manager');
+                            if (!next.includes('nemotron-edit')) next.push('nemotron-edit');
+                            return next;
+                          });
+                        }
+                      }}
+                      className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-600 cursor-pointer shrink-0"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1.5 font-bold text-xs text-slate-900">
+                          <Key className="w-4 h-4 text-purple-700" />
+                          <span>Can they use the Dev Dashboard</span>
+                        </div>
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded ${
+                          canAccessDev ? 'bg-purple-200 text-purple-950 font-bold' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {canAccessDev ? 'AUTHORIZED' : 'LOCKED'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-1 leading-snug">
+                        When checked, allows employee to access developer suites: DBMS Manager (SQL database console &amp; schema inspection) and Nemotron AI System Editor.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* 4E: VIEW-ONLY VS CAN EDIT DATA TICK BOX */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                canEditData ? 'border-emerald-400 bg-emerald-50/60 ring-1 ring-emerald-300' : 'border-amber-300 bg-amber-50/60 ring-1 ring-amber-200'
+              }`}>
+                <label className="flex items-start space-x-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={canEditData}
+                    onChange={(e) => setCanEditData(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-600 cursor-pointer shrink-0"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Edit2 className="w-4 h-4 text-emerald-700" />
+                        <span className="text-xs font-bold text-slate-900">Can they only view or can they also edit those data</span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        canEditData
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-amber-100 text-amber-800 border-amber-300'
+                      }`}>
+                        {canEditData ? 'CAN EDIT DATA (Read & Write)' : 'VIEW-ONLY (Read-Only Mode)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                      {canEditData
+                        ? 'Checked = Write Permissions Enabled: Employee is authorized to update clinician profiles, modify payer application statuses, manage uploaded documents, and edit dates.'
+                        : 'Unchecked = View-Only Mode: Employee can browse dashboards and records, but cannot edit, update, delete, or submit alterations to clinical or credentialing data.'}
+                    </p>
+                  </div>
+                </label>
               </div>
             </div>
 
@@ -768,6 +1168,57 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                             <span className="font-semibold text-slate-800">Credential:</span>
                             <span className="font-mono text-slate-600">Encrypted (Zero-Knowledge)</span>
                           </div>
+                        </div>
+
+                        {/* Configured Granular Permissions Indicators */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+                          {/* Entity Control Badge */}
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 inline-flex items-center space-x-1">
+                            <Building2 className="w-2.5 h-2.5 text-[#2B4C9D]" />
+                            <span>
+                              Entities: {acc.assignedEntities && acc.assignedEntities.length > 0 
+                                ? (acc.assignedEntities.length === entities.length ? 'All 3 Entities' : `${acc.assignedEntities.length} Selected`)
+                                : 'All Entities'}
+                            </span>
+                          </span>
+
+                          {/* Pages Allowed Badge */}
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 inline-flex items-center space-x-1">
+                            <Layers className="w-2.5 h-2.5 text-slate-500" />
+                            <span>
+                              Pages: {acc.allowedTabs && acc.allowedTabs.length > 0 ? `${acc.allowedTabs.length} Viewable` : 'Default Scope'}
+                            </span>
+                          </span>
+
+                          {/* Admin Dashboard Badge */}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center space-x-1 ${
+                            acc.canAccessAdmin || acc.accessLevel === 'ADMINISTRATOR'
+                              ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                              : 'bg-slate-50 text-slate-500 border-slate-200'
+                          }`}>
+                            <ShieldCheck className="w-2.5 h-2.5" />
+                            <span>Admin: {acc.canAccessAdmin || acc.accessLevel === 'ADMINISTRATOR' ? 'Yes' : 'No'}</span>
+                          </span>
+
+                          {/* Dev Dashboard Badge */}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center space-x-1 ${
+                            acc.canAccessDev || acc.systemRole === 'Developer'
+                              ? 'bg-purple-50 text-purple-800 border-purple-200'
+                              : 'bg-slate-50 text-slate-500 border-slate-200'
+                          }`}>
+                            <Key className="w-2.5 h-2.5" />
+                            <span>Dev: {acc.canAccessDev || acc.systemRole === 'Developer' ? 'Yes' : 'No'}</span>
+                          </span>
+
+                          {/* Edit vs View-Only Badge */}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center space-x-1 ${
+                            acc.canEditData !== false
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}>
+                            <Edit2 className="w-2.5 h-2.5" />
+                            <span>{acc.canEditData !== false ? 'Can Edit Data' : 'View-Only Access'}</span>
+                          </span>
                         </div>
 
                         {acc.assignedDisciplines && (

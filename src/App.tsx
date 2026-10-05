@@ -29,6 +29,7 @@ import { SmartDocumentIntakeHub } from './components/intake/SmartDocumentIntakeH
 import { DbmsManagerView } from './components/admin/DbmsManagerView';
 import { TicketManagementView } from './components/dev/TicketManagementView';
 import { NemotronEditSystemView } from './components/dev/NemotronEditSystemView';
+import { DeveloperHubView } from './components/dev/DeveloperHubView';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -89,10 +90,18 @@ const MainContent: React.FC = () => {
     setActiveTab('providers');
   };
 
-  const handleNavigateToTracker = (discipline?: Discipline) => {
-    if (discipline) {
-      setFilters((prev) => ({ ...prev, discipline }));
-    }
+  const handleNavigateToTracker = (
+    discipline?: Discipline,
+    statusCategory?: 'All' | 'Approved' | 'Pending' | 'Requiring Action' | 'Overdue'
+  ) => {
+    setFilters((prev) => ({
+      ...prev,
+      ...(discipline ? { discipline } : {}),
+      statusCategory: statusCategory || 'All',
+      stage: 'All',
+      isOverdueOnly: statusCategory === 'Overdue',
+      needsActionOnly: false,
+    }));
     setActiveTab('tracker');
   };
 
@@ -298,25 +307,43 @@ const MainContent: React.FC = () => {
           />
         )}
 
-        {/* Dedicated Tab: Supabase Live DBMS Manager (DEV / ADMIN) */}
-        {activeTab === 'dbms-manager' && (
-          <div className="pt-2">
-            <DbmsManagerView />
-          </div>
+        {/* Dedicated Dev Tab: Developer Center (DBMS Manager, Nemotron AI Edit, Ticket Management, Clinical Staff Monitor) */}
+        {activeTab === 'developer' && (
+          <DeveloperHubView
+            onOpenNewApplication={() => setIsNewAppModalOpen(true)}
+            onSelectProvider={(pId) => handleSelectProvider(pId)}
+            onNavigateToIntake={() => setActiveTab('document-intake')}
+          />
         )}
 
-        {/* Dedicated Tab: Ticket Management (All Employees Can Submit, Dev/Admin Manages) */}
+        {/* Dedicated Tab: Supabase Live DBMS Manager (DEV Profile / Admin) */}
+        {activeTab === 'dbms-manager' && (
+          <DeveloperHubView
+            initialSubTab="dbms-manager"
+            onOpenNewApplication={() => setIsNewAppModalOpen(true)}
+            onSelectProvider={(pId) => handleSelectProvider(pId)}
+            onNavigateToIntake={() => setActiveTab('document-intake')}
+          />
+        )}
+
+        {/* Dedicated Tab: Ticket Management (DEV ONLY) */}
         {activeTab === 'tickets' && (
-          <div className="pt-2">
-            <TicketManagementView />
-          </div>
+          <DeveloperHubView
+            initialSubTab="tickets"
+            onOpenNewApplication={() => setIsNewAppModalOpen(true)}
+            onSelectProvider={(pId) => handleSelectProvider(pId)}
+            onNavigateToIntake={() => setActiveTab('document-intake')}
+          />
         )}
 
         {/* Dedicated Tab: NVIDIA Nemotron Edit System (DEV Profile / Admin) */}
         {activeTab === 'nemotron-edit' && (
-          <div className="pt-2">
-            <NemotronEditSystemView />
-          </div>
+          <DeveloperHubView
+            initialSubTab="nemotron-edit"
+            onOpenNewApplication={() => setIsNewAppModalOpen(true)}
+            onSelectProvider={(pId) => handleSelectProvider(pId)}
+            onNavigateToIntake={() => setActiveTab('document-intake')}
+          />
         )}
           </motion.div>
         </AnimatePresence>

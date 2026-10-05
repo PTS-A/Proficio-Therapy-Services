@@ -706,7 +706,7 @@ export async function saveDocument(collectionName: string, docId: string, data: 
   } catch {}
 
   // 2. Persist to Supabase if connected
-  if (supabase) {
+  if (supabase && mapping.table !== 'system_savepoints' && collectionName !== 'savepoints') {
     updateSyncStatus({ isSyncing: true });
     try {
       // If saving a credentialing record, ensure foreign key references exist in Supabase first
@@ -816,7 +816,7 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
   } catch {}
 
   // 2. Remote Deletion
-  if (supabase) {
+  if (supabase && mapping.table !== 'system_savepoints' && collectionName !== 'savepoints') {
     updateSyncStatus({ isSyncing: true });
     try {
       // HIPAA §164.530(j) Audit Documentation of Record Deletion
@@ -853,6 +853,17 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
 export async function fetchCollection<T = any>(collectionName: string): Promise<T[]> {
   const mapping = COLLECTION_TO_TABLE[collectionName] || { table: collectionName };
 
+  // Virtual client-side collections without remote database tables (system_savepoints)
+  if (collectionName === 'savepoints' || collectionName === 'system_savepoints' || mapping.table === 'system_savepoints') {
+    try {
+      const cached = safeStorage.getItem(LOCAL_STORAGE_PREFIX + collectionName);
+      if (cached) {
+        return JSON.parse(cached) as T[];
+      }
+    } catch {}
+    return [];
+  }
+
   if (!supabase) {
     await ensureSupabaseClient();
   }
@@ -877,10 +888,14 @@ export async function fetchCollection<T = any>(collectionName: string): Promise<
         return transformed as T[];
       }
     } catch (err: any) {
-      console.warn(`[Supabase] fetchCollection failed for ${collectionName}, reading cache:`, err.message);
+      const msg = String(err?.message || err || '');
+      const isBenign = msg.includes('schema cache') || msg.includes('system_savepoints') || collectionName === 'savepoints';
+      if (!isBenign) {
+        console.warn(`[Supabase] fetchCollection failed for ${collectionName}, reading cache:`, msg);
+      }
       updateSyncStatus({
-        hasErrors: true,
-        errorMessage: err.message,
+        hasErrors: !isBenign,
+        errorMessage: isBenign ? undefined : msg,
       });
     }
   }
@@ -915,7 +930,7 @@ export async function saveBatch<T extends { id: string }>(collectionName: string
   } catch {}
 
   // 2. Supabase Upsert
-  if (supabase) {
+  if (supabase && mapping.table !== 'system_savepoints' && collectionName !== 'savepoints') {
     updateSyncStatus({ isSyncing: true });
     try {
       const rows = items.map((item) => toPostgresRow(collectionName, item));
@@ -962,27 +977,30 @@ export function subscribeToCollection<T = any>(
 
   // 1. Supabase Realtime WebSocket subscription
   let channel: any = null;
-  if (supabase) {
-    const channelName = `realtime_${mapping.table}_${Math.random().toString(36).slice(2, 7)}`;
-    channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: mapping.table },
-        async () => {
-          try {
-            const freshData = await fetchCollection<T>(collectionName);
-            onUpdate(freshData);
-          } catch (err: any) {
-            onError?.(err);
+  if (supabase && mapping.table !== 'system_savepoints' && collectionName !== 'savepoints') {
+    try {
+      const channelName = `realtime_${mapping.table}_${Math.random().toString(36).slice(2, 7)}`;
+      channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: mapping.table },
+          async () => {
+            try {
+              const freshData = await fetchCollection<T>(collectionName);
+              onUpdate(freshData);
+            } catch (err: any) {
+              onError?.(err);
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          updateSyncStatus({ isOnline: true });
-        }
-      });
+        )
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            updateSyncStatus({ isOnline: true });
+          }
+          // Safely absorb any WebSocket closure or disconnection without bubbling
+        });
+    } catch {}
   }
 
   // 2. Active background polling heartbeat (every 30 seconds) to ensure sync even if WebSockets are throttled

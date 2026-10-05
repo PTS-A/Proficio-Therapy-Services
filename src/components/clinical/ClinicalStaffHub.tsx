@@ -36,6 +36,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { LegalEntity, Provider, Payer, ProviderPayerEnrollment } from '../../types';
 import { DeleteStaffSafetyModal } from '../modals/DeleteStaffSafetyModal';
+import { canUserEdit, canViewEntity, canViewProvider } from '../../utils/rbac';
 
 interface ClinicalStaffHubProps {
   onSelectProviderId?: (providerId: string) => void;
@@ -204,9 +205,13 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
     );
   };
 
-  // Filter providers belonging to selected entity
-  const entityProviders = selectedEntityId 
-    ? (providers || []).filter((p) => isProviderInEntity(p, selectedEntityId))
+  const isEditAllowed = canUserEdit(currentAccount);
+  const isEntityAllowed = selectedEntityId ? canViewEntity(currentAccount, selectedEntityId) : true;
+  const visibleEntities = (entities || []).filter(e => canViewEntity(currentAccount, e.id));
+
+  // Filter providers belonging to selected entity and permitted for this employee
+  const entityProviders = (selectedEntityId && isEntityAllowed)
+    ? (providers || []).filter((p) => isProviderInEntity(p, selectedEntityId) && canViewProvider(currentAccount, p))
     : [];
 
   const agesBcbaCount = entityProviders.filter(isProviderBcba).length;
@@ -735,7 +740,14 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {entities.map((entity) => {
+            {visibleEntities.length === 0 ? (
+              <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-xs col-span-full">
+                <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                <h3 className="text-sm font-bold text-slate-800">No Operating Entities Assigned</h3>
+                <p className="text-xs text-slate-500 mt-1">Your user account does not have access to any operating entities. Contact system administrator.</p>
+              </div>
+            ) : (
+              visibleEntities.map((entity) => {
               const staffCount = providers.filter((p) => isProviderInEntity(p, entity.id)).length;
               const nameLower = (entity.legalName || entity.dba || '').toLowerCase();
               const isPstg = entity.id === 'ent-pstg-inc' || nameLower.includes('speech');
@@ -831,7 +843,7 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                   </div>
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
 
@@ -843,6 +855,9 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
             const name = `${p.firstName || ''} ${p.lastName || ''} ${p.fullName || ''}`.toLowerCase();
             const email = (p.email || '').toLowerCase();
             if (['fake', 'placeholder', 'demo user', 'test provider', 'john doe', 'jane doe', 'new clinical', 'new.clinical', 'saha torres', 'sara torres'].some((f) => name.includes(f) || email.includes(f))) {
+              return false;
+            }
+            if (!canViewProvider(currentAccount, p)) {
               return false;
             }
             if (masterEntityFilter !== 'ALL') {
@@ -2187,6 +2202,13 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
               </div>
             </div>
 
+            {!isEditAllowed && (
+              <div className="mx-6 sm:mx-8 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span><strong>View-Only Access:</strong> Your account is configured with read-only permissions. Modifying credentials, deleting staff, and updating insurance statuses are disabled.</span>
+              </div>
+            )}
+
             {/* 4 MODAL TABS */}
             <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200 shrink-0 overflow-x-auto scrollbar-none gap-1">
               <button
@@ -3084,14 +3106,21 @@ export const ClinicalStaffHub: React.FC<ClinicalStaffHubProps> = ({
                       Back to Insurances
                     </button>
 
-                    <button
-                      type="submit"
-                      disabled={isSaving360}
-                      className="px-6 py-2.5 bg-[#2B4C9D] hover:bg-[#1f3775] text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center space-x-2 cursor-pointer disabled:opacity-50"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>{isSaving360 ? 'Saving All Changes...' : 'Save 360 Changes'}</span>
-                    </button>
+                    {isEditAllowed ? (
+                      <button
+                        type="submit"
+                        disabled={isSaving360}
+                        className="px-6 py-2.5 bg-[#2B4C9D] hover:bg-[#1f3775] text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>{isSaving360 ? 'Saving All Changes...' : 'Save 360 Changes'}</span>
+                      </button>
+                    ) : (
+                      <span className="px-4 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>View-Only Mode (Saving Disabled)</span>
+                      </span>
+                    )}
                   </div>
                 </form>
               )}

@@ -120,7 +120,7 @@ URGENT: Credentialing authorization for {provider_name} with {payer_name} will e
 If renewal documentation has already been submitted to the payer, please confirm receipt with the payer representative. Otherwise, prioritize immediate packet submission.
 
 Assigned Specialist: {assigned_specialist}
-Credentialing Manager: Namitha Narayanan`,
+Credentialing Manager: Centralized Credentialing Lead`,
     isActive: true,
   },
   {
@@ -581,8 +581,8 @@ async function resolveRecipients(
     }
     // Fallback to active specialists
     if (!specialist) {
-      specialist = users.find(u => u.email === 'specialist@proficiotherapy.com' || u.system_role === 'Credentialing Specialist') ||
-                   employees.find(e => e.email === 'specialist@proficiotherapy.com');
+      specialist = users.find(u => u.email === 'specialist@ageslearningsolutions.com' || u.system_role === 'Credentialing Specialist') ||
+                   employees.find(e => e.email === 'specialist@ageslearningsolutions.com');
     }
 
     if (specialist && specialist.email) {
@@ -592,10 +592,10 @@ async function resolveRecipients(
 
   // 3. Credentialing Lead / Manager Role
   if (roles.includes('manager')) {
-    const manager = users.find(u => u.email === 'manager@proficiotherapy.com' || u.system_role === 'Credentialing Lead / Manager') ||
-                    employees.find(e => e.email === 'manager@proficiotherapy.com');
+    const manager = users.find(u => u.email === 'credentialing@ageslearningsolutions.com' || u.system_role === 'Credentialing Lead / Manager') ||
+                    employees.find(e => e.email === 'credentialing@ageslearningsolutions.com');
     if (manager && manager.email) {
-      addRecipient(manager.email, manager.name || manager.full_name || 'Namitha Narayanan (Manager)', 'Credentialing Manager');
+      addRecipient(manager.email, manager.name || manager.full_name || 'Centralized Credentialing Lead', 'Credentialing Manager');
     }
   }
 
@@ -832,7 +832,7 @@ export async function evaluateAndExecuteDeadlines(options: {
     const payerName = payer.name || payer.payer_name || 'Insurance Payer';
     const entityName = entity.legal_name || entity.dba || 'Proficio Therapy Services';
     const locationName = location.name || 'Main Clinic';
-    const assignedSpecialistName = assignedSpecialistUser.name || assignedSpecialistUser.full_name || 'Sanjay Tom';
+    const assignedSpecialistName = assignedSpecialistUser.name || assignedSpecialistUser.full_name || 'Centralized Credentialing Specialist';
 
     // Check applicable rules
     for (const rule of rules) {

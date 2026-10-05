@@ -147,4 +147,21 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       'Manage integrations (email, Power BI dataset)',
     ],
   },
+  {
+    id: 'Developer',
+    title: 'Developer',
+    category: 'Engineering & Platform Development',
+    defaultAccessLevel: 'ADMINISTRATOR',
+    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+    textColor: 'text-purple-700',
+    borderColor: 'border-purple-200',
+    bgColor: 'bg-purple-50/60',
+    description: 'System software engineer and platform developer. Exclusive access to Developer Dashboard, DBMS SQL console, Nemotron AI code editor, and technical bug tracking.',
+    responsibilities: [
+      'Platform architecture, database schema management & DBMS migrations',
+      'Nemotron AI system editor & codebase synchronization',
+      'Technical bug fixes, ticket triage, and system diagnostics',
+      'Full administrative access and infrastructure telemetry',
+    ],
+  },
 ];

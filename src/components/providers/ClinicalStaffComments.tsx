@@ -25,7 +25,7 @@ export const ClinicalStaffComments: React.FC<ClinicalStaffCommentsProps> = ({ pr
 
   const [newComment, setNewComment] = useState('');
   const [commentTargetPerson, setCommentTargetPerson] = useState('');
-  const [authorName, setAuthorName] = useState(currentAccount?.name || currentUser.name || 'Sanjay Tom');
+  const [authorName, setAuthorName] = useState(currentAccount?.name || currentUser.name || 'Centralized Credentialing Specialist');
   const [commentStatusTo, setCommentStatusTo] = useState('');
   const [commentCategory, setCommentCategory] = useState<ProviderCommentLog['category']>('Status Update');
   const [filterCategory, setFilterCategory] = useState<string>('All');
@@ -233,7 +233,7 @@ export const ClinicalStaffComments: React.FC<ClinicalStaffCommentsProps> = ({ pr
               <input
                 type="text"
                 required
-                placeholder={`e.g. ${provider.firstName} ${provider.lastName}, Namitha, Specialist`}
+                placeholder={`e.g. ${provider.firstName} ${provider.lastName}, Credentialing Specialist`}
                 value={commentTargetPerson}
                 onChange={(e) => setCommentTargetPerson(e.target.value)}
                 className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-sky-500 focus:bg-white"

@@ -16,6 +16,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
+import { initiateGoogleSignIn } from '../../services/authService';
 import { ProficioLogo } from '../common/ProficioLogo';
 import { RequestAccessPage } from './RequestAccessPage';
 import { MfaVerificationView } from './MfaVerificationView';
@@ -36,10 +37,6 @@ export const LoginPage: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showProviderSetupHelp, setShowProviderSetupHelp] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  // Same-Page Google SSO Dialogue Box State
-  const [showGoogleSsoDialog, setShowGoogleSsoDialog] = useState(false);
-  const [ssoGoogleEmail, setSsoGoogleEmail] = useState('');
 
   // Access Control Verification Result Modal
   const [denialDetails, setDenialDetails] = useState<{
@@ -123,33 +120,21 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Google OAuth SSO Sign In Handler (Guaranteed SAME PAGE across all mobile and desktop devices)
-  const handleGoogleSignIn = async (emailToVerify?: string) => {
+  // Google OAuth SSO Sign In Handler (Redirects to Google SSO Account Chooser)
+  const handleGoogleSignIn = async () => {
     setError(null);
     setDenialDetails(null);
     setShowProviderSetupHelp(false);
-
-    // Use entered email or prompt user to select an account via the corporate account chooser dialog
-    const targetEmail = (emailToVerify || email || '').trim();
-    if (!targetEmail) {
-      setShowGoogleSsoDialog(true);
-      return;
-    }
-
     setIsGoogleLoading(true);
-    try {
-      // Direct Same-Page Corporate Google SSO: zero redirects, zero popups, zero 404s
-      const res = await loginWithGoogle(targetEmail, { preferPopup: false });
-      setIsGoogleLoading(false);
 
+    try {
+      // Launch standard Google OAuth flow to prompt user with the Google Account Selector
+      const res = await initiateGoogleSignIn({ preferPopup: false });
       if (!res.success) {
-        if (res.denial) {
-          setDenialDetails(res.denial);
-        } else {
-          setError(res.error || 'Failed to authenticate corporate Google account.');
-        }
+        setIsGoogleLoading(false);
+        setError(res.error || 'Failed to initialize Google Single Sign-On.');
       }
-      return;
+      // If success, user's browser is navigated to Google's SSO page to select email
     } catch (err: any) {
       setIsGoogleLoading(false);
       setError('An error occurred during authentication: ' + (err?.message || 'Unknown error'));
@@ -403,7 +388,7 @@ export const LoginPage: React.FC = () => {
           <button
             type="button"
             id="google-signin-button"
-            onClick={() => setShowGoogleSsoDialog(true)}
+            onClick={() => handleGoogleSignIn()}
             disabled={isGoogleLoading || isPasswordSubmitting}
             className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 border border-slate-300 hover:border-slate-400 font-semibold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
           >
@@ -480,149 +465,6 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {/* Same-Page Google Single Sign-On Dialogue Box */}
-      {showGoogleSsoDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
-                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
-                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
-                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Google Workspace SSO</h3>
-                  <p className="text-xs text-slate-500">Sign in to Credentialing Hub</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGoogleSsoDialog(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer text-lg leading-none"
-              >
-                &times;
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Select an authorized corporate identity or enter your company Google email to proceed with Single Sign-On.
-            </p>
-
-            {/* Quick account choices */}
-            <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Choose an account:</label>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setShowGoogleSsoDialog(false);
-                  handleGoogleSignIn('dev@proficiotherapy.com');
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 transition-all text-left group cursor-pointer"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    D
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 group-hover:text-amber-950">Lead System Developer</p>
-                    <p className="text-[11px] font-mono text-slate-500">dev@proficiotherapy.com</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200/80 text-amber-900">Dev Profile</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowGoogleSsoDialog(false);
-                  handleGoogleSignIn('superadmin@proficiotherapy.com');
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-slate-50 transition-all text-left group cursor-pointer"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-full bg-[#2B4C9D] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    A
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 group-hover:text-[#2B4C9D]">System Administrator</p>
-                    <p className="text-[11px] font-mono text-slate-500">superadmin@proficiotherapy.com</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-[#2B4C9D]">Admin</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowGoogleSsoDialog(false);
-                  handleGoogleSignIn('manager@proficiotherapy.com');
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-slate-50 transition-all text-left group cursor-pointer"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    M
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-900">Namitha Narayanan</p>
-                    <p className="text-[11px] font-mono text-slate-500">manager@proficiotherapy.com</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">Manager</span>
-              </button>
-            </div>
-
-            {/* Custom Google Workspace Email Input */}
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <label className="block text-xs font-semibold text-slate-700">Or enter another company Google email:</label>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={ssoGoogleEmail}
-                  onChange={(e) => setSsoGoogleEmail(e.target.value)}
-                  placeholder="name@ageslearningsolutions.com"
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D]"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && ssoGoogleEmail.trim()) {
-                      e.preventDefault();
-                      setShowGoogleSsoDialog(false);
-                      handleGoogleSignIn(ssoGoogleEmail.trim());
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!ssoGoogleEmail.trim() || !ssoGoogleEmail.includes('@')}
-                  onClick={() => {
-                    setShowGoogleSsoDialog(false);
-                    handleGoogleSignIn(ssoGoogleEmail.trim());
-                  }}
-                  className="px-3.5 py-2 bg-[#2B4C9D] hover:bg-[#1a2f64] text-white rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-1">
-              <button
-                type="button"
-                onClick={() => setShowGoogleSsoDialog(false)}
-                className="px-4 py-2 text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -34,7 +34,7 @@ import {
   Check,
 } from 'lucide-react';
 import { Discipline, CredentialingStage } from '../../types';
-import { isAdminAccount, isDeveloper } from '../../utils/rbac';
+import { isAdminAccount, isDeveloper, canUserEdit, canViewEntity, canViewProvider } from '../../utils/rbac';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ResponsiveContainer,
@@ -141,7 +141,7 @@ const CustomAreaTooltip = ({ active, payload, label }: any) => {
 interface ManagementDashboardProps {
   onSelectRecord?: (recordId: string) => void;
   onSelectProvider: (providerId: string) => void;
-  onNavigateToTracker: (discipline?: Discipline) => void;
+  onNavigateToTracker: (discipline?: Discipline, statusCategory?: 'All' | 'Approved' | 'Pending' | 'Requiring Action' | 'Overdue') => void;
   onNavigateToLinking?: () => void;
   onNavigateToLocations?: () => void;
   onOpenAddProvider?: () => void;
@@ -825,11 +825,11 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   const disciplineStats = disciplinesList.map((disc) => {
     const discRecords = records.filter(r => r.discipline === disc);
     const discProviders = providers.filter(p => p.disciplines.includes(disc));
-    const submitted = discRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage)).length;
-    const pending = discRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending'].includes(r.stage)).length;
+    const submitted = discRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage) && !r.isOverdue).length;
+    const pending = discRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending', 'Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage) && !r.isOverdue).length;
     const approved = discRecords.filter(r => ['Approved', 'Linked', 'Effective'].includes(r.stage)).length;
     const requiringAction = discRecords.filter(r => ['Action Required', 'Additional Documents Requested', 'Correction Required', 'Overdue', 'Recredentialing Due'].includes(r.stage) || r.isOverdue).length;
-    const overdue = discRecords.filter(r => r.isOverdue).length;
+    const overdue = discRecords.filter(r => r.isOverdue || r.stage === 'Overdue').length;
     const rejected = discRecords.filter(r => r.stage === 'Closed / Not Contracted').length;
     
     const cycleSum = discRecords.reduce((sum, r) => sum + (r.totalCycleDays || r.daysInCurrentStage || 0), 0);
@@ -859,13 +859,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   // -------------------------------------------------------------
   const payerStats = payers.map((payer) => {
     const payerRecords = records.filter(r => r.payerId === payer.id);
-    const submitted = payerRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage)).length;
-    const pending = payerRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Payer Review', 'Additional Documents Requested', 'Correction Required', 'Linking Pending'].includes(r.stage)).length;
+    const submitted = payerRecords.filter(r => ['Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage) && !r.isOverdue).length;
+    const pending = payerRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending', 'Application Submitted', 'Resubmitted', 'Payer Review'].includes(r.stage) && !r.isOverdue).length;
     const approved = payerRecords.filter(r => ['Approved', 'Linked', 'Effective'].includes(r.stage)).length;
+    const requiringAction = payerRecords.filter(r => ['Action Required', 'Additional Documents Requested', 'Correction Required', 'Overdue', 'Recredentialing Due'].includes(r.stage) || r.isOverdue).length;
     const rejected = payerRecords.filter(r => r.stage === 'Closed / Not Contracted').length;
     
     const tatDays = payer.averageTatDays || 60;
-    const overdueCount = payerRecords.filter(r => r.isOverdue).length;
+    const overdueCount = payerRecords.filter(r => r.isOverdue || r.stage === 'Overdue').length;
 
     return {
       payer,
@@ -873,6 +874,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
       submitted,
       pending,
       approved,
+      requiringAction,
       rejected,
       averageTurnaroundDays: tatDays,
       overdueCount,
@@ -1121,8 +1123,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-shadow cursor-pointer group"
+                onClick={() => onNavigateToTracker(undefined, 'Pending')} 
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Credentialing Pending</span>
@@ -1132,7 +1134,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 </div>
                 <div className="mt-2">
                   <span className="text-2xl font-bold text-amber-700 tracking-tight">
-                    {activeRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending', 'Payer Review', 'Application Submitted'].includes(r.stage)).length}
+                    {activeRecords.filter(r => ['Intake', 'Documents Pending', 'Documents Complete', 'CAQH Pending', 'PAVE Pending', 'Application Preparation', 'Linking Pending', 'Payer Review', 'Application Submitted', 'Resubmitted'].includes(r.stage) && !r.isOverdue).length}
                   </span>
                   <p className="text-[10.5px] text-amber-600/80 mt-0.5">Pre-submission & linking</p>
                 </div>
@@ -1142,8 +1144,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-shadow cursor-pointer group"
+                onClick={() => onNavigateToTracker(undefined, 'Approved')} 
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Credentialing Approved</span>
@@ -1163,8 +1165,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker()} 
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:shadow-md transition-shadow cursor-pointer group"
+                onClick={() => onNavigateToTracker(undefined, 'Requiring Action')} 
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-orange-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-slate-500">Requiring Action</span>
@@ -1184,7 +1186,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker()} 
+                onClick={() => onNavigateToTracker(undefined, 'Overdue')} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-rose-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
@@ -1194,8 +1196,8 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                   </div>
                 </div>
                 <div className="mt-2">
-                  <span className={`text-2xl font-bold tracking-tight ${activeRecords.filter(r => r.isOverdue).length > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-                    {activeRecords.filter(r => r.isOverdue).length}
+                  <span className={`text-2xl font-bold tracking-tight ${activeRecords.filter(r => r.isOverdue || r.stage === 'Overdue').length > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                    {activeRecords.filter(r => r.isOverdue || r.stage === 'Overdue').length}
                   </span>
                   <p className="text-[10.5px] text-rose-600/80 mt-0.5">Lapsed follow-up date</p>
                 </div>
@@ -1488,26 +1490,6 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                 <button onClick={() => setStaffAlertSuccessMsg(null)} className="text-emerald-700 hover:underline cursor-pointer">Dismiss</button>
               </motion.div>
             )}
-
-            {/* Automated AESAS Schedule Information Strip */}
-            <div className="p-3.5 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-slate-50 border border-blue-100/80 rounded-xl text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-slate-700">
-              <div className="flex items-start md:items-center space-x-2.5">
-                <div className="p-1.5 bg-[#2B4C9D] text-white rounded-lg shrink-0 mt-0.5 md:mt-0">
-                  <BellRing className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <span className="font-bold text-[#2B4C9D]">Automated Email Routing &amp; Schedule (AESAS):</span>
-                  <div className="text-slate-600 mt-0.5 space-y-0.5">
-                    <div>&bull; <strong>Monthly Digest (1st of month):</strong> Broadcast to <strong>All Active Staff</strong>, <strong>System Administration</strong>, and <strong>Programmed CC Roster</strong> ({programmedCcRoster.length} recipients).</div>
-                    <div>&bull; <strong>Expiration Alerts (&le; 7 days):</strong> Delivered directly to <strong>Credentialing Head</strong>, <strong>System Admin</strong>, <strong>Programmed CC Roster</strong>, and <strong>Affected Clinician</strong>.</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 shrink-0 text-[11px] text-slate-500 font-medium self-end md:self-center">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Surveillance active for All 4 Entities</span>
-              </div>
-            </div>
 
             {/* Horizon Filter Buttons: 30 Days, 60 Days, 90 Days, 120 Days, All Horizons */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">

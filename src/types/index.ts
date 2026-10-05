@@ -77,6 +77,11 @@ export interface AppAccount {
   mustChangePasswordOnFirstLogin?: boolean;
   hasChangedInitialPassword?: boolean;
   isSuperAdmin?: boolean;
+  // Granular Onboarding Access Controls (Entity-to-entity, Pages, Admin, Dev, and Edit permission)
+  allowedTabs?: string[];
+  canAccessAdmin?: boolean;
+  canAccessDev?: boolean;
+  canEditData?: boolean;
   // Multi-Factor Authentication (TOTP / RFC 6238)
   mfaEnabled?: boolean;
   mfaSecret?: string;

@@ -326,6 +326,7 @@ export async function initiateGoogleSignIn(options?: {
           skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
+            prompt: 'select_account',
             state: sessionId || '',
           },
         },
@@ -339,6 +340,11 @@ export async function initiateGoogleSignIn(options?: {
 
     if (!authUrl) {
       return { success: false, error: 'Unable to acquire authorization URL from Google.' };
+    }
+
+    // Force Google to show the account selection screen ("Choose an account")
+    if (!authUrl.includes('prompt=')) {
+      authUrl += (authUrl.includes('?') ? '&' : '?') + 'prompt=select_account';
     }
 
     // 4. Standard Behavior: Navigate strictly in the SAME PAGE (zero new tabs or popups across all devices)

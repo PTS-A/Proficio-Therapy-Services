@@ -429,7 +429,11 @@ export const CredentialingTracker: React.FC<CredentialingTrackerProps> = ({
           <div>
             <select
               value={filters.stage}
-              onChange={(e) => setFilters((prev) => ({ ...prev, stage: e.target.value as CredentialingStage | 'All' }))}
+              onChange={(e) => setFilters((prev) => ({ 
+                ...prev, 
+                stage: e.target.value as CredentialingStage | 'All',
+                ...(e.target.value !== 'All' ? { statusCategory: 'All' } : {})
+              }))}
               className="w-full py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
             >
               <option value="All">All Workflow Stages</option>

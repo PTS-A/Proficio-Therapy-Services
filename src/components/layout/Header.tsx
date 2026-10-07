@@ -123,27 +123,33 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Primary operational tabs
-  const coreNavItems = [
-    { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
-    { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
-    ...(isAdminAccount(currentAccount)
-      ? [{ id: 'admin-dashboard' as const, label: 'Admin Hub', icon: ShieldCheck }]
-      : []),
-    ...(isDeveloper(currentAccount)
-      ? [{ id: 'developer' as const, label: 'Developer', icon: Terminal }]
-      : []),
-  ];
+  const isDevUser = isDeveloper(currentAccount);
 
-  // Secondary operational tabs (standard features only, no dev features)
-  const secondaryNavItems = [
-    { id: 'document-intake' as const, label: 'Smart Intake', icon: Sparkles },
-    { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
-    { id: 'locations' as const, label: 'Locations', icon: MapPin },
-    { id: 'comments-roster' as const, label: 'Comments Roster', icon: MessageSquare },
-    { id: 'aesas' as const, label: 'AESAS Alerts', icon: BellRing },
-    { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
-  ];
+  // Primary operational tabs
+  const coreNavItems = isDevUser
+    ? [
+        { id: 'dashboard' as const, label: 'System Dashboard', icon: Terminal },
+        { id: 'developer' as const, label: 'Developer Hub', icon: Cpu },
+      ]
+    : [
+        { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
+        { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
+        ...(isAdminAccount(currentAccount)
+          ? [{ id: 'admin-dashboard' as const, label: 'Admin Hub', icon: ShieldCheck }]
+          : []),
+      ];
+
+  // Secondary operational tabs (standard features only, hidden in dev account to keep header clean)
+  const secondaryNavItems = isDevUser
+    ? []
+    : [
+        { id: 'document-intake' as const, label: 'Smart Intake', icon: Sparkles },
+        { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
+        { id: 'locations' as const, label: 'Locations', icon: MapPin },
+        { id: 'comments-roster' as const, label: 'Comments Roster', icon: MessageSquare },
+        { id: 'aesas' as const, label: 'AESAS Alerts', icon: BellRing },
+        { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
+      ];
 
   // All navigation items for mobile drawer
   const allNavItems = [...coreNavItems, ...secondaryNavItems];
@@ -262,14 +268,16 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right: Actions (New Application, Bell, User Profile, Mobile Toggle) */}
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            {/* Quick Add Application Button */}
-            <button
-              onClick={onOpenNewApplication}
-              className="flex items-center space-x-1.5 h-9 px-3.5 bg-[#2B4C9D] hover:bg-[#203a7a] active:bg-[#1a2f64] text-white text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">New Application</span>
-            </button>
+            {/* Quick Add Application Button (Operational credentialing only, hidden in dev account) */}
+            {!isDevUser && (
+              <button
+                onClick={onOpenNewApplication}
+                className="flex items-center space-x-1.5 h-9 px-3.5 bg-[#2B4C9D] hover:bg-[#203a7a] active:bg-[#1a2f64] text-white text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">New Application</span>
+              </button>
+            )}
 
             {/* Notification Bell */}
             <button
@@ -348,8 +356,8 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
 
-                  {/* ELEGANT ADMIN DASHBOARD BUTTON UNDERNEATH PROFILE */}
-                  {canAccessTab(currentAccount, 'admin-dashboard') && (
+                  {/* ELEGANT ADMIN DASHBOARD BUTTON UNDERNEATH PROFILE (Admins only, not in dev account) */}
+                  {!isDevUser && canAccessTab(currentAccount, 'admin-dashboard') && (
                     <div className="p-2 border-b border-slate-100 bg-slate-50/70">
                       <button
                         onClick={() => {

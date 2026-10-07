@@ -30,15 +30,18 @@ import { DbmsManagerView } from './components/admin/DbmsManagerView';
 import { TicketManagementView } from './components/dev/TicketManagementView';
 import { NemotronEditSystemView } from './components/dev/NemotronEditSystemView';
 import { DeveloperHubView } from './components/dev/DeveloperHubView';
+import { DeveloperSystemDashboard } from './components/dev/DeveloperSystemDashboard';
 import { LoginPage } from './components/auth/LoginPage';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { ToastContainer } from './components/common/ToastContainer';
 import { Discipline } from './types';
-import { canAccessTab, getAllowedTabs } from './utils/rbac';
+import { canAccessTab, getAllowedTabs, isDeveloper } from './utils/rbac';
+import { telemetry } from './services/telemetryService';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTabType>('dashboard');
+  const [devDashboardMode, setDevDashboardMode] = useState<'system' | 'credentialing'>('system');
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
@@ -47,6 +50,28 @@ const MainContent: React.FC = () => {
   const [isNewAppModalOpen, setIsNewAppModalOpen] = useState<boolean>(false);
 
   const { setFilters, currentAccount, isAuthenticatingOAuth } = useCredentialing();
+
+  // Telemetry lifecycle initialization
+  React.useEffect(() => {
+    telemetry.init();
+  }, []);
+
+  React.useEffect(() => {
+    if (currentAccount) {
+      telemetry.setCurrentUser({
+        id: currentAccount.id,
+        email: currentAccount.email,
+        name: currentAccount.name,
+        role: currentAccount.systemRole || currentAccount.accessLevel,
+      });
+    } else {
+      telemetry.setCurrentUser(null);
+    }
+  }, [currentAccount]);
+
+  React.useEffect(() => {
+    telemetry.setCurrentTab(activeTab);
+  }, [activeTab]);
 
   // Enforce RBAC navigation constraints: if current activeTab is not allowed, fallback to first authorized tab
   React.useEffect(() => {
@@ -137,13 +162,17 @@ const MainContent: React.FC = () => {
             className="w-full"
           >
             {activeTab === 'dashboard' && (
-              <ManagementDashboard
-                onSelectRecord={handleSelectRecord}
-                onSelectProvider={handleSelectProvider}
-                onNavigateToTracker={handleNavigateToTracker}
-                onNavigateToLocations={() => setActiveTab('locations')}
-                onOpenAddProvider={handleOpenAddProvider}
-              />
+              isDeveloper(currentAccount) ? (
+                <DeveloperSystemDashboard />
+              ) : (
+                <ManagementDashboard
+                  onSelectRecord={handleSelectRecord}
+                  onSelectProvider={handleSelectProvider}
+                  onNavigateToTracker={handleNavigateToTracker}
+                  onNavigateToLocations={() => setActiveTab('locations')}
+                  onOpenAddProvider={handleOpenAddProvider}
+                />
+              )
             )}
 
         {activeTab === 'tracker' && (

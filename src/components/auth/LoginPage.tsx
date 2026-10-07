@@ -19,10 +19,9 @@ import { useCredentialing } from '../../context/CredentialingContext';
 import { initiateGoogleSignIn } from '../../services/authService';
 import { ProficioLogo } from '../common/ProficioLogo';
 import { RequestAccessPage } from './RequestAccessPage';
-import { MfaVerificationView } from './MfaVerificationView';
 
 export const LoginPage: React.FC = () => {
-  const { login, loginWithGoogle, sessionTimeoutMessage, pendingMfaAccount, cancelMfa } = useCredentialing();
+  const { login, loginWithGoogle, sessionTimeoutMessage } = useCredentialing();
 
   // Request Access Page State (for unregistered users)
   const [showRequestAccess, setShowRequestAccess] = useState(false);
@@ -69,15 +68,6 @@ export const LoginPage: React.FC = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
-
-  if (pendingMfaAccount) {
-    return (
-      <MfaVerificationView
-        account={pendingMfaAccount}
-        onCancel={cancelMfa}
-      />
-    );
-  }
 
   if (showRequestAccess) {
     return (
@@ -424,17 +414,6 @@ export const LoginPage: React.FC = () => {
               </>
             )}
           </button>
-
-          {/* 2-Step Multi-Factor Notice */}
-          <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5 text-xs text-slate-600">
-            <div className="flex items-center space-x-1.5 font-bold text-slate-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Two-Factor Authentication Mandate</span>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Every sign in requires Step 2 verification code via Google Authenticator app.
-            </p>
-          </div>
 
           {/* Unregistered User Access Request Link */}
           <div className="text-center pt-2 border-t border-slate-100">

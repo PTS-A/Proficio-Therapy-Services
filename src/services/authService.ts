@@ -11,6 +11,11 @@
 import { supabase, ensureSupabaseClient } from '../lib/supabase';
 import { AppAccount } from '../types';
 
+// Custom Production SSO Redirection Configuration
+// Staged for user command: "plan it code it but only implement after I say so"
+export const CUSTOM_PRODUCTION_SSO_DOMAIN = 'https://credentialing.ageslearningsolutions.com';
+export const ENABLE_CUSTOM_DOMAIN_REDIRECT = false; // Toggle to true when user instructs to implement
+
 export interface VerificationResponse {
   authorized: boolean;
   step: number;
@@ -294,7 +299,8 @@ export async function initiateGoogleSignIn(options?: {
       }
     }
 
-    const redirectUrl = `${window.location.origin}/auth/callback${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`;
+    const baseOrigin = ENABLE_CUSTOM_DOMAIN_REDIRECT ? CUSTOM_PRODUCTION_SSO_DOMAIN : window.location.origin;
+    const redirectUrl = `${baseOrigin}/auth/callback${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`;
 
     // 2. Fetch authoritative OAuth URL from server first
     let authUrl = '';
@@ -326,7 +332,7 @@ export async function initiateGoogleSignIn(options?: {
           skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
-            prompt: 'select_account',
+            prompt: 'select_account consent',
             state: sessionId || '',
           },
         },
@@ -344,7 +350,9 @@ export async function initiateGoogleSignIn(options?: {
 
     // Force Google to show the account selection screen ("Choose an account")
     if (!authUrl.includes('prompt=')) {
-      authUrl += (authUrl.includes('?') ? '&' : '?') + 'prompt=select_account';
+      authUrl += (authUrl.includes('?') ? '&' : '?') + 'prompt=select_account%20consent';
+    } else {
+      authUrl = authUrl.replace(/prompt=[^&]*/, 'prompt=select_account%20consent');
     }
 
     // 4. Standard Behavior: Navigate strictly in the SAME PAGE (zero new tabs or popups across all devices)

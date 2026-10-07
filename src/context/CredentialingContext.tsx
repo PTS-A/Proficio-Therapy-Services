@@ -589,11 +589,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
     return null;
   });
 
-  // MFA Authentication State
+  // MFA Authentication State (Disabled per user request)
   const [pendingMfaAccount, setPendingMfaAccount] = useState<AppAccount | null>(null);
   const [isMfaSoftwareWideEnabled, setIsMfaSoftwareWideEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem('cred_mfa_software_wide_enabled');
-    return saved !== 'false'; // defaults to true (enabled software-wide)
+    localStorage.removeItem('cred_mfa_software_wide_enabled');
+    return false; // MFA removed and disabled software-wide
   });
 
   // Global Emergency Lockdown State
@@ -1331,12 +1331,7 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!isMounted) return;
       if (res && res.handled) {
         if (res.authorized && res.account) {
-          // If the account specifically enrolled in MFA and MFA is software-wide enabled, challenge
-          if (res.account.mfaEnabled && isMfaSoftwareWideEnabled) {
-            setPendingMfaAccount(res.account);
-          } else {
-            finalizeLogin(res.account);
-          }
+          finalizeLogin(res.account);
           localStorage.removeItem('cred_timeout_reason');
           localStorage.removeItem('cred_oauth_denial');
         } else if (res.denial || res.error) {
@@ -1613,14 +1608,8 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     }
 
-    // If Google Authenticator MFA is toggled OFF software-wide, bypass MFA and log in immediately
-    if (!isMfaSoftwareWideEnabled) {
-      finalizeLogin(found);
-      return { success: true };
-    }
-
-    // Intercept with Google Authenticator TOTP Multi-Factor Authentication (45 CFR §164.312(a)(2)(i))
-    setPendingMfaAccount(found);
+    // MFA is removed: finalize login immediately
+    finalizeLogin(found);
     return { success: true };
   };
 

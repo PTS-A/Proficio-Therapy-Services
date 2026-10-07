@@ -1123,7 +1123,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker(undefined, 'Pending')} 
+                onClick={() => onNavigateToTracker(selectedDisciplineTab === 'All' ? undefined : selectedDisciplineTab, 'Pending')} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
@@ -1144,7 +1144,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker(undefined, 'Approved')} 
+                onClick={() => onNavigateToTracker(selectedDisciplineTab === 'All' ? undefined : selectedDisciplineTab, 'Approved')} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
@@ -1165,7 +1165,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker(undefined, 'Requiring Action')} 
+                onClick={() => onNavigateToTracker(selectedDisciplineTab === 'All' ? undefined : selectedDisciplineTab, 'Requiring Action')} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-orange-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
@@ -1186,7 +1186,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
               <motion.div 
                 whileHover={{ y: -3, transition: { duration: 0.16 } }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateToTracker(undefined, 'Overdue')} 
+                onClick={() => onNavigateToTracker(selectedDisciplineTab === 'All' ? undefined : selectedDisciplineTab, 'Overdue')} 
                 className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-rose-300 hover:shadow-md transition-shadow cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
@@ -1229,7 +1229,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                     </h2>
                   </div>
                   <button
-                    onClick={() => onNavigateToTracker()}
+                    onClick={() => onNavigateToTracker(selectedDisciplineTab === 'All' ? undefined : selectedDisciplineTab, 'Requiring Action')}
                     className="text-xs text-[#2B4C9D] font-medium hover:underline flex items-center space-x-1 cursor-pointer"
                   >
                     <span>View all</span>
@@ -1251,7 +1251,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                       return (
                         <div
                           key={rec.id}
-                          onClick={() => onNavigateToTracker()}
+                          onClick={() => onNavigateToTracker(selectedDisciplineTab === 'All' ? undefined : selectedDisciplineTab, 'Requiring Action')}
                           className="py-2.5 flex items-center justify-between hover:bg-slate-50 px-2 rounded-xl transition-colors cursor-pointer"
                         >
                           <div className="space-y-0.5 min-w-0 pr-2">
@@ -1956,11 +1956,50 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                         </div>
                       </td>
                       <td className="py-3.5 px-4 text-center font-semibold">{stat.totalProviders}</td>
-                      <td className="py-3.5 px-4 text-center font-bold">{stat.totalApplications}</td>
-                      <td className="py-3.5 px-4 text-center text-sky-700 font-semibold">{stat.submitted}</td>
-                      <td className="py-3.5 px-4 text-center text-amber-700 font-semibold">{stat.pending}</td>
-                      <td className="py-3.5 px-4 text-center text-emerald-700 font-semibold">{stat.approved}</td>
-                      <td className="py-3.5 px-4 text-center text-rose-600 font-bold">{stat.requiringAction}</td>
+                      <td className="py-3.5 px-4 text-center font-bold">
+                        <button 
+                          onClick={() => onNavigateToTracker(stat.discipline, 'All')}
+                          className="font-bold hover:underline cursor-pointer"
+                        >
+                          {stat.totalApplications}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-sky-700 font-semibold">
+                        <button 
+                          onClick={() => onNavigateToTracker(stat.discipline, 'Pending')}
+                          className="text-sky-700 hover:underline cursor-pointer font-semibold"
+                          title="View Pending Applications"
+                        >
+                          {stat.submitted}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-amber-700 font-semibold">
+                        <button 
+                          onClick={() => onNavigateToTracker(stat.discipline, 'Pending')}
+                          className="text-amber-700 hover:underline cursor-pointer font-semibold"
+                          title="View Pending Applications"
+                        >
+                          {stat.pending}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-emerald-700 font-semibold">
+                        <button 
+                          onClick={() => onNavigateToTracker(stat.discipline, 'Approved')}
+                          className="text-emerald-700 hover:underline cursor-pointer font-semibold"
+                          title="View Approved Applications"
+                        >
+                          {stat.approved}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-rose-600 font-bold">
+                        <button 
+                          onClick={() => onNavigateToTracker(stat.discipline, 'Requiring Action')}
+                          className="text-rose-600 hover:underline cursor-pointer font-bold"
+                          title="View Requiring Action Applications"
+                        >
+                          {stat.requiringAction}
+                        </button>
+                      </td>
                       <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-700">{stat.avgCycleDays}d</td>
                       <td className="py-3.5 px-4 text-right">
                         <button
@@ -2041,13 +2080,40 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-center font-semibold text-sky-700">
-                          {stat.submitted}
+                          <button
+                            onClick={() => {
+                              setFilters(prev => ({ ...prev, payerId: stat.payer.id, statusCategory: 'Pending', stage: 'All', isOverdueOnly: false }));
+                              onNavigateToTracker(undefined, 'Pending');
+                            }}
+                            className="text-sky-700 hover:underline cursor-pointer font-semibold"
+                            title="View Pending Applications for Payer"
+                          >
+                            {stat.submitted}
+                          </button>
                         </td>
                         <td className="py-3.5 px-4 text-center font-semibold text-amber-700">
-                          {stat.pending}
+                          <button
+                            onClick={() => {
+                              setFilters(prev => ({ ...prev, payerId: stat.payer.id, statusCategory: 'Pending', stage: 'All', isOverdueOnly: false }));
+                              onNavigateToTracker(undefined, 'Pending');
+                            }}
+                            className="text-amber-700 hover:underline cursor-pointer font-semibold"
+                            title="View Pending Applications for Payer"
+                          >
+                            {stat.pending}
+                          </button>
                         </td>
                         <td className="py-3.5 px-4 text-center font-semibold text-emerald-700">
-                          {stat.approved}
+                          <button
+                            onClick={() => {
+                              setFilters(prev => ({ ...prev, payerId: stat.payer.id, statusCategory: 'Approved', stage: 'All', isOverdueOnly: false }));
+                              onNavigateToTracker(undefined, 'Approved');
+                            }}
+                            className="text-emerald-700 hover:underline cursor-pointer font-semibold"
+                            title="View Approved Applications for Payer"
+                          >
+                            {stat.approved}
+                          </button>
                         </td>
                         <td className="py-3.5 px-4 text-center text-slate-500 font-semibold">
                           {stat.rejected}
@@ -2057,9 +2123,16 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           {stat.overdueCount > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                            <button
+                              onClick={() => {
+                                setFilters(prev => ({ ...prev, payerId: stat.payer.id, statusCategory: 'Overdue', stage: 'All', isOverdueOnly: true }));
+                                onNavigateToTracker(undefined, 'Overdue');
+                              }}
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 cursor-pointer"
+                              title="View Overdue Applications for Payer"
+                            >
                               {stat.overdueCount} Overdue
-                            </span>
+                            </button>
                           ) : (
                             <span className="text-slate-400">—</span>
                           )}

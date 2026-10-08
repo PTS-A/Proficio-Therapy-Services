@@ -189,7 +189,7 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
     return customTabs;
   }
 
-  // Developer Profile: Access to engineering tools and Developer Center
+  // Developer Profile: Access to engineering tools and Developer Center + Admin Dashboard & Credentialing operations
   if (role === 'Developer' || isDeveloper(account)) {
     return [
       'developer',
@@ -207,6 +207,14 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'tickets',
       'nemotron-edit',
       'dbms-manager',
+      'admin-dashboard',
+      'users',
+      'new-user',
+      'settings',
+      'automations',
+      'access-requests',
+      'security-center',
+      'staff-approvals',
     ];
   }
 
@@ -339,21 +347,21 @@ export const canAccessTab = (account: AppAccount | null | undefined, tab: Active
   // 2. Admin Dashboard Access Control (canAccessAdmin tick box)
   if (tab === 'admin-dashboard') {
     if (account.canAccessAdmin === true) return true;
-    if (account.canAccessAdmin === false) return false;
-    return isSuperAdmin(account) || isAdminAccount(account) || account.systemRole === 'Credentialing Lead / Manager';
+    if (account.canAccessAdmin === false && !isSuperAdmin(account) && !isDeveloper(account)) return false;
+    return isSuperAdmin(account) || isAdminAccount(account) || isDeveloper(account) || account.systemRole === 'Credentialing Lead / Manager';
   }
 
-  // 3. Super Admin Only Governance Tabs
-  if (tab === 'access-requests' || tab === 'security-center' || tab === 'google-authenticator') {
-    if (account.canAccessAdmin === false) return false;
-    return isSuperAdmin(account) || isAdminAccount(account);
+  // 3. Super Admin & Governance Tabs
+  if (tab === 'access-requests' || tab === 'security-center' || tab === 'google-authenticator' || tab === 'users' || tab === 'new-user' || tab === 'settings' || tab === 'automations') {
+    if (account.canAccessAdmin === false && !isSuperAdmin(account) && !isDeveloper(account)) return false;
+    return isSuperAdmin(account) || isAdminAccount(account) || isDeveloper(account);
   }
 
   // 4. Granular Page Permissions (what pages they can view tick boxes)
-  if (Array.isArray(account.allowedTabs) && account.allowedTabs.length > 0) {
+  if (Array.isArray(account.allowedTabs) && account.allowedTabs.length > 0 && !isDeveloper(account) && !isSuperAdmin(account)) {
     if (account.allowedTabs.includes(tab)) return true;
-    if (tab === 'users' && account.allowedTabs.includes('new-user')) return true;
-    if (tab === 'new-user' && account.allowedTabs.includes('users')) return true;
+    if ((tab as string) === 'users' && account.allowedTabs.includes('new-user')) return true;
+    if ((tab as string) === 'new-user' && account.allowedTabs.includes('users')) return true;
     return false;
   }
 
@@ -378,7 +386,7 @@ export const canAccessTab = (account: AppAccount | null | undefined, tab: Active
   }
   const allowed = getAllowedTabs(account);
   // Map synonyms like 'users' -> 'new-user'
-  if (tab === 'users' && allowed.includes('new-user')) return true;
-  if (tab === 'new-user' && allowed.includes('users')) return true;
+  if ((tab as string) === 'users' && allowed.includes('new-user')) return true;
+  if ((tab as string) === 'new-user' && allowed.includes('users')) return true;
   return allowed.includes(tab);
 };

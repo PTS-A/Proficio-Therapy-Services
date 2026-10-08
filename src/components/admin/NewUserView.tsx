@@ -259,20 +259,26 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
 
     // Ensure admin tab is kept in sync if admin access is granted
     let finalAllowedTabs = [...allowedTabs];
-    if (canAccessAdmin && !finalAllowedTabs.includes('admin-dashboard')) {
-      finalAllowedTabs.push('admin-dashboard');
+    if (canAccessAdmin) {
+      if (!finalAllowedTabs.includes('admin-dashboard')) finalAllowedTabs.push('admin-dashboard');
+    } else {
+      finalAllowedTabs = finalAllowedTabs.filter(t => t !== 'admin-dashboard');
     }
     if (canAccessDev) {
       if (!finalAllowedTabs.includes('dbms-manager')) finalAllowedTabs.push('dbms-manager');
       if (!finalAllowedTabs.includes('nemotron-edit')) finalAllowedTabs.push('nemotron-edit');
     }
 
+    const targetAccessLevel = canAccessAdmin ? 'ADMINISTRATOR' : accessLevel;
+    const isSuper = Boolean(canAccessAdmin || selectedRole === 'System Administrator' || selectedRole === 'Developer');
+
     if (editingAccountId) {
       updateAccount(editingAccountId, {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: password.trim() || 'proficio',
-        accessLevel: canAccessAdmin ? 'ADMINISTRATOR' : accessLevel,
+        accessLevel: targetAccessLevel,
+        isSuperAdmin: isSuper,
         systemRole: selectedRole,
         roleTitle: currentRoleDef.title,
         department: department.trim(),
@@ -295,7 +301,8 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: password.trim() || 'proficio',
-        accessLevel: canAccessAdmin ? 'ADMINISTRATOR' : accessLevel,
+        accessLevel: targetAccessLevel,
+        isSuperAdmin: isSuper,
         systemRole: selectedRole,
         roleTitle: currentRoleDef.title,
         department: department.trim(),

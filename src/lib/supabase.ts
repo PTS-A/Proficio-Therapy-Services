@@ -509,14 +509,40 @@ function toPostgresRow(collectionName: string, item: any): any {
     }
     if (item.isSuperAdmin !== undefined) {
       mapped.is_super_admin = item.isSuperAdmin;
-    } else if (item.accessLevel === 'ADMINISTRATOR' || item.systemRole === 'System Administrator') {
+    } else if (item.canAccessAdmin === false) {
+      mapped.is_super_admin = false;
+    } else if (item.accessLevel === 'ADMINISTRATOR' || item.systemRole === 'System Administrator' || item.canAccessAdmin === true) {
       mapped.is_super_admin = true;
     }
     if (item.department) mapped.department = item.department;
     if (item.assignedDisciplines) mapped.assigned_disciplines = item.assignedDisciplines;
     if (item.assignedEntities) mapped.assigned_entities = item.assignedEntities;
-    if (item.permissions) mapped.permissions = item.permissions;
     if (item.status) mapped.status = item.status;
+    if (item.mustChangePasswordOnFirstLogin !== undefined) {
+      mapped.must_change_password = item.mustChangePasswordOnFirstLogin;
+    }
+    if (item.hasChangedInitialPassword !== undefined) {
+      mapped.has_changed_password = item.hasChangedInitialPassword;
+    }
+
+    // Embed granular metadata in the permissions array so it is 100% persisted into Supabase PostgreSQL
+    const basePermissions = Array.isArray(item.permissions)
+      ? item.permissions.filter((p: string) => typeof p === 'string' && !p.startsWith('METADATA:'))
+      : [];
+    const metaPayload = {
+      canAccessAdmin: item.canAccessAdmin !== undefined
+        ? Boolean(item.canAccessAdmin)
+        : Boolean(item.accessLevel === 'ADMINISTRATOR' || item.systemRole === 'System Administrator' || item.systemRole === 'Developer'),
+      canAccessDev: item.canAccessDev !== undefined
+        ? Boolean(item.canAccessDev)
+        : Boolean(item.systemRole === 'Developer'),
+      canEditData: item.canEditData !== undefined ? Boolean(item.canEditData) : true,
+      allowedTabs: Array.isArray(item.allowedTabs) ? item.allowedTabs : [],
+      mustChangePasswordOnFirstLogin: item.mustChangePasswordOnFirstLogin,
+      hasChangedInitialPassword: item.hasChangedInitialPassword,
+    };
+    mapped.permissions = [...basePermissions, `METADATA:${JSON.stringify(metaPayload)}`];
+    mapped.updated_at = new Date().toISOString();
   }
   if (tableName === 'employees' && !mapped.full_name && (item.firstName || item.lastName)) {
     mapped.full_name = [item.firstName, item.lastName].filter(Boolean).join(' ');
@@ -620,6 +646,41 @@ function fromPostgresRow(collectionName: string, row: any): any {
     result.accessLevel = row.access_level || result.accessLevel || (row.is_super_admin ? 'ADMINISTRATOR' : 'USER');
     result.isSuperAdmin = Boolean(row.is_super_admin || row.access_level === 'ADMINISTRATOR' || result.systemRole === 'System Administrator');
     result.email = (row.email || result.email || '').toLowerCase().trim();
+
+    if (row.permissions && Array.isArray(row.permissions)) {
+      const metaStr = row.permissions.find((p: string) => typeof p === 'string' && p.startsWith('METADATA:'));
+      if (metaStr) {
+        try {
+          const meta = JSON.parse(metaStr.replace(/^METADATA:/, ''));
+          result.canAccessAdmin = meta.canAccessAdmin;
+          result.canAccessDev = meta.canAccessDev;
+          result.canEditData = meta.canEditData;
+          if (Array.isArray(meta.allowedTabs)) {
+            result.allowedTabs = meta.allowedTabs;
+          }
+          if (meta.mustChangePasswordOnFirstLogin !== undefined) {
+            result.mustChangePasswordOnFirstLogin = meta.mustChangePasswordOnFirstLogin;
+          }
+          if (meta.hasChangedInitialPassword !== undefined) {
+            result.hasChangedInitialPassword = meta.hasChangedInitialPassword;
+          }
+        } catch (e) {
+          console.warn('[fromPostgresRow] Failed to parse METADATA permissions:', e);
+        }
+      }
+      result.permissions = row.permissions.filter((p: string) => typeof p === 'string' && !p.startsWith('METADATA:'));
+    }
+
+    // Default fallbacks if not explicitly defined in metadata
+    if (result.canAccessAdmin === undefined) {
+      result.canAccessAdmin = result.accessLevel === 'ADMINISTRATOR' || result.systemRole === 'System Administrator' || result.systemRole === 'Developer' || result.systemRole === 'Credentialing Lead / Manager' || result.isSuperAdmin === true;
+    }
+    if (result.canAccessDev === undefined) {
+      result.canAccessDev = result.systemRole === 'Developer' || result.email?.toLowerCase().includes('dev@');
+    }
+    if (result.canEditData === undefined) {
+      result.canEditData = true;
+    }
   }
 
   if (tableName === 'entities') {
@@ -1092,8 +1153,11 @@ export async function testConnection(): Promise<{ ok: boolean; message: string; 
   }
 
   try {
-    const { error } = await supabase.from('stage_configs').select('id').limit(1);
-    if (error) throw error;
+    const { error: err1 } = await supabase.from('entities').select('id').limit(1);
+    if (err1) {
+      const { error: err2 } = await supabase.from('users').select('id').limit(1);
+      if (err2) throw err2;
+    }
     return {
       ok: true,
       message: 'Successfully connected to Supabase PostgreSQL & Realtime.',

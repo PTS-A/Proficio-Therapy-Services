@@ -148,13 +148,15 @@ const MainContent: React.FC = () => {
         onOpenNewApplication={() => setIsNewAppModalOpen(true)}
         onOpenAddProvider={handleOpenAddProvider}
         onOpenNotificationDrawer={() => setIsNotificationOpen(true)}
+        devDashboardMode={devDashboardMode}
+        setDevDashboardMode={setDevDashboardMode}
       />
 
       {/* Main Subpage Container with Fluid Page Transitions */}
       <main className="flex-1 w-full pb-12 overflow-x-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={activeTab}
+            key={activeTab + (activeTab === 'dashboard' ? `_${devDashboardMode}` : '')}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
@@ -162,7 +164,7 @@ const MainContent: React.FC = () => {
             className="w-full"
           >
             {activeTab === 'dashboard' && (
-              isDeveloper(currentAccount) ? (
+              (isDeveloper(currentAccount) && devDashboardMode === 'system') ? (
                 <DeveloperSystemDashboard />
               ) : (
                 <ManagementDashboard

@@ -302,46 +302,46 @@ export async function initiateGoogleSignIn(options?: {
     const baseOrigin = ENABLE_CUSTOM_DOMAIN_REDIRECT ? CUSTOM_PRODUCTION_SSO_DOMAIN : window.location.origin;
     const redirectUrl = `${baseOrigin}/auth/callback${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`;
 
-    // 2. Fetch authoritative OAuth URL from server first
+    // 2. Generate OAuth URL via browser client (saves PKCE verifier in localStorage for seamless handshake)
     let authUrl = '';
-    try {
-      const urlRes = await fetch('/api/auth/google/url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ redirectUrl }),
-      });
-      if (urlRes.ok) {
-        const urlData = await urlRes.json();
-        authUrl = urlData.url || '';
+    const client = supabase || await ensureSupabaseClient();
+    if (client) {
+      try {
+        const { data, error } = await client.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: redirectUrl,
+            skipBrowserRedirect: true,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'select_account consent',
+              state: sessionId || '',
+            },
+          },
+        });
+        if (!error && data?.url) {
+          authUrl = data.url;
+        }
+      } catch (clientErr) {
+        console.warn('[Client Google Auth URL init note]:', clientErr);
       }
-    } catch (e) {
-      console.warn('[Server Google Auth URL fetch fallback]:', e);
     }
 
-    // 3. Fallback to client-side Supabase client if server endpoint didn't respond
+    // 3. Fallback to server endpoint if browser client was unavailable
     if (!authUrl) {
-      const client = supabase || await ensureSupabaseClient();
-      if (!client) {
-        return { success: false, error: 'Database and authentication service is not connected.' };
+      try {
+        const urlRes = await fetch('/api/auth/google/url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ redirectUrl }),
+        });
+        if (urlRes.ok) {
+          const urlData = await urlRes.json();
+          authUrl = urlData.url || '';
+        }
+      } catch (e) {
+        console.warn('[Server Google Auth URL fetch fallback]:', e);
       }
-
-      const { data, error } = await client.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'select_account consent',
-            state: sessionId || '',
-          },
-        },
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-      authUrl = data?.url || '';
     }
 
     if (!authUrl) {

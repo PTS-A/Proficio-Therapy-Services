@@ -44,6 +44,10 @@ import {
   Database,
   Cpu,
   Terminal,
+  Activity,
+  CreditCard,
+  Code2,
+  LifeBuoy,
 } from 'lucide-react';
 
 export type ActiveTabType = 
@@ -80,6 +84,8 @@ interface HeaderProps {
   onOpenNewApplication: () => void;
   onOpenAddProvider: () => void;
   onOpenNotificationDrawer: () => void;
+  devDashboardMode?: 'system' | 'credentialing';
+  setDevDashboardMode?: (mode: 'system' | 'credentialing') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -88,6 +94,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewApplication,
   onOpenAddProvider,
   onOpenNotificationDrawer,
+  devDashboardMode = 'system',
+  setDevDashboardMode,
 }) => {
   const { 
     currentAccount, 
@@ -128,28 +136,35 @@ export const Header: React.FC<HeaderProps> = ({
   // Primary operational tabs
   const coreNavItems = isDevUser
     ? [
-        { id: 'dashboard' as const, label: 'System Dashboard', icon: Terminal },
+        { 
+          id: 'dashboard' as const, 
+          label: devDashboardMode === 'system' ? 'System Telemetry' : 'Credentialing Dashboard', 
+          icon: devDashboardMode === 'system' ? Terminal : Layers 
+        },
+        { id: 'tracker' as const, label: 'Tracker', icon: FileText },
+        { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
         { id: 'developer' as const, label: 'Developer Hub', icon: Cpu },
+        ...(canAccessTab(currentAccount, 'admin-dashboard')
+          ? [{ id: 'admin-dashboard' as const, label: 'Admin Hub', icon: ShieldCheck }]
+          : []),
       ]
     : [
         { id: 'dashboard' as const, label: 'Dashboard', icon: Layers },
         { id: 'providers' as const, label: 'Clinical Staff', icon: Users },
-        ...(isAdminAccount(currentAccount)
+        ...(isAdminAccount(currentAccount) || canAccessTab(currentAccount, 'admin-dashboard')
           ? [{ id: 'admin-dashboard' as const, label: 'Admin Hub', icon: ShieldCheck }]
           : []),
       ];
 
-  // Secondary operational tabs (standard features only, hidden in dev account to keep header clean)
-  const secondaryNavItems = isDevUser
-    ? []
-    : [
-        { id: 'document-intake' as const, label: 'Smart Intake', icon: Sparkles },
-        { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
-        { id: 'locations' as const, label: 'Locations', icon: MapPin },
-        { id: 'comments-roster' as const, label: 'Comments Roster', icon: MessageSquare },
-        { id: 'aesas' as const, label: 'AESAS Alerts', icon: BellRing },
-        { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
-      ];
+  // Secondary operational tabs
+  const secondaryNavItems = [
+    { id: 'document-intake' as const, label: 'Smart Intake', icon: Sparkles },
+    { id: 'payers' as const, label: 'Payers', icon: ShieldCheck },
+    { id: 'locations' as const, label: 'Locations', icon: MapPin },
+    { id: 'comments-roster' as const, label: 'Comments Roster', icon: MessageSquare },
+    { id: 'aesas' as const, label: 'AESAS Alerts', icon: BellRing },
+    { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
+  ];
 
   // All navigation items for mobile drawer
   const allNavItems = [...coreNavItems, ...secondaryNavItems];
@@ -356,8 +371,108 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
 
-                  {/* ELEGANT ADMIN DASHBOARD BUTTON UNDERNEATH PROFILE (Admins only, not in dev account) */}
-                  {!isDevUser && canAccessTab(currentAccount, 'admin-dashboard') && (
+                  {/* DEVELOPER PERSPECTIVE SWITCHER (Dev account can switch between Admin, Credentialing, and System views) */}
+                  {isDevUser && (
+                    <div className="p-2.5 border-b border-slate-100 bg-gradient-to-b from-indigo-50/50 to-purple-50/30">
+                      <div className="px-1 pb-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        <span>Developer Perspective Switcher</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-100 text-purple-700">MULTI-ROLE</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {/* 1. Admin Dashboard View */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setActiveTab('admin-dashboard');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer border ${
+                            activeTab === 'admin-dashboard'
+                              ? 'bg-gradient-to-r from-slate-900 to-indigo-950 text-white border-indigo-900 shadow-xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              activeTab === 'admin-dashboard' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                            }`}>
+                              <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <div className="truncate">
+                              <p className="text-xs font-bold leading-tight">Admin Dashboard</p>
+                              <p className={`text-[10px] leading-tight mt-0.5 ${activeTab === 'admin-dashboard' ? 'text-indigo-200' : 'text-slate-500'}`}>
+                                Users, settings, security &amp; approvals
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'admin-dashboard' ? 'text-indigo-300' : 'text-slate-400'}`} />
+                        </button>
+
+                        {/* 2. Credentialing Staff Operations View */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setDevDashboardMode?.('credentialing');
+                            setActiveTab('dashboard');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer border ${
+                            activeTab === 'dashboard' && devDashboardMode === 'credentialing'
+                              ? 'bg-gradient-to-r from-blue-900 to-[#2B4C9D] text-white border-blue-900 shadow-xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              activeTab === 'dashboard' && devDashboardMode === 'credentialing' ? 'bg-blue-400/20 text-blue-200' : 'bg-blue-50 text-blue-700'
+                            }`}>
+                              <Layers className="w-4 h-4" />
+                            </div>
+                            <div className="truncate">
+                              <p className="text-xs font-bold leading-tight">Credentialing Staff View</p>
+                              <p className={`text-[10px] leading-tight mt-0.5 ${activeTab === 'dashboard' && devDashboardMode === 'credentialing' ? 'text-blue-200' : 'text-slate-500'}`}>
+                                KPIs, applications, pipeline &amp; tracker
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'dashboard' && devDashboardMode === 'credentialing' ? 'text-blue-200' : 'text-slate-400'}`} />
+                        </button>
+
+                        {/* 3. Developer System Telemetry View */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setDevDashboardMode?.('system');
+                            setActiveTab('dashboard');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer border ${
+                            activeTab === 'dashboard' && devDashboardMode === 'system'
+                              ? 'bg-gradient-to-r from-purple-950 to-slate-900 text-white border-purple-900 shadow-xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              activeTab === 'dashboard' && devDashboardMode === 'system' ? 'bg-purple-400/20 text-purple-200' : 'bg-purple-50 text-purple-700'
+                            }`}>
+                              <Terminal className="w-4 h-4" />
+                            </div>
+                            <div className="truncate">
+                              <p className="text-xs font-bold leading-tight">System Telemetry &amp; Health</p>
+                              <p className={`text-[10px] leading-tight mt-0.5 ${activeTab === 'dashboard' && devDashboardMode === 'system' ? 'text-purple-200' : 'text-slate-500'}`}>
+                                Real-time DB latency, sessions &amp; errors
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'dashboard' && devDashboardMode === 'system' ? 'text-purple-200' : 'text-slate-400'}`} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STANDARD ADMIN DASHBOARD BUTTON FOR NON-DEV ADMINS */}
+                  {!isDevUser && (canAccessTab(currentAccount, 'admin-dashboard') || isAdmin) && (
                     <div className="p-2 border-b border-slate-100 bg-slate-50/70">
                       <button
                         onClick={() => {
@@ -390,49 +505,226 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   )}
 
-                  {/* CLINICAL STAFF SELF-SERVICE PORTAL ACCESS */}
-                  <div className="p-2 space-y-1">
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        setActiveTab('clinical-portal');
-                      }}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer ${
-                        activeTab === 'clinical-portal' 
-                          ? 'bg-blue-50 text-[#2B4C9D] font-bold' 
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <User className="w-4 h-4 text-indigo-600 shrink-0" />
-                        <span className="text-xs font-semibold">My Clinical Profile</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400">Self-service</span>
-                    </button>
+                  {/* CREDENTIALING STAFF VIEWS & OPERATIONS */}
+                  <div className="p-2 border-b border-slate-100">
+                    <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>Credentialing Operations</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setDevDashboardMode?.('credentialing');
+                          setActiveTab('dashboard');
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                          activeTab === 'dashboard' && devDashboardMode === 'credentialing'
+                            ? 'bg-blue-50 text-[#2B4C9D] font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Layers className="w-4 h-4 text-blue-600 shrink-0" />
+                          <span className="text-xs">Credentialing Dashboard</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">KPIs &amp; Pipeline</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('tracker');
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                          activeTab === 'tracker'
+                            ? 'bg-blue-50 text-[#2B4C9D] font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="text-xs">Credentialing Tracker</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">Kanban &amp; Table</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('providers');
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                          activeTab === 'providers'
+                            ? 'bg-blue-50 text-[#2B4C9D] font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-violet-600 shrink-0" />
+                          <span className="text-xs">Clinical Staff Master</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">Clinicians</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('payers');
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                          activeTab === 'payers'
+                            ? 'bg-blue-50 text-[#2B4C9D] font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <CreditCard className="w-4 h-4 text-sky-600 shrink-0" />
+                          <span className="text-xs">Insurance Payers</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('locations');
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                          activeTab === 'locations'
+                            ? 'bg-blue-50 text-[#2B4C9D] font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
+                          <span className="text-xs">Clinic Locations</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('entities');
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                          activeTab === 'entities'
+                            ? 'bg-blue-50 text-[#2B4C9D] font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span className="text-xs">Legal Entities</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setActiveTab('clinical-portal');
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                          activeTab === 'clinical-portal'
+                            ? 'bg-blue-50 text-[#2B4C9D] font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <User className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <span className="text-xs">Clinical Staff Portal</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">Self-service</span>
+                      </button>
+                    </div>
+                  </div>
 
-                    {/* DEVELOPER CENTER — RESTRICTED TO DEVELOPER PROFILE ONLY */}
-                    {isDeveloper(currentAccount) && (
-                      <div className="pt-1 border-t border-slate-100">
+                  {/* DEVELOPER TOOLS & TELEMETRY */}
+                  {isDevUser && (
+                    <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                      <div className="px-2 py-1 text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center justify-between">
+                        <span>Engineering &amp; Telemetry</span>
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-purple-100 text-purple-800">DEV</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setDevDashboardMode?.('system');
+                            setActiveTab('dashboard');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                            activeTab === 'dashboard' && devDashboardMode === 'system'
+                              ? 'bg-purple-100/70 text-purple-950 font-bold'
+                              : 'hover:bg-purple-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Activity className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span className="text-xs font-semibold">System Dashboard</span>
+                          </div>
+                          <span className="text-[10px] text-purple-500">Live Telemetry</span>
+                        </button>
                         <button
                           onClick={() => {
                             setUserMenuOpen(false);
                             setActiveTab('developer');
                           }}
-                          className={`w-full flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer ${
-                            activeTab === 'developer' 
-                              ? 'bg-purple-50 text-purple-900 font-bold' 
-                              : 'hover:bg-slate-50 text-slate-700'
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                            activeTab === 'developer'
+                              ? 'bg-purple-100/70 text-purple-950 font-bold'
+                              : 'hover:bg-purple-50 text-slate-700'
                           }`}
                         >
                           <div className="flex items-center space-x-2">
                             <Terminal className="w-4 h-4 text-purple-600 shrink-0" />
-                            <span className="text-xs font-semibold">Developer Center</span>
+                            <span className="text-xs font-semibold">Developer Hub</span>
                           </div>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">DEV ONLY</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setActiveTab('dbms-manager');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                            activeTab === 'dbms-manager'
+                              ? 'bg-purple-100/70 text-purple-950 font-bold'
+                              : 'hover:bg-purple-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Database className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span className="text-xs font-semibold">DBMS Manager</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">Supabase</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setActiveTab('nemotron-edit');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                            activeTab === 'nemotron-edit'
+                              ? 'bg-purple-100/70 text-purple-950 font-bold'
+                              : 'hover:bg-purple-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Code2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <span className="text-xs font-semibold">Nemotron Code Editor</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setActiveTab('tickets');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                            activeTab === 'tickets'
+                              ? 'bg-purple-100/70 text-purple-950 font-bold'
+                              : 'hover:bg-purple-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <LifeBuoy className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span className="text-xs font-semibold">System Tickets</span>
+                          </div>
                         </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   <div className="border-t border-slate-100 my-1"></div>
 

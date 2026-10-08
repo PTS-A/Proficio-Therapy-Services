@@ -6,7 +6,8 @@ function getSupabaseClient(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
   const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
   if (!url || !key) return null;
-  return createClient(url, key, {
+  const cleanUrl = url.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+  return createClient(cleanUrl, key, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -146,7 +147,7 @@ export async function verifyEmployeeAuthorization(
   // Check public.users table as well (HIPAA §164.502(b) Minimum Necessary)
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('id, name, email, access_level, system_role, role_title, department, avatar_url, status, is_active, assigned_disciplines, assigned_entities, is_super_admin')
+    .select('id, name, email, access_level, system_role, role_title, department, avatar_url, status, is_active, assigned_disciplines, assigned_entities, is_super_admin, permissions')
     .ilike('email', cleanEmail)
     .limit(1);
 
@@ -501,12 +502,37 @@ export async function verifyEmployeeAuthorization(
     };
   }
 
+  // Extract granular metadata from permissions
+  let canAccessAdmin = accessLevel === 'ADMINISTRATOR' || isSuperAdminEmail || systemRole === 'System Administrator' || existingUser?.is_super_admin === true;
+  let canAccessDev = systemRole === 'Developer' || cleanEmail.includes('dev');
+  let canEditData = true;
+  let customAllowedTabs: string[] | undefined = undefined;
+
+  if (existingUser?.permissions && Array.isArray(existingUser.permissions)) {
+    const metaStr = existingUser.permissions.find((p: string) => typeof p === 'string' && p.startsWith('METADATA:'));
+    if (metaStr) {
+      try {
+        const meta = JSON.parse(metaStr.replace(/^METADATA:/, ''));
+        if (meta.canAccessAdmin !== undefined) canAccessAdmin = meta.canAccessAdmin;
+        if (meta.canAccessDev !== undefined) canAccessDev = meta.canAccessDev;
+        if (meta.canEditData !== undefined) canEditData = meta.canEditData;
+        if (Array.isArray(meta.allowedTabs)) customAllowedTabs = meta.allowedTabs;
+      } catch {}
+    }
+  }
+
+  // Developer profile default: developer account always has admin dashboard and full capabilities enabled
+  if (systemRole === 'Developer') {
+    canAccessDev = true;
+    canAccessAdmin = true;
+  }
+
   // Construct or synchronize the resolved AppAccount object
   const resolvedAccount = {
     id: existingUser?.id || `acc-emp-${employee.id}`,
     name: employee.full_name || existingUser?.name || 'Verified Employee',
     email: cleanEmail,
-    accessLevel: accessLevel,
+    accessLevel: (canAccessAdmin ? 'ADMINISTRATOR' : accessLevel) as 'ADMINISTRATOR' | 'USER',
     systemRole: systemRole,
     roleTitle: employee.role_title || existingUser?.role_title || systemRole,
     department: employee.department || existingUser?.department || 'Proficio & AGES Credentialing Operations',
@@ -515,12 +541,31 @@ export async function verifyEmployeeAuthorization(
     assignedDisciplines: existingUser?.assigned_disciplines || ['ABA', 'Speech', 'OT'],
     assignedEntities: targetEntityId ? [targetEntityId] : ['ent-1'],
     assignedLocations: targetLocationId ? [targetLocationId] : ['loc-1'],
-    isSuperAdmin: isSuperAdminEmail || existingUser?.is_super_admin === true || systemRole === 'System Administrator',
+    isSuperAdmin: isSuperAdminEmail || existingUser?.is_super_admin === true || systemRole === 'System Administrator' || canAccessAdmin,
+    canAccessAdmin,
+    canAccessDev,
+    canEditData,
+    allowedTabs: customAllowedTabs,
     authProvider: 'google',
     googleId: googleProfile?.id,
     lastLogin: new Date().toISOString().split('T')[0],
-    permissions: getRolePermissions(systemRole),
+    permissions: existingUser?.permissions || getRolePermissions(systemRole),
   };
+
+  // Embed metadata if not already present
+  const basePermissions = Array.isArray(resolvedAccount.permissions)
+    ? resolvedAccount.permissions.filter((p: string) => typeof p === 'string' && !p.startsWith('METADATA:'))
+    : getRolePermissions(systemRole);
+
+  const metaPayload = {
+    canAccessAdmin: Boolean(resolvedAccount.canAccessAdmin),
+    canAccessDev: Boolean(resolvedAccount.canAccessDev),
+    canEditData: Boolean(resolvedAccount.canEditData),
+    allowedTabs: resolvedAccount.allowedTabs || [],
+  };
+
+  const finalPermissions = [...basePermissions, `METADATA:${JSON.stringify(metaPayload)}`];
+  resolvedAccount.permissions = finalPermissions;
 
   // Synchronize with public.users table in Supabase
   try {
@@ -538,6 +583,7 @@ export async function verifyEmployeeAuthorization(
       is_active: true,
       is_super_admin: resolvedAccount.isSuperAdmin,
       assigned_entities: resolvedAccount.assignedEntities,
+      permissions: finalPermissions,
       last_login: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'email' });
@@ -547,6 +593,7 @@ export async function verifyEmployeeAuthorization(
 
   // STEP 8: Permission Check
   const allowedTabs = computeAllowedTabs(resolvedAccount);
+  resolvedAccount.allowedTabs = allowedTabs;
 
   // STEP 9: Supabase RLS Session Alignment (Completed via authenticated user record)
 
@@ -661,7 +708,41 @@ function getRolePermissions(role: string): string[] {
  * Calculate allowed tabs for role
  */
 function computeAllowedTabs(account: any): string[] {
-  if (account.isSuperAdmin || account.systemRole === 'System Administrator') {
+  if (Array.isArray(account.allowedTabs) && account.allowedTabs.length > 0) {
+    const list = [...account.allowedTabs];
+    if (account.canAccessAdmin && !list.includes('admin-dashboard')) list.push('admin-dashboard');
+    return list;
+  }
+
+  if (account.systemRole === 'Developer' || account.canAccessDev) {
+    return [
+      'developer',
+      'dashboard',
+      'tracker',
+      'providers',
+      'locations',
+      'payers',
+      'entities',
+      'reports',
+      'document-intake',
+      'clinical-portal',
+      'aesas',
+      'comments-roster',
+      'tickets',
+      'nemotron-edit',
+      'dbms-manager',
+      'admin-dashboard',
+      'users',
+      'new-user',
+      'settings',
+      'automations',
+      'access-requests',
+      'security-center',
+      'staff-approvals',
+    ];
+  }
+
+  if (account.isSuperAdmin || account.systemRole === 'System Administrator' || account.canAccessAdmin) {
     return [
       'dashboard',
       'tracker',
@@ -675,6 +756,10 @@ function computeAllowedTabs(account: any): string[] {
       'users',
       'import',
       'settings',
+      'admin-dashboard',
+      'staff-approvals',
+      'aesas',
+      'comments-roster',
     ];
   }
 

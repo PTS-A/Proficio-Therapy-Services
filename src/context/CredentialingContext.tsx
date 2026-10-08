@@ -2318,7 +2318,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           const updated: AppAccount = {
             ...a,
             ...updates,
-            ...(isElevating ? { isSuperAdmin: true, accessLevel: 'ADMINISTRATOR' as const } : {}),
+            isSuperAdmin: updates.isSuperAdmin !== undefined
+              ? updates.isSuperAdmin
+              : (isElevating ? true : (a.isSuperAdmin ?? false)),
+            accessLevel: updates.accessLevel !== undefined
+              ? updates.accessLevel
+              : (isElevating ? 'ADMINISTRATOR' : (a.accessLevel || 'USER')),
           };
 
           if (currentAccount && (currentAccount.id === id || currentAccount.email.toLowerCase() === updated.email.toLowerCase())) {

@@ -284,7 +284,7 @@ export const LoginPage: React.FC = () => {
               Sign In to Credentialing Hub
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Sign in using your corporate email and password or Google Single Sign-On, followed by Google Authenticator MFA.
+              Sign in using your corporate email and password or Google Single Sign-On.
             </p>
           </div>
 
@@ -440,7 +440,7 @@ export const LoginPage: React.FC = () => {
             AGES &bull; Proficio Therapy &bull; Child&apos;s Play Therapy
           </p>
           <p className="text-[11px] text-slate-400 mt-1">
-            HIPAA Compliant &bull; 10-Step Authorization Chain &bull; Google Authenticator MFA
+            HIPAA Compliant &bull; 10-Step Authorization Chain &bull; Enterprise SSO
           </p>
         </div>
       </div>

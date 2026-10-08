@@ -729,7 +729,6 @@ function computeAllowedTabs(account: any): string[] {
       'aesas',
       'comments-roster',
       'tickets',
-      'nemotron-edit',
       'dbms-manager',
       'admin-dashboard',
       'users',

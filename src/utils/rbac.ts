@@ -24,7 +24,6 @@ export type ActiveTabType =
   | 'aesas'
   | 'comments-roster'
   | 'tickets'
-  | 'nemotron-edit'
   | 'dbms-manager'
   | 'developer';
 
@@ -94,10 +93,6 @@ export const canUserEdit = (account: AppAccount | null | undefined): boolean => 
 };
 
 export const canAccessDbmsManager = (account: AppAccount | null | undefined): boolean => {
-  return isAdminAccount(account) || isDeveloper(account);
-};
-
-export const canAccessNemotronEdit = (account: AppAccount | null | undefined): boolean => {
   return isAdminAccount(account) || isDeveloper(account);
 };
 
@@ -184,7 +179,6 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
     }
     if (account.canAccessDev) {
       if (!customTabs.includes('dbms-manager')) customTabs.push('dbms-manager');
-      if (!customTabs.includes('nemotron-edit')) customTabs.push('nemotron-edit');
     }
     return customTabs;
   }
@@ -205,7 +199,6 @@ export const getAllowedTabs = (account: AppAccount | null | undefined): ActiveTa
       'aesas',
       'comments-roster',
       'tickets',
-      'nemotron-edit',
       'dbms-manager',
       'admin-dashboard',
       'users',
@@ -338,7 +331,7 @@ export const canAccessTab = (account: AppAccount | null | undefined, tab: Active
   if (!account) return false;
 
   // 1. Dev Tools Access Control (Dev Tab only, not accessible by anyone other than dev)
-  if (tab === 'developer' || tab === 'dbms-manager' || tab === 'nemotron-edit' || tab === 'tickets') {
+  if (tab === 'developer' || tab === 'dbms-manager' || tab === 'tickets') {
     if (account.canAccessDev === true) return true;
     if (account.canAccessDev === false) return false;
     return isDeveloper(account) || isSuperAdmin(account);

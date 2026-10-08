@@ -28,7 +28,6 @@ import { AesasAlertsView } from './components/automations/AesasAlertsView';
 import { SmartDocumentIntakeHub } from './components/intake/SmartDocumentIntakeHub';
 import { DbmsManagerView } from './components/admin/DbmsManagerView';
 import { TicketManagementView } from './components/dev/TicketManagementView';
-import { NemotronEditSystemView } from './components/dev/NemotronEditSystemView';
 import { DeveloperHubView } from './components/dev/DeveloperHubView';
 import { DeveloperSystemDashboard } from './components/dev/DeveloperSystemDashboard';
 import { LoginPage } from './components/auth/LoginPage';
@@ -338,7 +337,7 @@ const MainContent: React.FC = () => {
           />
         )}
 
-        {/* Dedicated Dev Tab: Developer Center (DBMS Manager, Nemotron AI Edit, Ticket Management, Clinical Staff Monitor) */}
+        {/* Dedicated Dev Tab: Developer Center (DBMS Manager, Ticket Management, Clinical Staff Monitor) */}
         {activeTab === 'developer' && (
           <DeveloperHubView
             onOpenNewApplication={() => setIsNewAppModalOpen(true)}
@@ -361,16 +360,6 @@ const MainContent: React.FC = () => {
         {activeTab === 'tickets' && (
           <DeveloperHubView
             initialSubTab="tickets"
-            onOpenNewApplication={() => setIsNewAppModalOpen(true)}
-            onSelectProvider={(pId) => handleSelectProvider(pId)}
-            onNavigateToIntake={() => setActiveTab('document-intake')}
-          />
-        )}
-
-        {/* Dedicated Tab: NVIDIA Nemotron Edit System (DEV Profile / Admin) */}
-        {activeTab === 'nemotron-edit' && (
-          <DeveloperHubView
-            initialSubTab="nemotron-edit"
             onOpenNewApplication={() => setIsNewAppModalOpen(true)}
             onSelectProvider={(pId) => handleSelectProvider(pId)}
             onNavigateToIntake={() => setActiveTab('document-intake')}

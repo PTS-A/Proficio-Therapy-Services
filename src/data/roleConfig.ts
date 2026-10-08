@@ -156,10 +156,10 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
     textColor: 'text-purple-700',
     borderColor: 'border-purple-200',
     bgColor: 'bg-purple-50/60',
-    description: 'System software engineer and platform developer. Exclusive access to Developer Dashboard, DBMS SQL console, Nemotron AI code editor, and technical bug tracking.',
+    description: 'System software engineer and platform developer. Exclusive access to Developer Dashboard, DBMS SQL console, and technical bug tracking.',
     responsibilities: [
       'Platform architecture, database schema management & DBMS migrations',
-      'Nemotron AI system editor & codebase synchronization',
+      'System diagnostics, telemetry monitoring & codebase maintenance',
       'Technical bug fixes, ticket triage, and system diagnostics',
       'Full administrative access and infrastructure telemetry',
     ],

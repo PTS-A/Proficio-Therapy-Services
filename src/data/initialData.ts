@@ -56,7 +56,7 @@ const RAW_SEED_ACCOUNTS: Array<Omit<AppAccount, 'password' | 'isSuperAdmin'>> = 
     mustChangePasswordOnFirstLogin: false,
     hasChangedInitialPassword: true,
     permissions: [
-      'Full Developer Privileges (Database Manager, Ticket Management, Nemotron System Editor)',
+      'Full Developer Privileges (Database Manager, Ticket Management)',
       'Manage users, roles, and permissions',
     ],
   },

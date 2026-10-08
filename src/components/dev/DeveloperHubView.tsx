@@ -16,11 +16,10 @@ import {
 import { useCredentialing } from '../../context/CredentialingContext';
 import { isDeveloper, isSuperAdmin } from '../../utils/rbac';
 import { DbmsManagerView } from '../admin/DbmsManagerView';
-import { NemotronEditSystemView } from './NemotronEditSystemView';
 import { TicketManagementView } from './TicketManagementView';
 import { ClinicalStaffHub } from '../clinical/ClinicalStaffHub';
 
-export type DevSubTab = 'clinical-staff' | 'dbms-manager' | 'nemotron-edit' | 'tickets';
+export type DevSubTab = 'clinical-staff' | 'dbms-manager' | 'tickets';
 
 interface DeveloperHubViewProps {
   initialSubTab?: DevSubTab;
@@ -50,7 +49,7 @@ export const DeveloperHubView: React.FC<DeveloperHubViewProps> = ({
           </div>
           <h2 className="text-lg font-bold text-slate-900 mb-1">Developer Credentials Required</h2>
           <p className="text-xs text-slate-600 mb-6 max-w-md mx-auto leading-relaxed">
-            The Developer Tab (DBMS Manager, Nemotron AI Edit, and Ticket Management) is restricted exclusively to Developer profile accounts. Your current profile ({currentAccount?.email || 'Guest'}) does not have developer privileges.
+            The Developer Tab (DBMS Manager and Ticket Management) is restricted exclusively to Developer profile accounts. Your current profile ({currentAccount?.email || 'Guest'}) does not have developer privileges.
           </p>
         </div>
       </div>
@@ -74,14 +73,6 @@ export const DeveloperHubView: React.FC<DeveloperHubViewProps> = ({
       description: 'Direct Supabase PostgreSQL live table inspector & query console',
       count: null,
       badgeColor: 'bg-emerald-100 text-emerald-800'
-    },
-    {
-      id: 'nemotron-edit' as const,
-      label: 'Nemotron AI Edit',
-      icon: Cpu,
-      description: 'NVIDIA Nemotron prompt code editor & atomic system savepoints',
-      count: null,
-      badgeColor: 'bg-purple-100 text-purple-800'
     },
     {
       id: 'tickets' as const,
@@ -112,7 +103,7 @@ export const DeveloperHubView: React.FC<DeveloperHubViewProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Engineering workspace: DBMS SQL, Nemotron AI, Tickets &amp; Clinical Staff Monitor
+                  Engineering workspace: DBMS SQL, Tickets &amp; Clinical Staff Monitor
                 </p>
               </div>
             </div>
@@ -164,12 +155,6 @@ export const DeveloperHubView: React.FC<DeveloperHubViewProps> = ({
         {activeDevSubTab === 'dbms-manager' && (
           <div className="pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <DbmsManagerView />
-          </div>
-        )}
-
-        {activeDevSubTab === 'nemotron-edit' && (
-          <div className="pt-4">
-            <NemotronEditSystemView />
           </div>
         )}
 

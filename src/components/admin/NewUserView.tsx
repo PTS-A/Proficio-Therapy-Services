@@ -118,9 +118,9 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
       case 'Leadership / Management':
         return ['dashboard', 'reports', 'tracker', 'payers', 'clinical-portal', 'aesas', 'comments-roster', 'tickets'];
       case 'Developer':
-        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities', 'reports', 'document-intake', 'admin-dashboard', 'clinical-portal', 'staff-approvals', 'aesas', 'comments-roster', 'tickets', 'dbms-manager', 'nemotron-edit'];
+        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities', 'reports', 'document-intake', 'admin-dashboard', 'clinical-portal', 'staff-approvals', 'aesas', 'comments-roster', 'tickets', 'dbms-manager'];
       case 'System Administrator':
-        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities', 'reports', 'document-intake', 'admin-dashboard', 'clinical-portal', 'staff-approvals', 'aesas', 'comments-roster', 'tickets', 'dbms-manager', 'nemotron-edit'];
+        return ['dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities', 'reports', 'document-intake', 'admin-dashboard', 'clinical-portal', 'staff-approvals', 'aesas', 'comments-roster', 'tickets', 'dbms-manager'];
       case 'Provider':
         return ['dashboard', 'providers', 'tracker', 'clinical-portal', 'tickets'];
       default:
@@ -266,7 +266,6 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
     }
     if (canAccessDev) {
       if (!finalAllowedTabs.includes('dbms-manager')) finalAllowedTabs.push('dbms-manager');
-      if (!finalAllowedTabs.includes('nemotron-edit')) finalAllowedTabs.push('nemotron-edit');
     }
 
     const targetAccessLevel = canAccessAdmin ? 'ADMINISTRATOR' : accessLevel;
@@ -944,7 +943,6 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                           setAllowedTabs(prev => {
                             const next = [...prev];
                             if (!next.includes('dbms-manager')) next.push('dbms-manager');
-                            if (!next.includes('nemotron-edit')) next.push('nemotron-edit');
                             return next;
                           });
                         }
@@ -964,7 +962,7 @@ export const NewUserView: React.FC<NewUserViewProps> = ({ onBackToDashboard }) =
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600 mt-1 leading-snug">
-                        When checked, allows employee to access developer suites: DBMS Manager (SQL database console &amp; schema inspection) and Nemotron AI System Editor.
+                        When checked, allows employee to access developer suites: DBMS Manager (SQL database console &amp; schema inspection) and engineering tools.
                       </p>
                     </div>
                   </label>

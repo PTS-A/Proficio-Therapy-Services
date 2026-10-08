@@ -108,6 +108,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   outline-offset: 1px;
 }
 
+/* Custom sleek scrollbar for dropdowns and panels */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 /* Fluid Page Entry Animations */
 @keyframes pageGlideIn {
   from {

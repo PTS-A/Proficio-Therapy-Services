@@ -167,7 +167,6 @@ export async function verifyEmployeeAuthorization(
     existingUser?.is_super_admin === true ||
     existingUser?.system_role === 'System Administrator' ||
     existingUser?.access_level === 'SUPER_ADMIN' ||
-    cleanEmail === 'joel.reji@ageslearningsolutions.com' ||
     cleanEmail === 'credentialing@ageslearningsolutions.com' ||
     cleanEmail === 'superadmin@proficiotherapy.com' ||
     cleanEmail === 'dev@proficiotherapy.com' ||

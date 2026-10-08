@@ -8,7 +8,7 @@
 
 **Document Version:** 2026.3.0  
 **Classification:** Confidential • Internal Engineering & Operational Master Specification  
-**Project Lead:** Joel Reji (joel.reji@ageslearningsolutions.com)  
+**Project Lead:** Centralized Credentialing Operations (credentialing@ageslearningsolutions.com)  
 **Author:** Healthcare Engineering & Credentialing Operations Team  
 **Downloadable File Locations in Workspace:**
 - PDF Format: `/docs/CREDENTIALING_SYSTEM_MASTER_DOCUMENTATION.pdf` (and root `/CREDENTIALING_SYSTEM_MASTER_DOCUMENTATION.pdf`)

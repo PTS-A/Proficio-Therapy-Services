@@ -799,7 +799,8 @@ async function startServer() {
     const cleanEmail = (email || '').trim().toLowerCase();
 
     const isAuthorized =
-      cleanEmail === 'joel.reji@ageslearningsolutions.com' ||
+      cleanEmail === 'admin@ageslearningsolutions.com' ||
+      cleanEmail === 'credentialing@ageslearningsolutions.com' ||
       cleanEmail === 'superadmin@proficiotherapy.com' ||
       cleanEmail.endsWith('@ageslearningsolutions.com') ||
       cleanEmail.endsWith('@proficiotherapy.com');
@@ -813,7 +814,7 @@ async function startServer() {
 
     res.json({
       allowed: true,
-      role: cleanEmail === 'superadmin@proficiotherapy.com' || cleanEmail === 'joel.reji@ageslearningsolutions.com' ? 'Administrator' : 'Credentialing Specialist',
+      role: cleanEmail === 'superadmin@proficiotherapy.com' || cleanEmail === 'admin@ageslearningsolutions.com' ? 'Administrator' : 'Credentialing Specialist',
       email: cleanEmail,
     });
   });
@@ -1561,8 +1562,8 @@ async function startServer() {
     res.json({
       authorizedAccounts: [
         {
-          name: 'Joel Reji',
-          email: 'joel.reji@ageslearningsolutions.com',
+          name: 'Corporate Credentialing Specialist',
+          email: 'credentialing@ageslearningsolutions.com',
           role: 'Credentialing Specialist',
           status: 'Active',
           entity: 'AGES Learning Solutions',

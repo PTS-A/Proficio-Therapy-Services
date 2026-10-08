@@ -23,7 +23,7 @@ const documentTitle = 'Healthcare Credentialing & Provider Linking Management Sy
 const documentSubtitle = 'Comprehensive Master Specification, Workflows, Database Schemas, UI Architecture, and Automation Requirements';
 const docVersion = '2026.3.0';
 const docAuthor = 'Healthcare Engineering & Credentialing Operations Team';
-const projectLead = 'Joel Reji (joel.reji@ageslearningsolutions.com)';
+const projectLead = 'Centralized Credentialing Operations (credentialing@ageslearningsolutions.com)';
 const targetEntities = [
   { name: 'Ages Learning Solutions', code: 'ALS', discipline: 'Applied Behavior Analysis (ABA)', tax: '103K00000X / 106E00000X', board: 'Behavior Analyst Certification Board (BACB)' },
   { name: 'Proficio Speech Therapy', code: 'PST', discipline: 'Speech-Language Pathology (SLP)', tax: '235Z00000X', board: 'California SLPAHADB & ASHA (CCC-SLP)' },

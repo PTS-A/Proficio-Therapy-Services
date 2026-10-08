@@ -782,11 +782,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     }
     return {
-      id: 'acc-user-joel-reji',
-      name: 'Joel Mathew Reji',
-      email: 'joel.reji@ageslearningsolutions.com',
-      role: 'Admin',
-      accessLevel: 'ADMINISTRATOR',
+      id: 'usr-guest',
+      name: 'Guest User',
+      email: '',
+      role: 'Specialist',
+      accessLevel: 'READ_ONLY',
     };
   });
 
@@ -1294,6 +1294,14 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         email: currentAccount.email,
         role: currentAccount.accessLevel === 'ADMINISTRATOR' || currentAccount.systemRole === 'System Administrator' ? 'Admin' : 'Specialist',
         accessLevel: currentAccount.accessLevel,
+      });
+    } else {
+      setCurrentUser({
+        id: 'usr-guest',
+        name: 'Guest User',
+        email: '',
+        role: 'Specialist',
+        accessLevel: 'READ_ONLY',
       });
     }
   }, [currentAccount]);

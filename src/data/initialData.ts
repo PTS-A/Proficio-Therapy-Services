@@ -19,9 +19,9 @@ import {
 // Default credential authentication is resolved via cryptographic hashes in CredentialingContext.
 const RAW_SEED_ACCOUNTS: Array<Omit<AppAccount, 'password' | 'isSuperAdmin'>> = [
   {
-    id: 'acc-user-joel-reji',
-    name: 'Joel Mathew Reji',
-    email: 'joel.reji@ageslearningsolutions.com',
+    id: 'acc-admin-system',
+    name: 'System Administrator',
+    email: 'admin@ageslearningsolutions.com',
     accessLevel: 'ADMINISTRATOR',
     systemRole: 'System Administrator',
     roleTitle: 'System Administrator & IT Governance',
@@ -175,9 +175,9 @@ const SYSTEM_ADMIN_ROLE_TAG: UserRole = ('Ad' + 'min') as UserRole;
 
 export const INITIAL_USERS: User[] = [
   {
-    id: 'usr-joel-reji',
-    name: 'Joel Reji',
-    email: 'joel.reji@ageslearningsolutions.com',
+    id: 'usr-admin-system',
+    name: 'System Administrator',
+    email: 'admin@ageslearningsolutions.com',
     role: SYSTEM_ADMIN_ROLE_TAG,
     accessLevel: 'ADMINISTRATOR',
     assignedDisciplines: ['ABA', 'Speech', 'OT'],

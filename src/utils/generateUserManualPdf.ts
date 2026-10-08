@@ -311,7 +311,7 @@ export function generateUserManualPdf(userEmail: string = 'admin@proficiotherapy
   );
 
   const rbacData = [
-    ['SUPER ADMIN', 'Joel Reji / Senior Executives', 'Full read/write/delete across all modules, cloud database resync, user provisioning, system SLA config.'],
+    ['SUPER ADMIN', 'Executive IT Leadership & System Administrators', 'Full read/write/delete across all modules, cloud database resync, user provisioning, system SLA config.'],
     ['ADMINISTRATOR', 'Credentialing Directors / Managers', 'Full read/write access to all provider records, applications, documents, reports, and stage overrides.'],
     ['SPECIALIST', 'Credentialing Coordinators', 'Read/write on assigned providers & records, application status updates, notes, document uploads, linking requests.'],
     ['AUDITOR', 'Compliance & Quality Officers', 'Read-only access across all records, full export privileges for audit trails, comments, and reports.'],
@@ -502,7 +502,7 @@ export function generateUserManualPdf(userEmail: string = 'admin@proficiotherapy
   );
 
   addBullet('Multi-User Traceability', 'Every log records the author\'s name, timestamp, and category tag (Status Update, Follow-up, Payer Review, Document Missing, Clinical Team, General Note).');
-  addBullet('Target Colleague Mentions', 'Allows directing comments to a specific coordinator or manager (e.g., "Assigned to Joel Reji for Availity ticket escalation").');
+  addBullet('Target Colleague Mentions', 'Allows directing comments to a specific coordinator or manager (e.g., "Assigned to Credentialing Lead for Availity ticket escalation").');
   addBullet('Status Transition Audits', 'Whenever a clinician\'s status changes (e.g., from "In Progress" to "Linked"), the system automatically records a permanent audit entry showing Old Status -> New Status.');
   addBullet('Color-Coded Badges', 'Comments are visually highlighted by category for rapid scanning during weekly credentialing status reviews.');
 

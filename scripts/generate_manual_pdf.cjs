@@ -145,7 +145,7 @@ drawSectionHeading('2', 'Master Checklist of External Action Items');
 drawStepCard(
   '1',
   'Create & Configure Resend Account',
-  'Navigate to https://resend.com and sign up with your corporate email (e.g., joel.reji@ageslearningsolutions.com). Resend serves as the dedicated transactional email delivery engine for deadline reminders.'
+  'Navigate to https://resend.com and sign up with your corporate administrator email (e.g., admin@ageslearningsolutions.com). Resend serves as the dedicated transactional email delivery engine for deadline reminders.'
 );
 
 drawStepCard(

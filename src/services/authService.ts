@@ -102,7 +102,6 @@ async function verifyEmployeeClientFallback(
   }
 
   const isSuperAdminEmail =
-    cleanEmail === 'joel.reji@ageslearningsolutions.com' ||
     cleanEmail === 'credentialing@ageslearningsolutions.com' ||
     cleanEmail === 'superadmin@proficiotherapy.com' ||
     cleanEmail === 'dev@proficiotherapy.com' ||

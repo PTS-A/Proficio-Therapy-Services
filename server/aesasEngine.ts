@@ -512,7 +512,7 @@ export async function getAllEmployeeEmails(): Promise<string[]> {
   const fallbackRoster = [
     'credentialing@ageslearningsolutions.com',
     'specialist@ageslearningsolutions.com',
-    'joel.reji@ageslearningsolutions.com',
+    'admin@ageslearningsolutions.com',
     'erica.bustos@ageslearningsolutions.com',
     'laurens.slp@proficiotherapy.com',
     'alyssa.barker@childsplaytherapyservices.com',
@@ -1241,7 +1241,7 @@ export const runAesasExpirationCycles = async (options?: {
   let monthlyDigestSent = false;
   let dailyAlertsSent = 0;
 
-  // 1. Monthly Digest (1st of month or forced) -> All Employees & System Admin & Joel Reji
+  // 1. Monthly Digest (1st of month or forced) -> All Employees & System Admin
   if (isFirstOfMonth || options?.forceMonthlyDigest) {
     const digestResult = await sendAesasMonthlyExpirationDigest({
       employeeEmails: options?.employeeEmails,

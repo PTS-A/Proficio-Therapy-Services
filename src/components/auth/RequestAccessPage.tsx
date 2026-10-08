@@ -214,7 +214,7 @@ export const RequestAccessPage: React.FC<RequestAccessPageProps> = ({
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g., Joel Mathew Reji"
+                    placeholder="e.g., Alex Morgan"
                     className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2B4C9D]/20 focus:border-[#2B4C9D] text-slate-900"
                   />
                 </div>

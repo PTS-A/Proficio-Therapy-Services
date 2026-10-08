@@ -12,9 +12,15 @@ import { supabase, ensureSupabaseClient } from '../lib/supabase';
 import { AppAccount } from '../types';
 
 // Custom Production SSO Redirection Configuration
-// Staged for user command: "plan it code it but only implement after I say so"
-export const CUSTOM_PRODUCTION_SSO_DOMAIN = 'https://credentialing.ageslearningsolutions.com';
-export const ENABLE_CUSTOM_DOMAIN_REDIRECT = false; // Toggle to true when user instructs to implement
+export const CUSTOM_PRODUCTION_SSO_DOMAIN =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN) ||
+  'https://credentialing.ageslearningsolutions.com';
+
+export const ENABLE_CUSTOM_DOMAIN_REDIRECT =
+  (typeof import.meta !== 'undefined' &&
+    (import.meta.env?.VITE_ENABLE_CUSTOM_DOMAIN_REDIRECT === 'true' ||
+      import.meta.env?.ENABLE_CUSTOM_DOMAIN_REDIRECT === 'true')) ||
+  false;
 
 export interface VerificationResponse {
   authorized: boolean;

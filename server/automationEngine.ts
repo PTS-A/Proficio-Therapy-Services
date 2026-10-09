@@ -228,7 +228,7 @@ function getSupabaseClient(): SupabaseClient | null {
 
 // Resend Client Singleton
 let resendClient: Resend | null = null;
-const VERIFIED_SANDBOX_EMAIL = process.env.SANDBOX_EMAIL || 'admin@proficiotherapy.com';
+const VERIFIED_SANDBOX_EMAIL = 'admin@proficiotherapy.com';
 
 /**
  * Safely invokes Resend email dispatch while intercepting Resend internal console.error logger

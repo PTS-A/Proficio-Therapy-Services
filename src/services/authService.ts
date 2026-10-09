@@ -13,8 +13,8 @@ import { AppAccount } from '../types';
 
 // Custom Production SSO Redirection Configuration
 export const CUSTOM_PRODUCTION_SSO_DOMAIN =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN) ||
-  'https://credentialing.ageslearningsolutions.com';
+  (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN || import.meta.env?.VITE_APP_URL)) ||
+  '';
 
 export const ENABLE_CUSTOM_DOMAIN_REDIRECT =
   (typeof import.meta !== 'undefined' &&

@@ -2289,7 +2289,12 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           roleTitle: acc.roleTitle || acc.systemRole,
           entityName: primaryEntity?.name || 'AGES Learning Solutions / Proficio Therapy Services',
           temporaryPassword: acc.password || 'proficio',
-          portalUrl: typeof window !== 'undefined' ? window.location.origin : 'https://proficiotherapy.com',
+          portalUrl:
+            (typeof import.meta !== 'undefined' &&
+              (import.meta.env?.VITE_APP_URL ||
+                import.meta.env?.VITE_PORTAL_URL ||
+                import.meta.env?.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN)) ||
+            undefined,
         }),
       });
 

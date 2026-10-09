@@ -55,8 +55,8 @@ export const SYSTEM_ADMIN_EMAILS = [
   'admin@proficiotherapy.com',
 ];
 
-export const PRIMARY_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@proficiotherapy.com';
-export const VERIFIED_SANDBOX_EMAIL = process.env.SANDBOX_EMAIL || 'admin@proficiotherapy.com';
+export const PRIMARY_ADMIN_EMAIL = 'admin@proficiotherapy.com';
+export const VERIFIED_SANDBOX_EMAIL = 'admin@proficiotherapy.com';
 
 let aesasConfig: AesasGlobalConfig = {
   globalSentToEmail: 'credentialing-alerts@proficiotherapy.com',
@@ -89,7 +89,9 @@ export const updateProgrammedCcRoster = (roster: string[]): string[] => {
   return aesasConfig.globalCcRoster;
 };
 
-let aesasTemplates: AesasTemplate[] = [
+const TEMPLATES_FILE = path.join(process.cwd(), 'aesas_templates.json');
+
+export const DEFAULT_AESAS_TEMPLATES: AesasTemplate[] = [
   {
     id: 'tmpl-1',
     name: '1. Onboarding to System',
@@ -205,6 +207,20 @@ All AESAS background alert daemons, scheduled reminders, and consecutive dispatc
   },
 ];
 
+let aesasTemplates: AesasTemplate[] = (() => {
+  try {
+    if (fs.existsSync(TEMPLATES_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(TEMPLATES_FILE, 'utf8'));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[AESAS] Could not read saved templates file:', err);
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_AESAS_TEMPLATES));
+})();
+
 let aesasQueue: AesasReminderItem[] = [];
 
 let aesasExecutionLogs: any[] = [];
@@ -230,14 +246,25 @@ export const getAesasTemplates = (): AesasTemplate[] => {
 };
 
 export const updateAesasTemplate = (id: string, updates: Partial<AesasTemplate>): AesasTemplate | null => {
-  const idx = aesasTemplates.findIndex((t) => t.id === id);
+  const idx = aesasTemplates.findIndex((t) => t.id === id || t.code === id);
   if (idx === -1) return null;
   aesasTemplates[idx] = {
     ...aesasTemplates[idx],
     ...updates,
     updatedAt: new Date().toISOString(),
   };
+  try {
+    fs.writeFileSync(TEMPLATES_FILE, JSON.stringify(aesasTemplates, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[AESAS] Could not write templates file:', err);
+  }
   return aesasTemplates[idx];
+};
+
+export const resetAesasTemplate = (id: string): AesasTemplate | null => {
+  const def = DEFAULT_AESAS_TEMPLATES.find((t) => t.id === id || t.code === id);
+  if (!def) return null;
+  return updateAesasTemplate(id, def);
 };
 
 export const getAesasQueue = (): AesasReminderItem[] => {
@@ -820,7 +847,16 @@ export const sendAesasOnboardingEmail = async (params: {
 }): Promise<{ success: boolean; messageId?: string; simulated?: boolean; error?: string }> => {
   const tpl = aesasTemplates.find((t) => t.code === 'onboarding') || aesasTemplates[0];
 
-  const portalUrl = params.portalUrl || (process.env.APP_URL || 'https://proficiotherapy.com/login');
+  const configuredPortalUrl = process.env.APP_URL || process.env.PORTAL_URL || process.env.CUSTOM_PRODUCTION_SSO_DOMAIN;
+  let portalUrl = configuredPortalUrl;
+  if (!portalUrl) {
+    if (params.portalUrl && !params.portalUrl.includes('ais-dev') && !params.portalUrl.includes('localhost') && !params.portalUrl.includes('127.0.0.1')) {
+      portalUrl = params.portalUrl;
+    } else {
+      portalUrl = 'https://proficiotherapy.com/login';
+    }
+  }
+
   const tempPassword = params.temporaryPassword || 'proficio';
   const entity = params.entityName || 'AGES Learning Solutions / Proficio Therapy Services';
 
@@ -829,13 +865,18 @@ export const sendAesasOnboardingEmail = async (params: {
     .replace(/{employee_email}/g, params.employeeEmail)
     .replace(/{role_title}/g, params.roleTitle);
 
-  const renderedBody = tpl.body
+  let renderedBody = tpl.body
     .replace(/{employee_name}/g, params.employeeName)
     .replace(/{employee_email}/g, params.employeeEmail)
     .replace(/{role_title}/g, params.roleTitle)
     .replace(/{entity_name}/g, entity)
-    .replace(/{temporary_password}/g, tempPassword)
-    .replace(/https:\/\/proficiotherapy\.com\/login/g, portalUrl);
+    .replace(/{temporary_password}/g, tempPassword);
+
+  if (portalUrl) {
+    renderedBody = renderedBody
+      .replace(/{portal_url}/g, portalUrl)
+      .replace(/https:\/\/proficiotherapy\.com\/login/g, portalUrl);
+  }
 
   const res = await sendAesasEmail({
     to: params.employeeEmail,

@@ -13,6 +13,12 @@ export default defineConfig(() => {
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
         process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || ''
       ),
+      'import.meta.env.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN': JSON.stringify(
+        process.env.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN || process.env.CUSTOM_PRODUCTION_SSO_DOMAIN || process.env.VITE_APP_URL || process.env.APP_URL || ''
+      ),
+      'import.meta.env.VITE_APP_URL': JSON.stringify(
+        process.env.VITE_APP_URL || process.env.APP_URL || process.env.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN || process.env.CUSTOM_PRODUCTION_SSO_DOMAIN || ''
+      ),
     },
     resolve: {
       alias: {

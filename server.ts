@@ -1,11 +1,11 @@
+import 'dotenv/config';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
 
 // Custom Production SSO Redirection Configuration
-// Staged for user instruction: "plan it code it but only implement after I say so"
-export const CUSTOM_PRODUCTION_SSO_DOMAIN = 'https://credentialing.ageslearningsolutions.com';
+export const CUSTOM_PRODUCTION_SSO_DOMAIN = process.env.CUSTOM_PRODUCTION_SSO_DOMAIN || process.env.APP_URL || '';
 export const ENABLE_CUSTOM_DOMAIN_REDIRECT = process.env.ENABLE_CUSTOM_DOMAIN_REDIRECT === 'true'; // Toggle to true when user approves activation
 
 async function startServer() {
@@ -727,7 +727,7 @@ async function startServer() {
   // Execute migration via direct Postgres connection if password or connection string is provided
   app.post('/api/migration/apply', express.json({ limit: '10mb' }), async (req, res) => {
     const { password, connectionString } = req.body || {};
-    const dbPassword = password || process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD;
+    const dbPassword = password;
     const projectRef = 'uqaiotacheqjvfbanxtp';
 
     let connStr = connectionString;
@@ -2049,6 +2049,18 @@ async function startServer() {
     }
   });
 
+  // Reset an AESAS template to factory default
+  app.post('/api/aesas/templates/:id/reset', async (req, res) => {
+    try {
+      const { resetAesasTemplate } = await import('./server/aesasEngine');
+      const reset = resetAesasTemplate(req.params.id);
+      if (!reset) return res.status(404).json({ error: 'Template not found' });
+      res.json({ success: true, template: reset });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Get AESAS reminder queue and logs
   app.get('/api/aesas/queue', async (req, res) => {
     try {
@@ -2130,9 +2142,18 @@ async function startServer() {
   app.post('/api/aesas/onboard', async (req, res) => {
     try {
       const { sendAesasOnboardingEmail } = await import('./server/aesasEngine');
-      const host = req.get('host') || 'localhost:3000';
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-      const portalUrl = req.body?.portalUrl || `${protocol}://${host}/`;
+      const configuredPortalUrl = process.env.APP_URL || process.env.PORTAL_URL || process.env.CUSTOM_PRODUCTION_SSO_DOMAIN;
+      let portalUrl = configuredPortalUrl;
+
+      if (!portalUrl) {
+        if (req.body?.portalUrl && !req.body.portalUrl.includes('ais-dev') && !req.body.portalUrl.includes('localhost') && !req.body.portalUrl.includes('127.0.0.1')) {
+          portalUrl = req.body.portalUrl;
+        } else {
+          const host = req.get('host') || 'localhost:3000';
+          const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          portalUrl = `${protocol}://${host}/`;
+        }
+      }
 
       const result = await sendAesasOnboardingEmail({
         employeeName: req.body?.employeeName || 'New Staff Member',

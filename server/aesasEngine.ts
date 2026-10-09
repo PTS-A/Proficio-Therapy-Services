@@ -44,48 +44,47 @@ export interface AesasGlobalConfig {
   fromEmail: string;
 }
 
-export const CREDENTIALING_HEAD_EMAILS = [
-  'credentialing-head@proficiotherapy.com',
-  'manager@proficiotherapy.com',
-  'lead.credentialing@proficiotherapy.com',
-];
+const CC_ROSTER_FILE = path.join(process.cwd(), 'aesas_cc_roster.json');
 
-export const SYSTEM_ADMIN_EMAILS = [
-  'superadmin@proficiotherapy.com',
-  'admin@proficiotherapy.com',
-];
+export const CREDENTIALING_HEAD_EMAILS: string[] = [];
+
+export const SYSTEM_ADMIN_EMAILS: string[] = [];
 
 export const PRIMARY_ADMIN_EMAIL = 'admin@proficiotherapy.com';
 export const VERIFIED_SANDBOX_EMAIL = 'admin@proficiotherapy.com';
 
 let aesasConfig: AesasGlobalConfig = {
   globalSentToEmail: 'credentialing-alerts@proficiotherapy.com',
-  globalCcRoster: [
-    'credentialing-head@proficiotherapy.com',
-    'admin@proficiotherapy.com',
-    'superadmin@proficiotherapy.com',
-    'manager@proficiotherapy.com',
-  ],
-  fromEmail: process.env.RESEND_FROM_EMAIL || 'Proficio Credentialing <onboarding@resend.dev>',
+  globalCcRoster: (() => {
+    try {
+      if (fs.existsSync(CC_ROSTER_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(CC_ROSTER_FILE, 'utf8'));
+        if (Array.isArray(parsed)) {
+          return parsed.filter((e) => typeof e === 'string' && e.includes('@'));
+        }
+      }
+    } catch (err) {
+      console.warn('[AESAS] Could not read saved CC roster file:', err);
+    }
+    return [];
+  })(),
+  fromEmail: process.env.RESEND_FROM_EMAIL || 'AGES & Proficio Credentialing <mail@credentialing.ageslearningsolutions.com>',
 };
 
 export const getProgrammedCcRoster = (): string[] => {
-  if (Array.isArray(aesasConfig.globalCcRoster) && aesasConfig.globalCcRoster.length > 0) {
-    return aesasConfig.globalCcRoster;
-  }
-  return [
-    'credentialing-head@proficiotherapy.com',
-    'admin@proficiotherapy.com',
-    'superadmin@proficiotherapy.com',
-    'manager@proficiotherapy.com',
-  ];
+  return Array.isArray(aesasConfig.globalCcRoster) ? aesasConfig.globalCcRoster : [];
 };
 
 export const updateProgrammedCcRoster = (roster: string[]): string[] => {
   const cleaned = (roster || [])
     .map((e) => (typeof e === 'string' ? e.trim().toLowerCase() : ''))
     .filter((e) => e && e.includes('@'));
-  aesasConfig.globalCcRoster = cleaned.length > 0 ? cleaned : getProgrammedCcRoster();
+  aesasConfig.globalCcRoster = cleaned;
+  try {
+    fs.writeFileSync(CC_ROSTER_FILE, JSON.stringify(cleaned, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[AESAS] Could not write CC roster file:', err);
+  }
   return aesasConfig.globalCcRoster;
 };
 
@@ -125,7 +124,7 @@ Credentialing Operations & Systems Governance`,
     name: '2. Pending Insurance Credentialing Reminder',
     code: 'pending_reminder',
     to: '{responsible_email}',
-    cc: 'credentialing-lead@proficiotherapy.com, compliance@proficiotherapy.com',
+    cc: '',
     subject: 'ACTION REQUIRED: Pending Insurance Enrollment Reminder — {employee_name} ({payer_name})',
     body: `ATTENTION: Credentialing Operations & Provider Enrollment
 
@@ -155,7 +154,7 @@ Proficio Therapy Services Automated Email Alert System (AESAS)`,
     name: '3. Re-credentialing & Expiration Alert',
     code: 'recredentialing',
     to: '{recipient_email}',
-    cc: 'credentialing-head@proficiotherapy.com, manager@proficiotherapy.com, superadmin@proficiotherapy.com, admin@proficiotherapy.com',
+    cc: '',
     subject: 'EXPIRATION ALERT: {employee_name} — {payer_name} Deadline Notice',
     body: `Dear Credentialing Head, System Administrator, and Clinical Staff,
 
@@ -174,7 +173,7 @@ Please ensure all updated CAQH attestations, current malpractice COI, and update
 RECIPIENT ROUTING:
 Dispatched simultaneously to:
 • Credentialing Head (Centralized Credentialing Lead)
-• System Administrator (superadmin@proficiotherapy.com, admin@proficiotherapy.com)
+• System Administrator
 • Clinician Staff & Credentialing Operations
 
 Dispatched by: Automated Email Sending Alert System (AESAS)
@@ -187,7 +186,7 @@ Proficio Therapy Services & AGES Learning Solutions`,
     name: '4. A TEST EMAIL (System Admin Only)',
     code: 'test',
     to: '{admin_email}',
-    cc: 'admin@proficiotherapy.com',
+    cc: '',
     subject: 'AESAS Resend API Operational Health Verification — TEST DISPATCH',
     body: `SYSTEM ADMINISTRATOR OPERATIONAL VERIFICATION
 
@@ -1123,11 +1122,9 @@ export const sendAesasDailyCountdownAlert = async (item: ExpirationAdvisoryItem)
   const clinicianRecipient = item.employeeEmail || VERIFIED_SANDBOX_EMAIL;
 
   const programmedCc = getProgrammedCcRoster();
-  const ccRoster = [
-    ...programmedCc,
-    ...CREDENTIALING_HEAD_EMAILS,
-    ...SYSTEM_ADMIN_EMAILS,
-  ].filter((e, idx, arr) => arr.indexOf(e) === idx && e.toLowerCase() !== clinicianRecipient.toLowerCase()).join(', ');
+  const ccRoster = programmedCc
+    .filter((e) => e.toLowerCase() !== clinicianRecipient.toLowerCase())
+    .join(', ');
 
   const subject = `[URGENT: ${item.daysRemaining} DAYS REMAINING] Expiration Alert — ${item.employeeName} (${item.credentialType})`;
 
@@ -1198,11 +1195,9 @@ export const sendAesasIndividualExpirationAlert = async (item: ExpirationAdvisor
   const clinicianRecipient = item.employeeEmail || VERIFIED_SANDBOX_EMAIL;
 
   const programmedCc = getProgrammedCcRoster();
-  const ccRoster = [
-    ...programmedCc,
-    ...CREDENTIALING_HEAD_EMAILS,
-    ...SYSTEM_ADMIN_EMAILS,
-  ].filter((e, idx, arr) => arr.indexOf(e) === idx && e !== clinicianRecipient.toLowerCase()).join(', ');
+  const ccRoster = programmedCc
+    .filter((e) => e.toLowerCase() !== clinicianRecipient.toLowerCase())
+    .join(', ');
 
   const subject = `[AESAS EXPIRATION ALERT: ${item.daysRemaining} DAYS LEFT] ${item.employeeName} — ${item.credentialType}`;
 

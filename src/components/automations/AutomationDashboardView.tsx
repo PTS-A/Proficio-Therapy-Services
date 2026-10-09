@@ -257,7 +257,7 @@ export const AutomationDashboardView: React.FC = () => {
 
               <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200">
                 <Send className="w-3.5 h-3.5 text-slate-400" />
-                <span>From: <strong className="font-semibold text-slate-900">{status?.resend.fromEmail || 'credentials@proficiotherapy.com'}</strong></span>
+                <span>From: <strong className="font-semibold text-slate-900">{status?.resend.fromEmail || 'mail@credentialing.ageslearningsolutions.com'}</strong></span>
               </span>
 
               <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">

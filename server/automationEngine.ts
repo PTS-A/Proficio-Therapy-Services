@@ -275,9 +275,9 @@ export function isResendConfigured(): boolean {
 export function getResendStatus() {
   const configured = isResendConfigured();
   const rawFrom = process.env.RESEND_FROM_EMAIL;
-  const fromEmail = rawFrom && !rawFrom.includes('@proficiotherapy.com')
+  const fromEmail = rawFrom
     ? rawFrom
-    : (configured ? 'Proficio Credentialing <onboarding@resend.dev>' : 'simulated@proficiotherapy.com');
+    : 'AGES & Proficio Credentialing <mail@credentialing.ageslearningsolutions.com>';
   return {
     configured,
     fromEmail,
@@ -798,9 +798,9 @@ export async function evaluateAndExecuteDeadlines(options: {
 
   const resend = getResendClient();
   const rawFrom = process.env.RESEND_FROM_EMAIL;
-  let fromEmail = rawFrom && !rawFrom.includes('@proficiotherapy.com')
+  let fromEmail = rawFrom
     ? rawFrom
-    : 'Proficio Credentialing <onboarding@resend.dev>';
+    : 'AGES & Proficio Credentialing <mail@credentialing.ageslearningsolutions.com>';
 
   for (const record of records) {
     const rawExpDate = record.expiration_date || record.recredential_due_date;

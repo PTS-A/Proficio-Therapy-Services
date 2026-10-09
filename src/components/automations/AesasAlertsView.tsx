@@ -83,12 +83,7 @@ export const AesasAlertsView: React.FC = () => {
   const [status, setStatus] = useState<AesasStatus | null>(null);
   const [templates, setTemplates] = useState<AesasTemplate[]>([]);
   const [queue, setQueue] = useState<AesasQueueItem[]>([]);
-  const [ccRoster, setCcRoster] = useState<string[]>([
-    'credentialing-head@proficiotherapy.com',
-    'admin@proficiotherapy.com',
-    'superadmin@proficiotherapy.com',
-    'manager@proficiotherapy.com',
-  ]);
+  const [ccRoster, setCcRoster] = useState<string[]>([]);
   const [newCcEmail, setNewCcEmail] = useState('');
   const [isSavingCc, setIsSavingCc] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -514,7 +509,7 @@ export const AesasAlertsView: React.FC = () => {
             {status?.resendConfigured ? 'Connected' : 'Ready'}
           </div>
           <p className="text-[11px] text-slate-400">
-            Sender: <strong className="text-slate-600">{status?.senderEmail || 'alerts@credentialing.proficiotherapy.com'}</strong>
+            Sender: <strong className="text-slate-600">{status?.senderEmail || 'mail@credentialing.ageslearningsolutions.com'}</strong>
           </p>
         </div>
 
@@ -667,25 +662,57 @@ export const AesasAlertsView: React.FC = () => {
               These verified email addresses are automatically carbon-copied on all AESAS monthly expiration digests, daily 7-day countdown notices, and individual re-credentialing alerts.
             </p>
 
-            <div className="flex flex-wrap gap-2">
-              {ccRoster.map((email) => (
-                <span
-                  key={email}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-xs font-medium text-[#2B4C9D]"
-                >
-                  <span>{email}</span>
+            {ccRoster.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 text-center text-xs text-slate-500 space-y-1">
+                <p className="font-semibold text-slate-700">No Preprogrammed CC Recipients</p>
+                <p className="text-[11px] text-slate-400">
+                  Preprogrammed emails have been removed. Only email addresses explicitly added by an administrator or developer will receive automated carbon copies.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {ccRoster.map((email) => (
+                    <span
+                      key={email}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-xs font-medium text-[#2B4C9D]"
+                    >
+                      <span>{email}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCcEmail(email)}
+                        disabled={isSavingCc}
+                        className="text-blue-400 hover:text-rose-600 transition-colors cursor-pointer text-xs ml-0.5 font-bold"
+                        title="Remove from CC roster"
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex justify-end">
                   <button
                     type="button"
-                    onClick={() => handleRemoveCcEmail(email)}
-                    disabled={isSavingCc}
-                    className="text-blue-400 hover:text-rose-600 transition-colors cursor-pointer text-xs ml-0.5 font-bold"
-                    title="Remove from CC roster"
+                    onClick={async () => {
+                      if (window.confirm('Clear all emails from the CC distribution roster?')) {
+                        setCcRoster([]);
+                        try {
+                          await fetch('/api/aesas/cc-roster', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ccRoster: [] }),
+                          });
+                          addToast('All CC recipients cleared.', 'info');
+                        } catch {}
+                      }
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                   >
-                    &times;
+                    Clear All ({ccRoster.length})
                   </button>
-                </span>
-              ))}
-            </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 pt-1">
               <input
@@ -1137,7 +1164,7 @@ export const AesasAlertsView: React.FC = () => {
                         <div className="p-4 bg-slate-100/80 border-b border-slate-200 space-y-1.5">
                           <div className="flex items-center justify-between text-slate-800">
                             <div>
-                              <strong className="text-slate-900">From:</strong> Proficio Credentialing &lt;onboarding@resend.dev&gt;
+                              <strong className="text-slate-900">From:</strong> AGES &amp; Proficio Credentialing &lt;mail@credentialing.ageslearningsolutions.com&gt;
                             </div>
                             <span className="text-[10px] text-slate-400">Via Resend API</span>
                           </div>

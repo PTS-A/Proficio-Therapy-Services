@@ -235,12 +235,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   }, [employees, clinicalStaff, users, providers, accounts]);
 
   // Programmed CC Email Roster State for AESAS
-  const [programmedCcRoster, setProgrammedCcRoster] = useState<string[]>([
-    'credentialing-head@proficiotherapy.com',
-    'admin@proficiotherapy.com',
-    'superadmin@proficiotherapy.com',
-    'manager@proficiotherapy.com',
-  ]);
+  const [programmedCcRoster, setProgrammedCcRoster] = useState<string[]>([]);
   const [isCcRosterModalOpen, setIsCcRosterModalOpen] = useState(false);
   const [newCcRosterInput, setNewCcRosterInput] = useState('');
   const [isSavingCcRoster, setIsSavingCcRoster] = useState(false);
@@ -250,7 +245,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     fetch('/api/aesas/cc-roster')
       .then((r) => r.json())
       .then((data) => {
-        if (data.success && Array.isArray(data.ccRoster) && data.ccRoster.length > 0) {
+        if (data.success && Array.isArray(data.ccRoster)) {
           setProgrammedCcRoster(data.ccRoster);
         }
       })

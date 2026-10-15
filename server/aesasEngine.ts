@@ -629,7 +629,7 @@ export const sendAesasEmail = async (params: {
     </div>
   `;
 
-  const fromAddress = rawFrom || 'Proficio Credentialing <onboarding@resend.dev>';
+  const fromAddress = rawFrom || process.env.RESEND_FROM_EMAIL || 'AGES & Proficio Credentialing <mail@credentialing.ageslearningsolutions.com>';
 
   if (isResendConfigured && cleanTo.length > 0) {
     try {

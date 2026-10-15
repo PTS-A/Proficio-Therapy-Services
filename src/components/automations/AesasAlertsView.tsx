@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
 import { isAdminAccount, isDeveloper } from '../../utils/rbac';
+import { safeFetchJson, safeParseResponse } from '../../utils/safeFetch';
 
 interface AesasStatus {
   service: string;
@@ -152,16 +153,16 @@ export const AesasAlertsView: React.FC = () => {
     setIsLoading(true);
     try {
       const [resStatus, resTemplates, resQueue, resCc] = await Promise.all([
-        fetch('/api/aesas/status').then((r) => r.json()).catch(() => null),
-        fetch('/api/aesas/templates').then((r) => r.json()).catch(() => ({ templates: [] })),
-        fetch('/api/aesas/queue').then((r) => r.json()).catch(() => ({ queue: [] })),
-        fetch('/api/aesas/cc-roster').then((r) => r.json()).catch(() => null),
+        safeFetchJson<AesasStatus>('/api/aesas/status'),
+        safeFetchJson<{ templates: AesasTemplate[] }>('/api/aesas/templates'),
+        safeFetchJson<{ queue: AesasQueueItem[] }>('/api/aesas/queue'),
+        safeFetchJson<{ ccRoster: string[] }>('/api/aesas/cc-roster'),
       ]);
 
-      if (resStatus) setStatus(resStatus);
-      if (resTemplates?.templates) setTemplates(resTemplates.templates);
-      if (resQueue?.queue) setQueue(resQueue.queue);
-      if (resCc?.ccRoster && Array.isArray(resCc.ccRoster)) setCcRoster(resCc.ccRoster);
+      if (resStatus.data) setStatus(resStatus.data);
+      if (resTemplates.data?.templates) setTemplates(resTemplates.data.templates);
+      if (resQueue.data?.queue) setQueue(resQueue.data.queue);
+      if (resCc.data?.ccRoster && Array.isArray(resCc.data.ccRoster)) setCcRoster(resCc.data.ccRoster);
     } catch (err) {
       console.warn('Failed to load AESAS data:', err);
     } finally {
@@ -190,17 +191,20 @@ export const AesasAlertsView: React.FC = () => {
     setIsSavingTemplate(true);
     try {
       const targetId = editingTemplate.id || editingTemplate.code;
-      const res = await fetch(`/api/aesas/templates/${targetId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update template');
+      const parsed = await safeFetchJson<{ success: boolean; template?: AesasTemplate; error?: string }>(
+        `/api/aesas/templates/${targetId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editForm),
+        }
+      );
+      if (!parsed.success || !parsed.data?.success) {
+        throw new Error(parsed.error || parsed.data?.error || 'Failed to update template');
       }
+      const updatedTpl = parsed.data.template;
       setTemplates((prev) =>
-        prev.map((t) => (t.id === targetId || t.code === targetId ? { ...t, ...data.template } : t))
+        prev.map((t) => (t.id === targetId || t.code === targetId ? { ...t, ...updatedTpl } : t))
       );
       addToast(`Template "${editForm.name}" updated successfully!`, 'success');
       setEditingTemplate(null);
@@ -219,23 +223,28 @@ export const AesasAlertsView: React.FC = () => {
     setIsResettingTemplate(true);
     try {
       const targetId = editingTemplate.id || editingTemplate.code;
-      const res = await fetch(`/api/aesas/templates/${targetId}/reset`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to reset template');
-      }
-      setTemplates((prev) =>
-        prev.map((t) => (t.id === targetId || t.code === targetId ? { ...t, ...data.template } : t))
+      const parsed = await safeFetchJson<{ success: boolean; template?: AesasTemplate; error?: string }>(
+        `/api/aesas/templates/${targetId}/reset`,
+        {
+          method: 'POST',
+        }
       );
-      setEditForm({
-        name: data.template.name || '',
-        subject: data.template.subject || '',
-        cc: data.template.cc || '',
-        body: data.template.body || '',
-        description: data.template.description || '',
-      });
+      if (!parsed.success || !parsed.data?.success) {
+        throw new Error(parsed.error || parsed.data?.error || 'Failed to reset template');
+      }
+      const resetTpl = parsed.data.template;
+      if (resetTpl) {
+        setTemplates((prev) =>
+          prev.map((t) => (t.id === targetId || t.code === targetId ? { ...t, ...resetTpl } : t))
+        );
+        setEditForm({
+          name: resetTpl.name || '',
+          subject: resetTpl.subject || '',
+          cc: resetTpl.cc || '',
+          body: resetTpl.body || '',
+          description: resetTpl.description || '',
+        });
+      }
       addToast('Template reset to factory default!', 'info');
     } catch (err: any) {
       addToast(err.message || 'Failed to reset template', 'error');
@@ -315,13 +324,12 @@ export const AesasAlertsView: React.FC = () => {
   const persistCcRoster = async (roster: string[]) => {
     setIsSavingCc(true);
     try {
-      const res = await fetch('/api/aesas/cc-roster', {
+      const parsed = await safeFetchJson<{ success: boolean; error?: string }>('/api/aesas/cc-roster', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ccRoster: roster }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (parsed.success && parsed.data?.success) {
         addToast('Programmed CC roster updated successfully.', 'success');
       } else {
         addToast('Notice: CC roster updated locally.', 'info');
@@ -341,9 +349,12 @@ export const AesasAlertsView: React.FC = () => {
   const handleProcessQueue = async () => {
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/aesas/process', { method: 'POST' });
-      const data = await res.json();
-      addToast(`AESAS Queue Processed: ${data.processedCount || 0} alerts dispatched via Resend.`, 'success');
+      const parsed = await safeFetchJson<{ success: boolean; processedCount?: number; error?: string }>('/api/aesas/process', { method: 'POST' });
+      if (parsed.success && parsed.data) {
+        addToast(`AESAS Queue Processed: ${parsed.data.processedCount || 0} alerts dispatched via Resend.`, 'success');
+      } else {
+        addToast(parsed.error || parsed.data?.error || 'Failed to process AESAS queue', 'error');
+      }
       await loadData();
     } catch (err: any) {
       addToast(err.message || 'Failed to process AESAS queue', 'error');
@@ -356,13 +367,12 @@ export const AesasAlertsView: React.FC = () => {
   const handleTriggerMonthlyDigest = async () => {
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/aesas/expirations/digest', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
+      const parsed = await safeFetchJson<{ success: boolean; error?: string }>('/api/aesas/expirations/digest', { method: 'POST' });
+      if (parsed.success && parsed.data?.success) {
         addToast('AESAS Monthly Expirations Digest dispatched to all active staff and programmed CC roster via Resend!', 'success');
         await loadData();
       } else {
-        addToast(data.error || 'Failed to dispatch digest', 'error');
+        addToast(parsed.error || parsed.data?.error || 'Failed to dispatch digest', 'error');
       }
     } catch (err: any) {
       addToast(err.message || 'Failed to dispatch digest', 'error');
@@ -389,20 +399,19 @@ export const AesasAlertsView: React.FC = () => {
         responsiblePerson: currentAccount?.name || 'Credentialing Specialist',
       };
 
-      const res = await fetch('/api/aesas/test-send', {
+      const parsed = await safeFetchJson<{ success: boolean; messageId?: string; error?: string }>('/api/aesas/test-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (data.success) {
+      if (parsed.success && parsed.data?.success) {
         addToast(
-          `Test email dispatched via Resend API to ${testRecipientEmail}! Message ID: ${data.messageId || 'SENT'}`,
+          `Test email dispatched via Resend API to ${testRecipientEmail}! Message ID: ${parsed.data.messageId || 'SENT'}`,
           'success'
         );
       } else {
-        addToast(data.error || 'Failed to dispatch email', 'error');
+        addToast(parsed.error || parsed.data?.error || 'Failed to dispatch email', 'error');
       }
       await loadData();
     } catch (err: any) {
@@ -415,7 +424,7 @@ export const AesasAlertsView: React.FC = () => {
   // Delete / Cancel queue item
   const handleDeleteQueueItem = async (itemId: string) => {
     try {
-      await fetch(`/api/aesas/queue/${itemId}`, { method: 'DELETE' });
+      await safeFetchJson(`/api/aesas/queue/${itemId}`, { method: 'DELETE' });
       addToast('Alert item removed from AESAS queue.', 'info');
       setQueue((prev) => prev.filter((item) => item.id !== itemId));
     } catch (err) {
@@ -426,12 +435,13 @@ export const AesasAlertsView: React.FC = () => {
   // Clear Entire AESAS Queue
   const handleClearEntireQueue = async () => {
     try {
-      const res = await fetch('/api/aesas/queue', { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
+      const parsed = await safeFetchJson<{ success: boolean; error?: string }>('/api/aesas/queue', { method: 'DELETE' });
+      if (parsed.success && parsed.data?.success) {
         setQueue([]);
         addToast('All scheduled emails cleared from AESAS queue.', 'success');
         await loadData();
+      } else {
+        addToast(parsed.error || 'Failed to clear AESAS queue', 'error');
       }
     } catch (err: any) {
       addToast(err.message || 'Failed to clear AESAS queue', 'error');

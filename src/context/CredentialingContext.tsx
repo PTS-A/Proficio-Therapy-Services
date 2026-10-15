@@ -61,6 +61,7 @@ import {
 } from '../data/initialData';
 import { addBusinessDays, calculateBusinessDays, calculateDaysBetween, getAgingBucket, isFollowUpOverdue } from '../utils/slaCalculator';
 import { validateCredentialingRecord } from '../utils/entityValidation';
+import { safeParseResponse } from '../utils/safeFetch';
 import { 
   testConnection, 
   fetchCollection, 
@@ -2298,10 +2299,15 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Failed to dispatch onboarding email.' };
+      const parsed = await safeParseResponse(res);
+      if (!parsed.success || !parsed.data?.success) {
+        return {
+          success: false,
+          error: parsed.error || parsed.data?.error || `Failed to dispatch onboarding email (${parsed.status}).`,
+        };
       }
+
+      const data = parsed.data;
 
       logAuditEvent({
         userId: currentAccount?.id || 'sys-admin',
@@ -2393,12 +2399,10 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshAccessRequests = async () => {
     try {
       const res = await fetch('/api/access-requests');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.requests)) {
-          setAccessRequests(data.requests);
-          localStorage.setItem('cred_access_requests', JSON.stringify(data.requests));
-        }
+      const parsed = await safeParseResponse<{ success: boolean; requests?: AccessRequest[] }>(res);
+      if (parsed.success && parsed.data?.success && Array.isArray(parsed.data.requests)) {
+        setAccessRequests(parsed.data.requests);
+        localStorage.setItem('cred_access_requests', JSON.stringify(parsed.data.requests));
       }
     } catch (err) {
       console.warn('[CredentialingContext] Failed to fetch access requests from API:', err);
@@ -2429,9 +2433,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      const resData = await res.json();
-      if (res.ok && resData.success && resData.request) {
-        const newReq: AccessRequest = resData.request;
+      const parsed = await safeParseResponse<{ success: boolean; request?: AccessRequest; error?: string }>(res);
+      if (parsed.success && parsed.data?.success && parsed.data.request) {
+        const newReq: AccessRequest = parsed.data.request;
         setAccessRequests((prev) => {
           const filtered = prev.filter((r) => r.id !== newReq.id);
           const updated = [newReq, ...filtered];
@@ -2503,10 +2507,11 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           },
         }),
       });
-      const resData = await res.json();
-      if (!res.ok || !resData.success) {
-        return { success: false, error: resData.error || 'Failed to approve request on server.' };
+      const parsed = await safeParseResponse<{ success: boolean; employeeId?: string; error?: string }>(res);
+      if (!parsed.success || !parsed.data?.success) {
+        return { success: false, error: parsed.error || parsed.data?.error || 'Failed to approve request on server.' };
       }
+      const resData = parsed.data;
 
       // Also create/update account locally so user immediately appears in accounts and user roster
       const accResult = createAccount({
@@ -2609,9 +2614,9 @@ export const CredentialingProvider: React.FC<{ children: React.ReactNode }> = ({
           reviewedBy: currentAccount?.name || 'Super Administrator',
         }),
       });
-      const resData = await res.json();
-      if (!res.ok || !resData.success) {
-        return { success: false, error: resData.error || 'Failed to deny request on server.' };
+      const parsed = await safeParseResponse<{ success: boolean; error?: string }>(res);
+      if (!parsed.success || !parsed.data?.success) {
+        return { success: false, error: parsed.error || parsed.data?.error || 'Failed to deny request on server.' };
       }
 
       setAccessRequests((prev) => {

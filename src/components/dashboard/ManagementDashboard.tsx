@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCredentialing } from '../../context/CredentialingContext';
+import { safeFetchJson } from '../../utils/safeFetch';
 import { 
   Building2, 
   CheckCircle2, 
@@ -242,11 +243,10 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
 
   // Load Programmed CC Roster from backend
   React.useEffect(() => {
-    fetch('/api/aesas/cc-roster')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.ccRoster)) {
-          setProgrammedCcRoster(data.ccRoster);
+    safeFetchJson<{ success: boolean; ccRoster: string[] }>('/api/aesas/cc-roster')
+      .then((parsed) => {
+        if (parsed.success && Array.isArray(parsed.data?.ccRoster)) {
+          setProgrammedCcRoster(parsed.data.ccRoster);
         }
       })
       .catch((err) => console.warn('Could not fetch CC roster:', err));
@@ -255,14 +255,13 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
   const handleSaveCcRoster = async (updatedRoster: string[]) => {
     setIsSavingCcRoster(true);
     try {
-      const res = await fetch('/api/aesas/cc-roster', {
+      const parsed = await safeFetchJson<{ success: boolean; ccRoster: string[] }>('/api/aesas/cc-roster', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ccRoster: updatedRoster }),
       });
-      const data = await res.json();
-      if (data.success) {
-        setProgrammedCcRoster(data.ccRoster);
+      if (parsed.success && parsed.data?.ccRoster) {
+        setProgrammedCcRoster(parsed.data.ccRoster);
       }
     } catch (e) {
       console.error('Failed to update CC roster:', e);
@@ -533,7 +532,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     try {
       setIsSendingDigest(true);
       setDigestSuccessMsg(null);
-      const res = await fetch('/api/aesas/expirations/digest', {
+      const parsed = await safeFetchJson<{ success: boolean; recipientsCount?: number; count?: number; error?: string }>('/api/aesas/expirations/digest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -552,14 +551,14 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           })),
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (parsed.success && parsed.data?.success) {
+        const data = parsed.data;
         setDigestSuccessMsg(
           `AESAS Monthly Digest dispatched to Active Staff (${data.recipientsCount || rosterEmails.length}), System Administration, and Programmed CC Roster (${programmedCcRoster.length} recipients, ${data.count || expirationItems.length} records tracked).`
         );
         setTimeout(() => setDigestSuccessMsg(null), 7000);
       } else {
-        setDigestSuccessMsg(data.error ? `Dispatch Notice: ${data.error}` : 'Monthly digest broadcast queued via AESAS.');
+        setDigestSuccessMsg(parsed.data?.error ? `Dispatch Notice: ${parsed.data.error}` : 'Monthly digest broadcast queued via AESAS.');
         setTimeout(() => setDigestSuccessMsg(null), 5000);
       }
     } catch (e: any) {
@@ -575,7 +574,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     try {
       setIsEvaluatingCycles(true);
       setEvalSuccessMsg(null);
-      const res = await fetch('/api/aesas/expirations/evaluate', {
+      const parsed = await safeFetchJson<{ success: boolean; dailyAlertsSent?: number; error?: string }>('/api/aesas/expirations/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -594,11 +593,13 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           })),
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        const count = data.dailyAlertsSent ?? 0;
+      if (parsed.success && parsed.data?.success) {
+        const count = parsed.data.dailyAlertsSent ?? 0;
         setEvalSuccessMsg(`AESAS evaluated: ${count} daily countdown alert(s) dispatched to Programmed CC Roster and clinician within 7 days.`);
         setTimeout(() => setEvalSuccessMsg(null), 6000);
+      } else {
+        setEvalSuccessMsg('AESAS evaluation completed.');
+        setTimeout(() => setEvalSuccessMsg(null), 4000);
       }
     } catch (e: any) {
       console.error('Failed to evaluate cycles:', e);
@@ -613,7 +614,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
     try {
       setSendingStaffId(item.id);
       setStaffAlertSuccessMsg(null);
-      const res = await fetch('/api/aesas/expirations/alert', {
+      const parsed = await safeFetchJson<{ success: boolean; error?: string }>('/api/aesas/expirations/alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -630,8 +631,7 @@ export const ManagementDashboard: React.FC<ManagementDashboardProps> = ({
           },
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (parsed.success && parsed.data?.success) {
         setStaffAlertSuccessMsg(
           `Expiration alert successfully dispatched to ${item.clinicianName} and Programmed CC Roster (${programmedCcRoster.length} recipients).`
         );

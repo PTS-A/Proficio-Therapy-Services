@@ -917,7 +917,7 @@ export async function evaluateAndExecuteDeadlines(options: {
 
           if (isVerifiedRecipient) {
             try {
-              fromEmail = 'Proficio Credentialing <onboarding@resend.dev>';
+              fromEmail = rawFrom || process.env.RESEND_FROM_EMAIL || 'AGES & Proficio Credentialing <mail@credentialing.ageslearningsolutions.com>';
               const sendResult = await safeResendSend(resend, {
                 from: fromEmail,
                 to: cleanRecipientEmail,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Plus, Trash2, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, Send, Users, Info } from 'lucide-react';
 import { useCredentialing } from '../../context/CredentialingContext';
+import { safeFetchJson } from '../../utils/safeFetch';
 
 export const CcRosterAdminView: React.FC = () => {
   const { addToast } = useCredentialing();
@@ -12,10 +13,9 @@ export const CcRosterAdminView: React.FC = () => {
   const loadCcRoster = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/aesas/cc-roster');
-      const data = await res.json();
-      if (data?.ccRoster && Array.isArray(data.ccRoster)) {
-        setCcRoster(data.ccRoster);
+      const parsed = await safeFetchJson<{ ccRoster: string[] }>('/api/aesas/cc-roster');
+      if (parsed.data?.ccRoster && Array.isArray(parsed.data.ccRoster)) {
+        setCcRoster(parsed.data.ccRoster);
       }
     } catch (err: any) {
       console.warn('Could not load CC roster:', err);
@@ -55,13 +55,12 @@ export const CcRosterAdminView: React.FC = () => {
   const saveRoster = async (roster: string[], successMsg: string) => {
     setIsSaving(true);
     try {
-      const res = await fetch('/api/aesas/cc-roster', {
+      const parsed = await safeFetchJson<{ success: boolean }>('/api/aesas/cc-roster', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ccRoster: roster }),
       });
-      const data = await res.json();
-      if (data?.success) {
+      if (parsed.success && parsed.data?.success) {
         addToast(successMsg, 'success');
       } else {
         addToast('Notice: CC roster saved locally.', 'info');

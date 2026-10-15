@@ -22,9 +22,30 @@ async function startServer() {
   const isBundled = typeof __dirname !== 'undefined' && path.basename(__dirname) === 'dist';
   const isProduction = process.env.NODE_ENV === 'production' || isBundled;
 
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // ----------------------------------------------------------------------------
+  // CORS & Preflight Handling for Multi-Domain Deployments
+  // ----------------------------------------------------------------------------
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    next();
+  });
 
   // ----------------------------------------------------------------------------
   // HIPAA §164.312(e)(1) & ISO/IEC 27001:2022 A.8.20 / A.8.24 Security Headers
@@ -2128,18 +2149,18 @@ async function startServer() {
   });
 
   // Directly send email through AESAS Resend engine
-  app.post('/api/aesas/send', async (req, res) => {
+  app.post(['/api/aesas/send', '/api/aesas/send/'], async (req, res) => {
     try {
       const { sendAesasEmail } = await import('./server/aesasEngine');
       const result = await sendAesasEmail(req.body || {});
-      res.json(result);
+      return res.status(200).json(result || { success: true });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err?.message || 'Email send failed' });
     }
   });
 
   // Dispatch employee onboarding credentials email via AESAS Resend engine
-  app.post('/api/aesas/onboard', async (req, res) => {
+  app.post(['/api/aesas/onboard', '/api/aesas/onboard/'], async (req, res) => {
     try {
       const { sendAesasOnboardingEmail } = await import('./server/aesasEngine');
       const configuredPortalUrl = process.env.APP_URL || process.env.PORTAL_URL || process.env.CUSTOM_PRODUCTION_SSO_DOMAIN;
@@ -2164,15 +2185,15 @@ async function startServer() {
         portalUrl,
       });
 
-      res.json(result);
+      return res.status(200).json(result || { success: true });
     } catch (err: any) {
       console.error('[AESAS Onboard Error]', err);
-      res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err?.message || 'Failed to dispatch onboarding email' });
     }
   });
 
   // AESAS Expirations: Send Monthly Expiration Digest (1st of Month - All Employees & System Admin)
-  app.post('/api/aesas/expirations/digest', async (req, res) => {
+  app.post(['/api/aesas/expirations/digest', '/api/aesas/expirations/digest/'], async (req, res) => {
     try {
       const { sendAesasMonthlyExpirationDigest } = await import('./server/aesasEngine');
       const result = await sendAesasMonthlyExpirationDigest({
@@ -2180,28 +2201,28 @@ async function startServer() {
         employeeEmails: req.body?.employeeEmails,
         items: req.body?.items,
       });
-      res.json(result);
+      return res.status(200).json(result || { success: true });
     } catch (err: any) {
       console.error('[AESAS Expirations Digest Error]', err);
-      res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err?.message || 'Failed to dispatch digest' });
     }
   });
 
   // AESAS Expirations: Send Expiration Alert to Credentialing Head, System Admin & Clinician
-  app.post('/api/aesas/expirations/alert', async (req, res) => {
+  app.post(['/api/aesas/expirations/alert', '/api/aesas/expirations/alert/'], async (req, res) => {
     try {
       const { sendAesasIndividualExpirationAlert } = await import('./server/aesasEngine');
       const item = req.body?.item || req.body;
       const result = await sendAesasIndividualExpirationAlert(item);
-      res.json(result);
+      return res.status(200).json(result || { success: true });
     } catch (err: any) {
       console.error('[AESAS Expiration Alert Error]', err);
-      res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err?.message || 'Failed to dispatch alert' });
     }
   });
 
   // AESAS Expirations: Evaluate & Run Expiration Cycles (1st of month digest + 7-day daily countdowns)
-  app.post('/api/aesas/expirations/evaluate', async (req, res) => {
+  app.post(['/api/aesas/expirations/evaluate', '/api/aesas/expirations/evaluate/'], async (req, res) => {
     try {
       const { runAesasExpirationCycles } = await import('./server/aesasEngine');
       const result = await runAesasExpirationCycles({
@@ -2209,10 +2230,10 @@ async function startServer() {
         employeeEmails: req.body?.employeeEmails,
         items: req.body?.items,
       });
-      res.json({ success: true, ...result });
+      return res.status(200).json({ success: true, ...result });
     } catch (err: any) {
       console.error('[AESAS Expirations Evaluate Error]', err);
-      res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err?.message || 'Failed to evaluate expiration cycles' });
     }
   });
 
@@ -2281,6 +2302,11 @@ async function startServer() {
       console.warn('[AESAS Expirations] Scheduled cycle non-fatal warning:', err);
     }
   }, 6 * 60 * 60 * 1000);
+
+  // API 404 Fallback: Guarantee all unhandled /api/* requests return valid JSON instead of dropping or HTML
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({ success: false, error: `API route ${req.method} ${req.path} not found` });
+  });
 
   // Vite middleware for development / Static file serving for production
   if (!isProduction) {

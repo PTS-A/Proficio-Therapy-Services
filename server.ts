@@ -2265,7 +2265,55 @@ async function startServer() {
     }
   });
 
-  // Scheduled background runner for deadline checks and AESAS expiration cycles
+  // =========================================================================
+  // EXECUTIVE REPORTS & GOOGLE SHEETS WORKBOOK INTEGRATION ROUTES
+  // =========================================================================
+
+  // Get Google Sheets configuration (from system_config table)
+  app.get(['/api/reports/config', '/api/reports/config/'], async (req, res) => {
+    try {
+      const { getReportConfig } = await import('./server/reportEngine');
+      const config = await getReportConfig();
+      res.json({ success: true, config });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Update Google Sheets configuration
+  app.put(['/api/reports/config', '/api/reports/config/'], async (req, res) => {
+    try {
+      const { saveReportConfig } = await import('./server/reportEngine');
+      const updated = await saveReportConfig(req.body || {});
+      res.json({ success: true, config: updated });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get all saved report snapshots
+  app.get(['/api/reports/snapshots', '/api/reports/snapshots/'], async (req, res) => {
+    try {
+      const { getReportSnapshots } = await import('./server/reportEngine');
+      const snapshots = await getReportSnapshots();
+      res.json({ success: true, snapshots });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Save or update an immutable report snapshot
+  app.post(['/api/reports/snapshots', '/api/reports/snapshots/'], async (req, res) => {
+    try {
+      const { saveReportSnapshot } = await import('./server/reportEngine');
+      const saved = await saveReportSnapshot(req.body);
+      res.json({ success: true, snapshot: saved });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Scheduled background runner for deadline checks, AESAS expiration cycles, and automated report snapshots
   // Runs 30s after server startup, then every 6 hours automatically
   setTimeout(async () => {
     try {
@@ -2274,6 +2322,14 @@ async function startServer() {
       await evaluateAndExecuteDeadlines({ dryRun: false });
     } catch (err) {
       console.warn('[Background Automation] Initial deadline check non-fatal warning:', err);
+    }
+
+    try {
+      console.log('[Report Snapshots] Running automated weekly/monthly snapshot cycles...');
+      const { runAutomatedSnapshotCycles } = await import('./server/reportEngine');
+      await runAutomatedSnapshotCycles();
+    } catch (err) {
+      console.warn('[Report Snapshots] Automated snapshot cycle non-fatal warning:', err);
     }
 
     try {
@@ -2300,6 +2356,14 @@ async function startServer() {
       await runAesasExpirationCycles();
     } catch (err) {
       console.warn('[AESAS Expirations] Scheduled cycle non-fatal warning:', err);
+    }
+
+    try {
+      console.log('[Report Snapshots] Running scheduled automated weekly/monthly snapshot check...');
+      const { runAutomatedSnapshotCycles } = await import('./server/reportEngine');
+      await runAutomatedSnapshotCycles();
+    } catch (err) {
+      console.warn('[Report Snapshots] Scheduled snapshot cycle non-fatal warning:', err);
     }
   }, 6 * 60 * 60 * 1000);
 

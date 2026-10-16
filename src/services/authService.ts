@@ -14,13 +14,21 @@ import { AppAccount } from '../types';
 // Custom Production SSO Redirection Configuration
 export const CUSTOM_PRODUCTION_SSO_DOMAIN =
   (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_CUSTOM_PRODUCTION_SSO_DOMAIN || import.meta.env?.VITE_APP_URL)) ||
-  '';
+  'https://credentialing.ageslearningsolutions.com';
 
 export const ENABLE_CUSTOM_DOMAIN_REDIRECT =
   (typeof import.meta !== 'undefined' &&
     (import.meta.env?.VITE_ENABLE_CUSTOM_DOMAIN_REDIRECT === 'true' ||
       import.meta.env?.ENABLE_CUSTOM_DOMAIN_REDIRECT === 'true')) ||
   false;
+
+export const APPROVED_WHITELIST_DOMAINS = [
+  'https://credentialing.ageslearningsolutions.com',
+  'credentialing.ageslearningsolutions.com',
+  'https://pts-credentialing-1da61.firebaseapp.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
 
 export interface VerificationResponse {
   authorized: boolean;

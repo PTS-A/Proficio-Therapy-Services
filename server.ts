@@ -4,9 +4,22 @@ import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
 
-// Custom Production SSO Redirection Configuration
-export const CUSTOM_PRODUCTION_SSO_DOMAIN = process.env.CUSTOM_PRODUCTION_SSO_DOMAIN || process.env.APP_URL || '';
-export const ENABLE_CUSTOM_DOMAIN_REDIRECT = process.env.ENABLE_CUSTOM_DOMAIN_REDIRECT === 'true'; // Toggle to true when user approves activation
+// Custom Production SSO Redirection Configuration & Approved Whitelist Domain
+export const CUSTOM_PRODUCTION_SSO_DOMAIN =
+  process.env.CUSTOM_PRODUCTION_SSO_DOMAIN ||
+  process.env.APP_URL ||
+  'https://credentialing.ageslearningsolutions.com';
+export const ENABLE_CUSTOM_DOMAIN_REDIRECT = process.env.ENABLE_CUSTOM_DOMAIN_REDIRECT === 'true';
+
+// Authoritative Whitelist Domains for AGES / Proficio Credentialing Platform
+export const APPROVED_WHITELIST_DOMAINS = [
+  'https://credentialing.ageslearningsolutions.com',
+  'credentialing.ageslearningsolutions.com',
+  'https://pts-credentialing-1da61.firebaseapp.com',
+  'https://pts-credentialing-1da61.web.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
 
 async function startServer() {
   const app = express();

@@ -44,6 +44,20 @@ googleProvider.setCustomParameters({
 let cachedAccessToken: string | null = null;
 let isSigningIn = false;
 
+// Authoritative Whitelist Domains for Google OAuth & Sheets Synchronization
+export const APPROVED_WHITELIST_DOMAINS = [
+  'https://credentialing.ageslearningsolutions.com',
+  'credentialing.ageslearningsolutions.com',
+  'https://pts-credentialing-1da61.firebaseapp.com',
+  'https://pts-credentialing-1da61.web.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+
+// Production Company Logo Formula for Google Sheets (Row 1 Top Bar)
+export const COMPANY_LOGO_SHEET_FORMULA =
+  '=IMAGE("https://credentialing.ageslearningsolutions.com/Proficio-Therapy-Horizontal.png", 4, 38, 145)';
+
 export interface GoogleSheetsConfig {
   spreadsheetId: string | null;
   spreadsheetUrl: string | null;
@@ -153,7 +167,7 @@ export const signInWithGoogle = async (): Promise<{ user: User; accessToken: str
     console.error('[GoogleSheetsService] OAuth Sign-In Error:', err);
     if (err?.code === 'auth/unauthorized-domain') {
       throw new Error(
-        'Domain authorization was just provisioned in Google Cloud/Firebase. Please reload the page in a few seconds, or connect your workbook directly using "Link Existing Sheet".'
+        'Domain authorization restriction: The approved default domain is https://credentialing.ageslearningsolutions.com/. If running on an alternate preview origin, add this origin in Firebase Console > Authentication > Settings > Authorized domains, or simply use "Link Existing Sheet" to connect your Google Sheet directly.'
       );
     }
     throw err;
@@ -278,14 +292,197 @@ export const SNAPSHOT_LOG_HEADERS = [
   'Overdue / Delayed'
 ];
 
+export const MONTHLY_RECORD_HEADERS = [
+  'Clinician Name',
+  'NPI',
+  'Discipline',
+  'Legal Entity',
+  'Payer Name',
+  'Stage',
+  'Submission Date',
+  'Approval Date',
+  'Effective Date',
+  'Expiration Date',
+  'Days in Stage',
+  'Next Follow-Up'
+];
+
+/**
+ * Standard branded top bar with official company logo formula for Google Sheets
+ * Evaluates =IMAGE("...") in cell A1 and positions metadata in rows 1-3
+ */
+export const getBrandedTopBarValues = (
+  subsheetTitle: string,
+  lastUpdatedStr?: string
+): (string | number)[][] => {
+  const dateStr = lastUpdatedStr || new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  return [
+    [
+      COMPANY_LOGO_SHEET_FORMULA,
+      'AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES',
+      '',
+      '',
+      'Executive Credentialing Management System',
+      '',
+      '',
+      '',
+      'CONFIDENTIAL — HIPAA §164.312',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      ''
+    ],
+    [
+      '',
+      'Entity Scope: Proficio Therapy Services, LLC & PSTG INC',
+      '',
+      '',
+      `Subsheet: ${subsheetTitle}`,
+      '',
+      '',
+      '',
+      'Two-Way Synchronized Application Master',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      ''
+    ],
+    [
+      '',
+      'Generated for AGES Executive Reporting • Continuous Sync Engine',
+      '',
+      '',
+      `Last Synchronized: ${dateStr}`,
+      '',
+      '',
+      '',
+      'Domain: https://credentialing.ageslearningsolutions.com/',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      ''
+    ],
+    ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''] // Row 4 spacer
+  ];
+};
+
+/**
+ * Formats Google Sheets tab: Freezes top 5 rows, sets dark navy top bar, and sets header styling
+ */
+export const formatSheetHeaderAndTopBar = async (
+  token: string,
+  spreadsheetId: string,
+  sheetId: number,
+  columnCount: number = 18
+): Promise<void> => {
+  try {
+    const requests = [
+      // Freeze rows 1-5 (Top bar + Header)
+      {
+        updateSheetProperties: {
+          properties: {
+            sheetId,
+            gridProperties: {
+              frozenRowCount: 5,
+            },
+          },
+          fields: 'gridProperties.frozenRowCount',
+        },
+      },
+      // Format rows 1-3 (Navy blue branded top bar)
+      {
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: 0,
+            endRowIndex: 3,
+            startColumnIndex: 0,
+            endColumnIndex: columnCount,
+          },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: { red: 0.059, green: 0.169, blue: 0.361 }, // #0f2b5c
+              textFormat: {
+                foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 },
+                bold: true,
+                fontSize: 10,
+              },
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat)',
+        },
+      },
+      // Format row 5 (Header row)
+      {
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: 4,
+            endRowIndex: 5,
+            startColumnIndex: 0,
+            endColumnIndex: columnCount,
+          },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: { red: 0.118, green: 0.161, blue: 0.231 }, // #1e293b
+              textFormat: {
+                foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 },
+                bold: true,
+                fontSize: 10,
+              },
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat)',
+        },
+      },
+    ];
+
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ requests }),
+    });
+  } catch (err) {
+    console.warn('[GoogleSheetsService] formatSheetHeaderAndTopBar notice:', err);
+  }
+};
+
 /**
  * Creates a brand new Google Sheets workbook for the credentialing report integration
+ * Populates Executive_Overview, Live_Records, Current Month Subsheet, Sync_Log, and Snapshot_Log
+ * with Company Logo in the top bar of all subsheets!
  */
 export const createCredentialingWorkbook = async (
   token: string,
   userEmail?: string
 ): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> => {
-  const title = `Proficio Therapy Services — Credentialing Master Workbook (${new Date().getFullYear()})`;
+  const currentYear = new Date().getFullYear();
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const currentMonthName = monthNames[new Date().getMonth()];
+  const currentMonthSheetTitle = `Monthly_${currentMonthName}_${currentYear}`;
+
+  const title = `Proficio Therapy Services — Credentialing Master Workbook (${currentYear})`;
 
   const payload = {
     properties: {
@@ -297,32 +494,54 @@ export const createCredentialingWorkbook = async (
       {
         properties: {
           sheetId: 0,
-          title: 'Live_Records',
+          title: 'Executive_Overview',
           gridProperties: {
-            frozenRowCount: 1,
-            rowCount: 200,
-            columnCount: LIVE_RECORDS_HEADERS.length + 2,
+            frozenRowCount: 5,
+            rowCount: 100,
+            columnCount: 18,
           },
         },
       },
       {
         properties: {
           sheetId: 1,
-          title: 'Sync_Log',
+          title: 'Live_Records',
           gridProperties: {
-            frozenRowCount: 1,
-            rowCount: 200,
-            columnCount: SYNC_LOG_HEADERS.length + 2,
+            frozenRowCount: 5,
+            rowCount: 300,
+            columnCount: LIVE_RECORDS_HEADERS.length + 2,
           },
         },
       },
       {
         properties: {
           sheetId: 2,
+          title: currentMonthSheetTitle,
+          gridProperties: {
+            frozenRowCount: 5,
+            rowCount: 200,
+            columnCount: MONTHLY_RECORD_HEADERS.length + 2,
+          },
+        },
+      },
+      {
+        properties: {
+          sheetId: 3,
+          title: 'Sync_Log',
+          gridProperties: {
+            frozenRowCount: 5,
+            rowCount: 300,
+            columnCount: SYNC_LOG_HEADERS.length + 2,
+          },
+        },
+      },
+      {
+        properties: {
+          sheetId: 4,
           title: 'Snapshot_Log',
           gridProperties: {
-            frozenRowCount: 1,
-            rowCount: 200,
+            frozenRowCount: 5,
+            rowCount: 300,
             columnCount: SNAPSHOT_LOG_HEADERS.length + 2,
           },
         },
@@ -348,12 +567,42 @@ export const createCredentialingWorkbook = async (
   const spreadsheetId = data.spreadsheetId;
   const spreadsheetUrl = data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
-  // Write initial header rows to all 3 sheets
-  await writeSheetValues(token, spreadsheetId, 'Live_Records!A1:R1', [LIVE_RECORDS_HEADERS]);
-  await writeSheetValues(token, spreadsheetId, 'Sync_Log!A1:F1', [SYNC_LOG_HEADERS]);
-  await writeSheetValues(token, spreadsheetId, 'Snapshot_Log!A1:O1', [SNAPSHOT_LOG_HEADERS]);
+  // 1. Write Branded Top Bar with Company Logo formula to all 5 sheets
+  const nowIso = new Date().toISOString();
+  await writeSheetValues(token, spreadsheetId, 'Executive_Overview!A1:R4', getBrandedTopBarValues('Executive_Overview', nowIso));
+  await writeSheetValues(token, spreadsheetId, 'Live_Records!A1:R4', getBrandedTopBarValues('Live_Records', nowIso));
+  await writeSheetValues(token, spreadsheetId, `${currentMonthSheetTitle}!A1:R4`, getBrandedTopBarValues(currentMonthSheetTitle, nowIso));
+  await writeSheetValues(token, spreadsheetId, 'Sync_Log!A1:R4', getBrandedTopBarValues('Sync_Log', nowIso));
+  await writeSheetValues(token, spreadsheetId, 'Snapshot_Log!A1:R4', getBrandedTopBarValues('Snapshot_Log', nowIso));
 
-  // Log initial creation into Sync_Log
+  // 2. Write Table Column Headers at row 5 on all sheets
+  await writeSheetValues(token, spreadsheetId, 'Executive_Overview!A5:L5', [[
+    'Metric / KPI Category',
+    'Total Active',
+    'Speech Pathology',
+    'Applied Behavior Analysis (ABA)',
+    'Occupational Therapy (OT)',
+    'PTS LLC',
+    'PSTG INC',
+    'In-Network Status',
+    'Overdue Alerts',
+    'Cycle Days Avg',
+    'Last Calculated',
+    'Notes'
+  ]]);
+  await writeSheetValues(token, spreadsheetId, 'Live_Records!A5:R5', [LIVE_RECORDS_HEADERS]);
+  await writeSheetValues(token, spreadsheetId, `${currentMonthSheetTitle}!A5:L5`, [MONTHLY_RECORD_HEADERS]);
+  await writeSheetValues(token, spreadsheetId, 'Sync_Log!A5:F5', [SYNC_LOG_HEADERS]);
+  await writeSheetValues(token, spreadsheetId, 'Snapshot_Log!A5:O5', [SNAPSHOT_LOG_HEADERS]);
+
+  // 3. Format header styling and top bar for all 5 sheets
+  await formatSheetHeaderAndTopBar(token, spreadsheetId, 0, 18);
+  await formatSheetHeaderAndTopBar(token, spreadsheetId, 1, LIVE_RECORDS_HEADERS.length);
+  await formatSheetHeaderAndTopBar(token, spreadsheetId, 2, MONTHLY_RECORD_HEADERS.length);
+  await formatSheetHeaderAndTopBar(token, spreadsheetId, 3, SYNC_LOG_HEADERS.length);
+  await formatSheetHeaderAndTopBar(token, spreadsheetId, 4, SNAPSHOT_LOG_HEADERS.length);
+
+  // 4. Log initial creation into Sync_Log
   await appendSheetValues(token, spreadsheetId, 'Sync_Log!A:F', [
     [
       new Date().toISOString(),
@@ -361,11 +610,11 @@ export const createCredentialingWorkbook = async (
       'Workbook Structure',
       userEmail || 'Proficio Credentialing Admin',
       'SUCCESS',
-      'Dedicated workbook created with Live_Records, Sync_Log, and Snapshot_Log sheets.',
+      `Dedicated workbook created with Company Logo top bar and subsheets: Executive_Overview, Live_Records, ${currentMonthSheetTitle}, Sync_Log, and Snapshot_Log.`,
     ],
   ]);
 
-  // Save new workbook config in app database
+  // 5. Save new workbook config in app database
   await saveGoogleSheetsConfig({
     spreadsheetId,
     spreadsheetUrl,
@@ -373,10 +622,138 @@ export const createCredentialingWorkbook = async (
     createdAt: new Date().toISOString(),
     lastSyncedAt: new Date().toISOString(),
     lastSyncStatus: 'SUCCESS',
-    lastSyncMessage: 'Workbook initialized successfully.',
+    lastSyncMessage: `Workbook initialized with company logo top bar & ${currentMonthSheetTitle} subsheet.`,
   });
 
   return { spreadsheetId, spreadsheetUrl };
+};
+
+/**
+ * Ensures a monthly subsheet exists in the workbook for the given month/year
+ * If missing, automatically creates the subsheet, injects company logo top bar,
+ * sets column headers, populates records, and formats styling!
+ */
+export const ensureMonthlySubsheet = async (
+  token: string,
+  spreadsheetId: string,
+  year?: number,
+  month?: number,
+  records: CredentialingRecord[] = [],
+  providers: Provider[] = [],
+  payers: Payer[] = [],
+  entities: LegalEntity[] = [],
+  userEmail?: string
+): Promise<{ sheetName: string; created: boolean }> => {
+  const now = new Date();
+  const targetYear = year || now.getFullYear();
+  const targetMonth = typeof month === 'number' ? month : now.getMonth() + 1;
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const monthName = monthNames[targetMonth - 1];
+  const sheetName = `Monthly_${monthName}_${targetYear}`;
+
+  try {
+    // Check if sheet tab already exists
+    const metaRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    let sheetExists = false;
+    let nextSheetId = 100;
+    if (metaRes.ok) {
+      const meta = await metaRes.json();
+      const existingSheets = meta.sheets || [];
+      nextSheetId = existingSheets.length + 10;
+      sheetExists = existingSheets.some((s: any) => s.properties?.title === sheetName);
+    }
+
+    if (!sheetExists) {
+      // Add new monthly subsheet tab
+      const addReq = {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                sheetId: nextSheetId,
+                title: sheetName,
+                gridProperties: {
+                  frozenRowCount: 5,
+                  rowCount: Math.max(records.length + 20, 100),
+                  columnCount: MONTHLY_RECORD_HEADERS.length + 2,
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(addReq),
+      });
+
+      // Write Company Logo top bar and headers
+      await writeSheetValues(token, spreadsheetId, `${sheetName}!A1:R4`, getBrandedTopBarValues(sheetName));
+      await writeSheetValues(token, spreadsheetId, `${sheetName}!A5:L5`, [MONTHLY_RECORD_HEADERS]);
+      await formatSheetHeaderAndTopBar(token, spreadsheetId, nextSheetId, MONTHLY_RECORD_HEADERS.length);
+
+      // Populate monthly records if available
+      if (records.length > 0) {
+        const rows = records.map((r) => {
+          const prov = providers.find((p) => p.id === r.providerId);
+          const pay = payers.find((p) => p.id === r.payerId);
+          const ent = entities.find((e) => e.id === r.entityId);
+          const provName = prov ? ((prov as any).fullName || `${prov.firstName} ${prov.lastName}`) : 'N/A';
+          const entName = ent?.dba || ent?.legalName || 'Proficio Therapy Services, LLC';
+
+          return [
+            provName,
+            prov?.npi || '',
+            r.discipline || 'Speech',
+            entName,
+            pay?.name || '',
+            r.stage || 'Intake',
+            r.submissionDate || '',
+            r.approvalDate || '',
+            r.effectiveDate || '',
+            r.expirationDate || '',
+            r.daysInCurrentStage || 0,
+            r.nextFollowUpDate || '',
+          ];
+        });
+
+        await writeSheetValues(token, spreadsheetId, `${sheetName}!A6:L${rows.length + 5}`, rows);
+      }
+
+      // Log into Sync_Log
+      await appendSheetValues(token, spreadsheetId, 'Sync_Log!A:F', [
+        [
+          new Date().toISOString(),
+          'MONTHLY_SUBSHEET_CREATED',
+          sheetName,
+          userEmail || 'Automated System',
+          'SUCCESS',
+          `Created monthly subsheet "${sheetName}" with company logo top bar and ${records.length} records.`,
+        ],
+      ]);
+
+      return { sheetName, created: true };
+    }
+
+    return { sheetName, created: false };
+  } catch (err: any) {
+    console.warn(`[GoogleSheetsService] ensureMonthlySubsheet for ${sheetName}:`, err);
+    return { sheetName, created: false };
+  }
 };
 
 // ----------------------------------------------------------------------------
@@ -523,11 +900,18 @@ export const syncAppToGoogleSheets = async (
       ];
     });
 
-    // 2. Clear existing Live_Records rows below headers and write freshly synced set
-    await clearSheetValues(token, spreadsheetId, 'Live_Records!A2:R1000');
+    // 2. Ensure branded top bar with company logo and column headers at row 5
+    await writeSheetValues(token, spreadsheetId, 'Live_Records!A1:R4', getBrandedTopBarValues('Live_Records', new Date().toISOString()));
+    await writeSheetValues(token, spreadsheetId, 'Live_Records!A5:R5', [LIVE_RECORDS_HEADERS]);
+
+    // Clear existing Live_Records rows below headers and write freshly synced set
+    await clearSheetValues(token, spreadsheetId, 'Live_Records!A6:R1000');
     if (rows.length > 0) {
-      await writeSheetValues(token, spreadsheetId, `Live_Records!A2:R${rows.length + 1}`, rows);
+      await writeSheetValues(token, spreadsheetId, `Live_Records!A6:R${rows.length + 5}`, rows);
     }
+
+    // Automatically ensure the current month subsheet exists and has the latest roster
+    await ensureMonthlySubsheet(token, spreadsheetId, undefined, undefined, records, providers, payers, entities, userEmail);
 
     // 3. Log to Sync_Log
     const timestamp = new Date().toISOString();
@@ -740,11 +1124,11 @@ export const archiveSnapshotToGoogleSheets = async (
       console.warn('[GoogleSheetsService] Notice adding sheet tab:', sheetAddErr);
     }
 
-    // 2. Prepare formatted report header & KPI summary
+    // 2. Prepare formatted report header with company logo top bar & KPI summary
     const content = [
-      ['PROFICIO THERAPY SERVICES — EXECUTIVE CREDENTIALING REPORT SNAPSHOT', '', '', '', '', '', '', '', '', '', ''],
-      [`Report Type: ${snapshot.reportType.toUpperCase()}`, `Period: ${snapshot.reportingPeriod}`, `Report Date: ${snapshot.reportDate}`, `Entity Scope: ${snapshot.entityScope}`, '', '', '', '', '', '', ''],
-      [`Snapshot ID: ${snapshot.id}`, `Version: v${snapshot.version}${snapshot.isCorrection ? ' (AUDITED REVISION)' : ''}`, `Created By: ${snapshot.createdBy}`, `Archived: ${snapshot.createdAt}`, '', '', '', '', '', '', ''],
+      [COMPANY_LOGO_SHEET_FORMULA, 'AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES', '', '', 'Executive Credentialing Report Snapshot', '', '', '', 'CONFIDENTIAL — HIPAA §164.312', '', ''],
+      ['', `Report Type: ${snapshot.reportType.toUpperCase()}`, `Period: ${snapshot.reportingPeriod}`, `Report Date: ${snapshot.reportDate}`, `Entity Scope: ${snapshot.entityScope}`, '', '', '', 'Domain: https://credentialing.ageslearningsolutions.com/', '', ''],
+      ['', `Snapshot ID: ${snapshot.id}`, `Version: v${snapshot.version}${snapshot.isCorrection ? ' (AUDITED REVISION)' : ''}`, `Created By: ${snapshot.createdBy}`, `Archived: ${snapshot.createdAt}`, '', '', '', 'Status: Locked Historical Record', '', ''],
       ['', '', '', '', '', '', '', '', '', '', ''],
       [
         `Active Intakes: ${snapshot.kpis.activeIntakes}`,

@@ -97,6 +97,17 @@ export const ReportsView: React.FC = () => {
     currentAccount?.systemRole?.includes('Manager')
   );
 
+  // Clinical staff check: clinical staff need NOT login or link to worksheet (strictly admin/developer only)
+  const isClinicalStaff = Boolean(
+    currentAccount?.role === 'clinical_staff' ||
+    currentAccount?.systemRole?.toLowerCase().includes('clinician') ||
+    currentAccount?.systemRole?.toLowerCase().includes('therapist') ||
+    (currentAccount?.systemRole?.toLowerCase().includes('staff') && !isDeveloper(currentAccount) && !isAdminAccount(currentAccount))
+  );
+
+  // Only Administrator or Developer accounts can connect or synchronize the Google Sheets workbook
+  const canManageSheetsWorkbook = isAuthorized && !isClinicalStaff;
+
   // Main Tabs
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly' | 'upload'>('weekly');
   const [selectedMonthlyDiscipline, setSelectedMonthlyDiscipline] = useState<'Consolidated' | 'Speech' | 'ABA' | 'OT'>('Consolidated');
@@ -980,47 +991,54 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. GOOGLE SHEETS CONTINUOUS TWO-WAY SYNCHRONIZATION BAR                    */}
+      {/* 2. GOOGLE SHEETS CONTINUOUS TWO-WAY SYNCHRONIZATION BAR (ADMIN/DEV ONLY)   */}
       {/* ========================================================================= */}
-      <div className="bg-gradient-to-r from-slate-900 to-[#1e3a8a] text-white p-4 sm:p-5 rounded-2xl shadow-sm print:hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-start sm:items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5" viewBox="0 0 48 48" fill="none">
-                <path fill="#2E7D32" d="M37 42H11a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4h18l12 12v20a4 4 0 0 1-4 4z" />
-                <path fill="#81C784" d="M29 6v12h12" />
-                <path fill="#FFFFFF" d="M16 22h16v3H16zm0 6h16v3H16zm0 6h10v3H16z" />
-              </svg>
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-bold tracking-tight text-white">
-                  Google Sheets Continuous Two-Way Synchronization
-                </h3>
-                {sheetsConfig.spreadsheetId ? (
-                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                    <CheckCheck className="w-3 h-3" />
-                    <span>Workbook Connected</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                    <span>Setup Required</span>
-                  </span>
-                )}
-                {sheetsConfig.lastSyncStatus === 'CONFLICT_DETECTED' && (
-                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/30 text-amber-200 border border-amber-400/40">
-                    <AlertTriangle className="w-3 h-3" />
-                    <span>Conflicts Detected</span>
-                  </span>
-                )}
+      {canManageSheetsWorkbook && (
+        <div className="bg-gradient-to-r from-slate-900 to-[#1e3a8a] text-white p-4 sm:p-5 rounded-2xl shadow-sm print:hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" viewBox="0 0 48 48" fill="none">
+                  <path fill="#2E7D32" d="M37 42H11a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4h18l12 12v20a4 4 0 0 1-4 4z" />
+                  <path fill="#81C784" d="M29 6v12h12" />
+                  <path fill="#FFFFFF" d="M16 22h16v3H16zm0 6h16v3H16zm0 6h10v3H16z" />
+                </svg>
               </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                {sheetsConfig.spreadsheetId
-                  ? `Master Workbook: ${sheetsConfig.sheetTitle} • Last Synced: ${sheetsConfig.lastSyncedAt ? new Date(sheetsConfig.lastSyncedAt).toLocaleTimeString() : 'Never'}`
-                  : 'Synchronize credentialing records, live stage changes, and period snapshots with a dedicated Google Sheets workbook.'}
-              </p>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-bold tracking-tight text-white">
+                    Google Sheets Continuous Two-Way Synchronization
+                  </h3>
+                  {sheetsConfig.spreadsheetId ? (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                      <CheckCheck className="w-3 h-3" />
+                      <span>Workbook Connected</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                      <span>Setup Required</span>
+                    </span>
+                  )}
+                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                    <span>Logo Formula Active</span>
+                  </span>
+                  <span className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/10 text-slate-300 border border-white/10">
+                    <span>Domain: credentialing.ageslearningsolutions.com</span>
+                  </span>
+                  {sheetsConfig.lastSyncStatus === 'CONFLICT_DETECTED' && (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/30 text-amber-200 border border-amber-400/40">
+                      <AlertTriangle className="w-3 h-3" />
+                      <span>Conflicts Detected</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  {sheetsConfig.spreadsheetId
+                    ? `Master Workbook: ${sheetsConfig.sheetTitle} • Subsheets: Executive_Overview, Live_Records, Monthly Snapshots, Sync_Log, Snapshot_Log • Last Synced: ${sheetsConfig.lastSyncedAt ? new Date(sheetsConfig.lastSyncedAt).toLocaleTimeString() : 'Never'}`
+                    : 'Synchronize credentialing records, live stage changes, monthly subsheets (auto-created 1st of month), and period snapshots with a dedicated Google Sheets workbook.'}
+                </p>
+              </div>
             </div>
-          </div>
 
           {/* Google Sheets Actions */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1172,6 +1190,7 @@ export const ReportsView: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 3. ENHANCED CONTROLS TOOLBAR (PERIOD, DATE FIELD, DATE RANGE, APPLY, SNAPSHOT) */}
@@ -1909,8 +1928,29 @@ export const ReportsView: React.FC = () => {
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Paste the full URL from your browser address bar when viewing your Google Sheet, or the 44-character spreadsheet ID. The system will link this workbook for live two-way synchronization and period snapshots.
+                Paste the full URL from your browser address bar when viewing your Google Sheet, or the 44-character spreadsheet ID. Direct linking connects your workbook immediately without requiring browser OAuth popup.
               </p>
+            </div>
+
+            {/* Workbook Specifications & Domain Whitelist Callout */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700 space-y-2">
+              <div className="font-bold text-slate-900 flex items-center justify-between">
+                <span>Workbook Architecture & Features:</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                  5 Subsheets
+                </span>
+              </div>
+              <ul className="text-[11px] text-slate-600 space-y-1 list-disc list-inside">
+                <li><strong>Company Logo Top Bar:</strong> Formula <code>=IMAGE(&quot;...&quot;)</code> active on every subsheet.</li>
+                <li><strong>Executive_Overview:</strong> High-level KPI cards and pipeline metrics.</li>
+                <li><strong>Live_Records:</strong> Continuous two-way synchronization table with frozen headers.</li>
+                <li><strong>Monthly Subsheets:</strong> Automatically created on the 1st of every month with locked snapshots.</li>
+                <li><strong>Sync_Log &amp; Snapshot_Log:</strong> Audit trails and historical snapshot logs.</li>
+              </ul>
+              <div className="pt-1.5 border-t border-slate-200 text-[10px] text-slate-500">
+                <strong>Approved Whitelist Domain:</strong>{' '}
+                <span className="font-mono text-slate-700">https://credentialing.ageslearningsolutions.com/</span>
+              </div>
             </div>
 
             {sheetsConfig.spreadsheetId && (

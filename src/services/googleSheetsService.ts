@@ -151,6 +151,11 @@ export const signInWithGoogle = async (): Promise<{ user: User; accessToken: str
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (err: any) {
     console.error('[GoogleSheetsService] OAuth Sign-In Error:', err);
+    if (err?.code === 'auth/unauthorized-domain') {
+      throw new Error(
+        'Domain authorization was just provisioned in Google Cloud/Firebase. Please reload the page in a few seconds, or connect your workbook directly using "Link Existing Sheet".'
+      );
+    }
     throw err;
   } finally {
     isSigningIn = false;

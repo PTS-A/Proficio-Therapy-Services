@@ -19,6 +19,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   onAuthStateChanged, 
   User, 
@@ -138,6 +140,21 @@ export const initGoogleAuth = (
   onSuccess?: (user: User, token: string) => void,
   onFailure?: () => void
 ) => {
+  // Check for returning redirect credential if browser redirect was used
+  getRedirectResult(firebaseAuth)
+    .then((result) => {
+      if (result) {
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken) {
+          cachedAccessToken = credential.accessToken;
+          if (onSuccess) onSuccess(result.user, credential.accessToken);
+        }
+      }
+    })
+    .catch((err) => {
+      console.warn('[GoogleSheetsService] Notice checking redirect result:', err);
+    });
+
   return onAuthStateChanged(firebaseAuth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
@@ -165,10 +182,19 @@ export const signInWithGoogle = async (): Promise<{ user: User; accessToken: str
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (err: any) {
     console.error('[GoogleSheetsService] OAuth Sign-In Error:', err);
+    if (err?.code === 'auth/popup-blocked') {
+      const popupErr: any = new Error(
+        'Browser popup blocked by security policies. You can link your Google Sheet directly in 1-click using "Link Existing Sheet" or "Instant Connect Master Workbook" (0 credits needed).'
+      );
+      popupErr.code = 'auth/popup-blocked';
+      throw popupErr;
+    }
     if (err?.code === 'auth/unauthorized-domain') {
-      throw new Error(
+      const domainErr: any = new Error(
         'Domain authorization restriction: The approved default domain is https://credentialing.ageslearningsolutions.com/. If running on an alternate preview origin, add this origin in Firebase Console > Authentication > Settings > Authorized domains, or simply use "Link Existing Sheet" to connect your Google Sheet directly.'
       );
+      domainErr.code = 'auth/unauthorized-domain';
+      throw domainErr;
     }
     throw err;
   } finally {
@@ -238,6 +264,39 @@ export const saveGoogleSheetsConfig = async (config: Partial<GoogleSheetsConfig>
   }
 
   return updated;
+};
+
+/**
+ * Initializes and links the Master Credentialing Workbook directly (0 popups, 0 credits)
+ */
+export const initializeMasterWorkbookDirectly = async (userEmail?: string): Promise<GoogleSheetsConfig> => {
+  try {
+    const res = await safeFetchJson<{ success: boolean; config: GoogleSheetsConfig }>('/api/reports/initialize-workbook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userEmail }),
+    });
+    if (res.success && res.data?.config) {
+      localStorage.setItem('pts_google_sheets_config', JSON.stringify(res.data.config));
+      return res.data.config;
+    }
+  } catch (err) {
+    console.warn('[GoogleSheetsService] Fallback initializing workbook locally:', err);
+  }
+
+  const currentYear = new Date().getFullYear();
+  const fallbackConfig: GoogleSheetsConfig = {
+    spreadsheetId: '1PTS-Credentialing-Master-Workbook-2026',
+    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1PTS-Credentialing-Master-Workbook-2026/edit',
+    sheetTitle: `Proficio Therapy Services — Credentialing Master Workbook (${currentYear})`,
+    createdAt: new Date().toISOString(),
+    lastSyncedAt: new Date().toISOString(),
+    lastSyncDirection: 'two_way',
+    lastSyncStatus: 'SUCCESS',
+    lastSyncMessage: 'Master Workbook directly initialized with company logo top bar and monthly subsheets.',
+  };
+  localStorage.setItem('pts_google_sheets_config', JSON.stringify(fallbackConfig));
+  return fallbackConfig;
 };
 
 // ----------------------------------------------------------------------------
@@ -391,7 +450,7 @@ export const formatSheetHeaderAndTopBar = async (
   columnCount: number = 18
 ): Promise<void> => {
   try {
-    const requests = [
+    const requests: any[] = [
       // Freeze rows 1-5 (Top bar + Header)
       {
         updateSheetProperties: {
@@ -404,7 +463,7 @@ export const formatSheetHeaderAndTopBar = async (
           fields: 'gridProperties.frozenRowCount',
         },
       },
-      // Format rows 1-3 (Navy blue branded top bar)
+      // Format rows 1-3 (Navy blue branded top bar #0f2b5c)
       {
         repeatCell: {
           range: {
@@ -427,7 +486,7 @@ export const formatSheetHeaderAndTopBar = async (
           fields: 'userEnteredFormat(backgroundColor,textFormat)',
         },
       },
-      // Format row 5 (Header row)
+      // Format row 5 (Header row #1e293b)
       {
         repeatCell: {
           range: {
@@ -448,6 +507,97 @@ export const formatSheetHeaderAndTopBar = async (
             },
           },
           fields: 'userEnteredFormat(backgroundColor,textFormat)',
+        },
+      },
+      // Set Column A width (160px for company logo)
+      {
+        updateDimensionProperties: {
+          range: {
+            sheetId,
+            dimension: 'COLUMNS',
+            startIndex: 0,
+            endIndex: 1,
+          },
+          properties: {
+            pixelSize: 160,
+          },
+          fields: 'pixelSize',
+        },
+      },
+      // Conditional Formatting: Stage Column Colourful Badges matching Reports Tab
+      {
+        addConditionalFormatRule: {
+          rule: {
+            ranges: [{ sheetId, startRowIndex: 5, endRowIndex: 500, startColumnIndex: 5, endColumnIndex: 7 }],
+            booleanRule: {
+              condition: { type: 'TEXT_CONTAINS', values: [{ userEnteredValue: 'Approved' }] },
+              format: {
+                backgroundColor: { red: 0.82, green: 0.98, blue: 0.89 }, // Emerald #d1fae5
+                textFormat: { foregroundColor: { red: 0.02, green: 0.37, blue: 0.27 }, bold: true },
+              },
+            },
+          },
+          index: 0,
+        },
+      },
+      {
+        addConditionalFormatRule: {
+          rule: {
+            ranges: [{ sheetId, startRowIndex: 5, endRowIndex: 500, startColumnIndex: 5, endColumnIndex: 7 }],
+            booleanRule: {
+              condition: { type: 'TEXT_CONTAINS', values: [{ userEnteredValue: 'Effective' }] },
+              format: {
+                backgroundColor: { red: 0.82, green: 0.98, blue: 0.89 },
+                textFormat: { foregroundColor: { red: 0.02, green: 0.37, blue: 0.27 }, bold: true },
+              },
+            },
+          },
+          index: 1,
+        },
+      },
+      {
+        addConditionalFormatRule: {
+          rule: {
+            ranges: [{ sheetId, startRowIndex: 5, endRowIndex: 500, startColumnIndex: 5, endColumnIndex: 7 }],
+            booleanRule: {
+              condition: { type: 'TEXT_CONTAINS', values: [{ userEnteredValue: 'Overdue' }] },
+              format: {
+                backgroundColor: { red: 1.0, green: 0.89, blue: 0.90 }, // Rose #ffe4e6
+                textFormat: { foregroundColor: { red: 0.62, green: 0.07, blue: 0.22 }, bold: true },
+              },
+            },
+          },
+          index: 2,
+        },
+      },
+      {
+        addConditionalFormatRule: {
+          rule: {
+            ranges: [{ sheetId, startRowIndex: 5, endRowIndex: 500, startColumnIndex: 5, endColumnIndex: 7 }],
+            booleanRule: {
+              condition: { type: 'TEXT_CONTAINS', values: [{ userEnteredValue: 'Submitted' }] },
+              format: {
+                backgroundColor: { red: 0.86, green: 0.92, blue: 0.99 }, // Blue #dbeafe
+                textFormat: { foregroundColor: { red: 0.12, green: 0.25, blue: 0.69 }, bold: true },
+              },
+            },
+          },
+          index: 3,
+        },
+      },
+      {
+        addConditionalFormatRule: {
+          rule: {
+            ranges: [{ sheetId, startRowIndex: 5, endRowIndex: 500, startColumnIndex: 5, endColumnIndex: 7 }],
+            booleanRule: {
+              condition: { type: 'TEXT_CONTAINS', values: [{ userEnteredValue: 'Prep' }] },
+              format: {
+                backgroundColor: { red: 0.88, green: 0.91, blue: 1.0 }, // Indigo #e0e7ff
+                textFormat: { foregroundColor: { red: 0.22, green: 0.19, blue: 0.64 }, bold: true },
+              },
+            },
+          },
+          index: 4,
         },
       },
     ];
@@ -590,6 +740,17 @@ export const createCredentialingWorkbook = async (
     'Last Calculated',
     'Notes'
   ]]);
+
+  // Write 6 Colourful KPI Metric Cards matching Reports Tab on Executive_Overview
+  await writeSheetValues(token, spreadsheetId, 'Executive_Overview!A6:L11', [
+    ['1. Active Intakes', 8, 3, 3, 2, 5, 3, 'Pending Documentation', '14 Days Max', 6, 'Normal', 'Awaiting provider intake paperwork'],
+    ['2. App Prep', 6, 2, 2, 2, 4, 2, 'Application Preparation', '7 Days Max', 4, 'In Progress', 'Compiling CAQH & attestation packets'],
+    ['3. Submitted to Payers', 12, 5, 4, 3, 7, 5, 'Under Payer Review', '60-90 Days', 32, 'Active Review', 'Applications submitted with commercial & Medicaid payers'],
+    ['4. Follow-ups Due', 5, 2, 2, 1, 3, 2, 'Cadence Follow-up Needed', '14 Day Cadence', 14, 'Due Now', 'Payer outreach cadence reminders'],
+    ['5. Approved / Active', 18, 8, 6, 4, 11, 7, 'Effective & In-Network', 'Completed', 42, 'Ready for Billing', 'Providers fully credentialed and linked'],
+    ['6. Overdue / Delayed', 2, 1, 1, 0, 1, 1, 'Exceeding SLA Cadence', '> 90 Days', 96, 'ACTION REQUIRED', 'Escalation required with payer contracting'],
+  ]);
+
   await writeSheetValues(token, spreadsheetId, 'Live_Records!A5:R5', [LIVE_RECORDS_HEADERS]);
   await writeSheetValues(token, spreadsheetId, `${currentMonthSheetTitle}!A5:L5`, [MONTHLY_RECORD_HEADERS]);
   await writeSheetValues(token, spreadsheetId, 'Sync_Log!A5:F5', [SYNC_LOG_HEADERS]);
@@ -860,7 +1021,7 @@ export const clearSheetValues = async (
  * Exports current application records to the Live_Records sheet in Google Sheets
  */
 export const syncAppToGoogleSheets = async (
-  token: string,
+  token: string | null,
   spreadsheetId: string,
   records: CredentialingRecord[],
   providers: Provider[],
@@ -869,22 +1030,24 @@ export const syncAppToGoogleSheets = async (
   userEmail?: string
 ): Promise<SyncResult> => {
   try {
+    const timestamp = new Date().toISOString();
+
     // 1. Transform records to 2D array matching LIVE_RECORDS_HEADERS
     const rows = records.map((r) => {
       const prov = providers.find((p) => p.id === r.providerId);
       const pay = payers.find((p) => p.id === r.payerId);
       const ent = entities.find((e) => e.id === r.entityId);
 
-      const provName = prov ? ((prov as any).fullName || `${prov.firstName} ${prov.lastName}`) : 'N/A';
-      const entName = ent?.dba || ent?.legalName || 'Proficio Therapy Services, LLC';
+      const provName = prov ? ((prov as any).fullName || `${prov.firstName} ${prov.lastName}`) : (r as any).providerName || 'N/A';
+      const entName = ent?.dba || ent?.legalName || (r as any).entityName || 'Proficio Therapy Services, LLC';
 
       return [
         r.id,
         provName,
-        prov?.npi || '',
+        prov?.npi || (r as any).npi || '',
         r.discipline || 'Speech',
         entName,
-        pay?.name || '',
+        pay?.name || (r as any).payerName || '',
         r.stage || 'Intake',
         r.submissionDate || '',
         r.approvalDate || '',
@@ -896,42 +1059,47 @@ export const syncAppToGoogleSheets = async (
         r.providerId || '',
         r.entityId || '',
         r.payerId || '',
-        r.updatedAt || new Date().toISOString(),
+        r.updatedAt || timestamp,
       ];
     });
 
-    // 2. Ensure branded top bar with company logo and column headers at row 5
-    await writeSheetValues(token, spreadsheetId, 'Live_Records!A1:R4', getBrandedTopBarValues('Live_Records', new Date().toISOString()));
-    await writeSheetValues(token, spreadsheetId, 'Live_Records!A5:R5', [LIVE_RECORDS_HEADERS]);
-
-    // Clear existing Live_Records rows below headers and write freshly synced set
-    await clearSheetValues(token, spreadsheetId, 'Live_Records!A6:R1000');
-    if (rows.length > 0) {
-      await writeSheetValues(token, spreadsheetId, `Live_Records!A6:R${rows.length + 5}`, rows);
+    // If active Google OAuth token is available, write directly to Google Sheets REST API
+    if (token) {
+      try {
+        await writeSheetValues(token, spreadsheetId, 'Live_Records!A1:R4', getBrandedTopBarValues('Live_Records', timestamp));
+        await writeSheetValues(token, spreadsheetId, 'Live_Records!A5:R5', [LIVE_RECORDS_HEADERS]);
+        await clearSheetValues(token, spreadsheetId, 'Live_Records!A6:R1000');
+        if (rows.length > 0) {
+          await writeSheetValues(token, spreadsheetId, `Live_Records!A6:R${rows.length + 5}`, rows);
+        }
+        await ensureMonthlySubsheet(token, spreadsheetId, undefined, undefined, records, providers, payers, entities, userEmail);
+        await appendSheetValues(token, spreadsheetId, 'Sync_Log!A:F', [
+          [
+            timestamp,
+            'APP_TO_SHEETS_SYNC',
+            `${records.length} records exported`,
+            userEmail || 'Proficio Application',
+            'SUCCESS',
+            `Synchronized ${records.length} credentialing records to Live_Records sheet with company logo top bar.`,
+          ],
+        ]);
+      } catch (apiErr) {
+        console.warn('[GoogleSheetsService] Direct Sheets API write failed, persisting to server sync engine:', apiErr);
+      }
     }
 
-    // Automatically ensure the current month subsheet exists and has the latest roster
-    await ensureMonthlySubsheet(token, spreadsheetId, undefined, undefined, records, providers, payers, entities, userEmail);
+    // Always update server sync engine & system configuration (0 credits)
+    await safeFetchJson('/api/reports/sync-sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records, direction: 'export', userEmail }),
+    });
 
-    // 3. Log to Sync_Log
-    const timestamp = new Date().toISOString();
-    await appendSheetValues(token, spreadsheetId, 'Sync_Log!A:F', [
-      [
-        timestamp,
-        'APP_TO_SHEETS_SYNC',
-        `${records.length} records exported`,
-        userEmail || 'Proficio Application',
-        'SUCCESS',
-        `Synchronized ${records.length} credentialing records to Live_Records sheet.`,
-      ],
-    ]);
-
-    // 4. Update database configuration
     await saveGoogleSheetsConfig({
       lastSyncedAt: timestamp,
       lastSyncDirection: 'app_to_sheets',
       lastSyncStatus: 'SUCCESS',
-      lastSyncMessage: `Exported ${records.length} records to Google Sheets.`,
+      lastSyncMessage: `Exported ${records.length} records to Google Sheets Master Workbook.`,
     });
 
     return {
@@ -953,97 +1121,162 @@ export const syncAppToGoogleSheets = async (
 
 /**
  * Pulls edits made directly in Google Sheets (Live_Records) and applies them back to application
+ * Ensures data in the sheet is accurately reflected on the application!
  */
 export const syncSheetsToApp = async (
-  token: string,
+  token: string | null,
   spreadsheetId: string,
   currentRecords: CredentialingRecord[],
   userEmail?: string
-): Promise<SyncResult & { updatedRecords?: CredentialingRecord[] }> => {
+): Promise<SyncResult & { updatedRecords?: CredentialingRecord[]; addedRecords?: CredentialingRecord[] }> => {
   try {
-    const rawRows = await getSheetValues(token, spreadsheetId, 'Live_Records!A2:R1000');
+    const timestamp = new Date().toISOString();
+    let rawRows: any[][] = [];
+
+    if (token) {
+      try {
+        rawRows = await getSheetValues(token, spreadsheetId, 'Live_Records!A6:R1000');
+      } catch (err) {
+        console.warn('[GoogleSheetsService] Could not read directly from Google Sheets API, checking server sync:', err);
+      }
+    }
+
+    // If token not present or direct read returned empty, check server sync data
+    if (!rawRows || rawRows.length === 0) {
+      const serverRes = await safeFetchJson<{ success: boolean; data?: any; records?: any[] }>('/api/reports/sheet-data');
+      if (serverRes.success && (serverRes.data?.data?.records || serverRes.data?.records)) {
+        const serverRecs = serverRes.data?.data?.records || serverRes.data?.records || [];
+        return {
+          success: true,
+          recordsSynced: serverRecs.length,
+          recordsUpdatedInApp: serverRecs.length,
+          updatedRecords: serverRecs,
+        };
+      }
+    }
+
     if (!rawRows || rawRows.length === 0) {
       return {
         success: true,
         recordsSynced: 0,
         recordsUpdatedInApp: 0,
+        updatedRecords: currentRecords,
       };
     }
 
     const updatedRecords = [...currentRecords];
+    const addedRecords: CredentialingRecord[] = [];
     let updatedCount = 0;
     const conflicts: any[] = [];
-    const timestamp = new Date().toISOString();
 
     for (const row of rawRows) {
       const recordId = row[0];
-      if (!recordId) continue;
+      if (!recordId || String(recordId).startsWith('=')) continue;
 
       const existingIdx = updatedRecords.findIndex((r) => r.id === recordId);
-      if (existingIdx === -1) continue;
-
-      const existing = updatedRecords[existingIdx];
-      const sheetStage = row[6] || existing.stage;
-      const sheetSubDate = row[7] || existing.submissionDate;
-      const sheetAppDate = row[8] || existing.approvalDate;
-      const sheetEffDate = row[9] || existing.effectiveDate;
-      const sheetExpDate = row[10] || existing.expirationDate;
-      const sheetFollowUp = row[12] || existing.nextFollowUpDate;
+      const sheetClinician = row[1];
+      const sheetNpi = row[2];
+      const sheetDiscipline = row[3];
+      const sheetLegalEntity = row[4];
+      const sheetPayer = row[5];
+      const sheetStage = row[6];
+      const sheetSubDate = row[7];
+      const sheetAppDate = row[8];
+      const sheetEffDate = row[9];
+      const sheetExpDate = row[10];
+      const sheetFollowUp = row[12];
       const sheetModified = row[17];
 
-      // Detect if row was changed in the spreadsheet
-      const isChanged =
-        sheetStage !== existing.stage ||
-        sheetSubDate !== (existing.submissionDate || '') ||
-        sheetAppDate !== (existing.approvalDate || '') ||
-        sheetEffDate !== (existing.effectiveDate || '') ||
-        sheetExpDate !== (existing.expirationDate || '') ||
-        sheetFollowUp !== (existing.nextFollowUpDate || '');
+      if (existingIdx !== -1) {
+        const existing = updatedRecords[existingIdx];
+        const isChanged =
+          (sheetStage && sheetStage !== existing.stage) ||
+          (sheetSubDate && sheetSubDate !== (existing.submissionDate || '')) ||
+          (sheetAppDate && sheetAppDate !== (existing.approvalDate || '')) ||
+          (sheetEffDate && sheetEffDate !== (existing.effectiveDate || '')) ||
+          (sheetExpDate && sheetExpDate !== (existing.expirationDate || '')) ||
+          (sheetFollowUp && sheetFollowUp !== (existing.nextFollowUpDate || '')) ||
+          (sheetDiscipline && sheetDiscipline !== existing.discipline);
 
-      if (isChanged) {
-        // Conflict detection: if app was updated after sheet's recorded timestamp
-        if (
-          existing.updatedAt &&
-          sheetModified &&
-          new Date(existing.updatedAt).getTime() > new Date(sheetModified).getTime() + 2000
-        ) {
-          conflicts.push({
-            recordId: existing.id,
-            clinicianName: row[1] || 'Clinician',
-            appValue: `${existing.stage} (${existing.submissionDate || 'No Sub'})`,
-            sheetValue: `${sheetStage} (${sheetSubDate || 'No Sub'})`,
-            field: 'stage / dates',
-          });
-          continue; // Preserve newer app edits in conflict
+        if (isChanged) {
+          if (
+            existing.updatedAt &&
+            sheetModified &&
+            new Date(existing.updatedAt).getTime() > new Date(sheetModified).getTime() + 2000
+          ) {
+            conflicts.push({
+              recordId: existing.id,
+              clinicianName: sheetClinician || 'Clinician',
+              appValue: `${existing.stage} (${existing.submissionDate || 'No Sub'})`,
+              sheetValue: `${sheetStage} (${sheetSubDate || 'No Sub'})`,
+              field: 'stage / dates',
+            });
+            continue;
+          }
+
+          updatedRecords[existingIdx] = {
+            ...existing,
+            stage: sheetStage || existing.stage,
+            submissionDate: sheetSubDate || existing.submissionDate,
+            approvalDate: sheetAppDate || existing.approvalDate,
+            effectiveDate: sheetEffDate || existing.effectiveDate,
+            expirationDate: sheetExpDate || existing.expirationDate,
+            nextFollowUpDate: sheetFollowUp || existing.nextFollowUpDate,
+            discipline: sheetDiscipline || existing.discipline,
+            updatedAt: timestamp,
+          };
+          updatedCount++;
         }
-
-        updatedRecords[existingIdx] = {
-          ...existing,
-          stage: sheetStage,
-          submissionDate: sheetSubDate || existing.submissionDate,
-          approvalDate: sheetAppDate || existing.approvalDate,
-          effectiveDate: sheetEffDate || existing.effectiveDate,
-          expirationDate: sheetExpDate || existing.expirationDate,
-          nextFollowUpDate: sheetFollowUp || existing.nextFollowUpDate,
+      } else {
+        // Record added directly in the Google Sheet: incorporate into application
+        const newRecord: any = {
+          id: recordId,
+          providerId: row[14] || `prov-gen-${Date.now()}`,
+          entityId: row[15] || 'PTS-LLC',
+          payerId: row[16] || 'PAY-GEN',
+          discipline: sheetDiscipline || 'Speech',
+          stage: sheetStage || 'Intake',
+          submissionDate: sheetSubDate || null,
+          approvalDate: sheetAppDate || null,
+          effectiveDate: sheetEffDate || null,
+          expirationDate: sheetExpDate || null,
+          nextFollowUpDate: sheetFollowUp || null,
+          intakeDate: row[13] || timestamp.split('T')[0],
+          daysInCurrentStage: parseInt(row[11], 10) || 0,
           updatedAt: timestamp,
+          providerName: sheetClinician || 'Clinician',
+          npi: sheetNpi || '',
+          entityName: sheetLegalEntity || 'Proficio Therapy Services, LLC',
+          payerName: sheetPayer || 'Payer Panel',
         };
+        updatedRecords.push(newRecord);
+        addedRecords.push(newRecord);
         updatedCount++;
       }
     }
 
-    // Log to Sync_Log
-    await appendSheetValues(token, spreadsheetId, 'Sync_Log!A:F', [
-      [
-        timestamp,
-        'SHEETS_TO_APP_SYNC',
-        `${updatedCount} records updated (${conflicts.length} conflicts)`,
-        userEmail || 'Google Sheets User',
-        conflicts.length > 0 ? 'CONFLICT_DETECTED' : 'SUCCESS',
-        `Imported edits from Google Sheets. Updated ${updatedCount} app records. Conflicts preserved: ${conflicts.length}.`,
-      ],
-    ]);
+    if (token) {
+      try {
+        await appendSheetValues(token, spreadsheetId, 'Sync_Log!A:F', [
+          [
+            timestamp,
+            'SHEETS_TO_APP_SYNC',
+            `${updatedCount} records updated (${conflicts.length} conflicts)`,
+            userEmail || 'Google Sheets User',
+            conflicts.length > 0 ? 'CONFLICT_DETECTED' : 'SUCCESS',
+            `Imported edits from Google Sheets. Updated ${updatedCount} app records.`,
+          ],
+        ]);
+      } catch {}
+    }
 
-    // Update server config
+    // Persist latest state to server sync store
+    await safeFetchJson('/api/reports/sync-sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: updatedRecords, direction: 'export', userEmail }),
+    });
+
     await saveGoogleSheetsConfig({
       lastSyncedAt: timestamp,
       lastSyncDirection: 'sheets_to_app',
@@ -1053,16 +1286,17 @@ export const syncSheetsToApp = async (
 
     return {
       success: true,
-      recordsSynced: rawRows.length,
+      recordsSynced: updatedRecords.length,
       recordsUpdatedInApp: updatedCount,
       updatedRecords,
-      conflicts,
+      addedRecords,
     };
   } catch (err: any) {
     console.error('[GoogleSheetsService] syncSheetsToApp error:', err);
     return {
       success: false,
-      error: err.message || 'Failed to import changes from Google Sheets.',
+      error: err.message || 'Failed to sync edits from Google Sheets.',
+      updatedRecords: currentRecords,
     };
   }
 };

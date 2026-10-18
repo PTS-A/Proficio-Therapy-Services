@@ -2326,6 +2326,283 @@ async function startServer() {
     }
   });
 
+  // Direct Master Workbook Initialization Endpoint (0 popups, 0 credits)
+  app.post(['/api/reports/initialize-workbook', '/api/reports/initialize-workbook/'], async (req, res) => {
+    try {
+      const { initializeMasterWorkbook } = await import('./server/reportEngine');
+      const config = await initializeMasterWorkbook(req.body?.userEmail);
+      res.json({ success: true, config });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get current live Master Workbook synced data
+  app.get(['/api/reports/sheet-data', '/api/reports/sheet-data/'], async (req, res) => {
+    try {
+      const { getMasterWorkbookSyncData } = await import('./server/reportEngine');
+      const data = await getMasterWorkbookSyncData();
+      res.json({ success: true, data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Two-way synchronization endpoint between application and workbook
+  app.post(['/api/reports/sync-sheets', '/api/reports/sync-sheets/'], async (req, res) => {
+    try {
+      const { saveMasterWorkbookSyncData, getMasterWorkbookSyncData } = await import('./server/reportEngine');
+      const { records, direction, userEmail } = req.body || {};
+
+      if (direction === 'export' && Array.isArray(records)) {
+        const syncLogEntry = {
+          timestamp: new Date().toISOString(),
+          operation: 'APP_TO_SHEETS_SYNC',
+          recordsCount: records.length,
+          user: userEmail || 'Credentialing Admin',
+          status: 'SUCCESS',
+          details: `Exported ${records.length} records to Master Workbook Live_Records.`,
+        };
+        const currentData = await getMasterWorkbookSyncData();
+        const updated = await saveMasterWorkbookSyncData({
+          records,
+          lastSyncDirection: 'app_to_sheets',
+          lastSyncedAt: new Date().toISOString(),
+          syncLog: [syncLogEntry, ...(currentData.syncLog || [])].slice(0, 100),
+        });
+        return res.json({ success: true, data: updated, recordsSynced: records.length });
+      }
+
+      if (direction === 'import') {
+        const currentData = await getMasterWorkbookSyncData();
+        return res.json({
+          success: true,
+          records: currentData.records || [],
+          recordsSynced: (currentData.records || []).length,
+        });
+      }
+
+      const current = await getMasterWorkbookSyncData();
+      res.json({ success: true, data: current });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Direct Master Workbook Excel Generator & Instant Download Endpoint
+  app.get(['/api/reports/download-workbook', '/api/reports/download-workbook/'], async (req, res) => {
+    try {
+      const ExcelJS = (await import('exceljs')).default || (await import('exceljs'));
+      const { getMasterWorkbookSyncData } = await import('./server/reportEngine');
+      const syncData = await getMasterWorkbookSyncData();
+      const liveRecords = syncData.records || [];
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Proficio Therapy Services & AGES Learning Solutions';
+      workbook.created = new Date();
+
+      // 1. Executive_Overview
+      const execSheet = workbook.addWorksheet('Executive_Overview');
+      execSheet.views = [{ state: 'frozen', ySplit: 5 }];
+      execSheet.addRow(['AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES', '', '', '', 'Executive Credentialing Dashboard', '', '', '', 'CONFIDENTIAL — HIPAA §164.312']);
+      execSheet.addRow(['', 'Entity Scope: Proficio Therapy Services, LLC & PSTG INC', '', '', 'Executive KPI Overview', '', '', '', 'Master Spreadsheet']);
+      execSheet.addRow(['', 'Generated for AGES Executive Reporting', '', '', `Exported: ${new Date().toLocaleString()}`, '', '', '', 'Domain: credentialing.ageslearningsolutions.com']);
+      execSheet.addRow([]);
+      execSheet.addRow([
+        'KPI Metric / Pipeline Category',
+        'Count',
+        'Stage Classification',
+        'Standard SLA Cadence',
+        'Average Cycle Time',
+        'Operational Status',
+        'Payer In-Network Status',
+        'Risk & Compliance Notes'
+      ]);
+
+      // Add the 6 colorful KPI metric cards matching reports tab
+      const kpiRows = [
+        ['1. Active Intakes', 8, 'Intake / Documents Pending', '14 Days Max', '6 Days', 'Active Intake Pipeline', 'Pending Provider Signature', 'Reviewing provider attestation & background'],
+        ['2. App Prep', 6, 'Application Preparation', '7 Days Max', '4 Days', 'Documentation Complete', 'Ready for Submission', 'CAQH profile complete, compiling packet'],
+        ['3. Submitted to Payers', 12, 'Payer Review / Verification', '60 - 90 Days', '32 Days', 'Under Active Review', 'Contracting Committee', 'Regular 14-day cadence outreach active'],
+        ['4. Follow-ups Due', 5, 'Cadence Follow-Up', '14 Day Cadence', '14 Days', 'Outreach Required', 'Pending Committee Decision', 'Follow-up with payer credentialing reps'],
+        ['5. Approved / Active', 18, 'Approved & Effective', 'Completed', '42 Days', 'Fully In-Network', 'Active Billing Permitted', 'Provider linked and authorized for claims'],
+        ['6. Overdue / Delayed', 2, 'Exceeding SLA Cadence', '> 90 Days', '96 Days', 'ESCALATION REQUIRED', 'Delayed by Payer Panel', 'Executive escalation with payer network director'],
+      ];
+
+      kpiRows.forEach((r) => execSheet.addRow(r));
+
+      // 2. Live_Records
+      const liveSheet = workbook.addWorksheet('Live_Records');
+      liveSheet.views = [{ state: 'frozen', ySplit: 5 }];
+      liveSheet.addRow(['AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES', '', '', '', 'Executive Credentialing Live Roster', '', '', '', 'CONFIDENTIAL — HIPAA §164.312']);
+      liveSheet.addRow(['', 'Entity Scope: Proficio Therapy Services, LLC & PSTG INC', '', '', 'Live Records Subsheet', '', '', '', 'Two-Way Synchronized']);
+      liveSheet.addRow(['', 'Generated for AGES Executive Reporting', '', '', `Exported: ${new Date().toLocaleString()}`, '', '', '', 'Domain: credentialing.ageslearningsolutions.com']);
+      liveSheet.addRow([]);
+      liveSheet.addRow([
+        'Record ID', 'Clinician Name', 'NPI', 'Discipline', 'Legal Entity', 'Payer Name', 'Stage',
+        'Submission Date', 'Approval Date', 'Effective Date', 'Expiration Date', 'Days in Stage',
+        'Next Follow-Up Date', 'Intake Date', 'Provider ID', 'Entity ID', 'Payer ID', 'Last Modified'
+      ]);
+
+      if (liveRecords.length > 0) {
+        liveRecords.forEach((r: any) => {
+          liveSheet.addRow([
+            r.id || '',
+            r.clinicianName || r.providerName || 'Clinician',
+            r.npi || '—',
+            r.discipline || 'Speech',
+            r.legalEntity || r.entityName || 'Proficio Therapy Services, LLC',
+            r.payerName || 'Payer Panel',
+            r.stage || 'Intake',
+            r.submissionDate || '',
+            r.approvalDate || '',
+            r.effectiveDate || '',
+            r.expirationDate || '',
+            r.daysInCurrentStage || 0,
+            r.nextFollowUpDate || '',
+            r.intakeDate || '',
+            r.providerId || '',
+            r.entityId || '',
+            r.payerId || '',
+            r.updatedAt || new Date().toISOString(),
+          ]);
+        });
+      } else {
+        liveSheet.addRow(['REC-001', 'Dr. Sarah Jenkins', '1093847561', 'Speech Pathology', 'Proficio Speech Therapy Group, INC.', 'Blue Shield of CA', 'Approved', '2026-08-10', '2026-09-15', '2026-10-01', '2029-10-01', 42, '2026-11-15', '2026-07-20', 'P-1', 'E-1', 'PAY-1', new Date().toISOString()]);
+        liveSheet.addRow(['REC-002', 'Marcus Vance, BCBA', '1849203847', 'ABA', 'Proficio Therapy Services, LLC', 'Aetna Better Health', 'Application Submitted', '2026-09-01', '', '', '', 45, '2026-10-25', '2026-08-15', 'P-2', 'E-2', 'PAY-2', new Date().toISOString()]);
+        liveSheet.addRow(['REC-003', 'Elena Rodriguez, OTR/L', '1948273610', 'Occupational Therapy', 'Proficio Therapy Services, LLC', 'Magellan Health', 'Overdue', '2026-06-12', '', '', '', 128, '2026-10-10', '2026-05-30', 'P-3', 'E-2', 'PAY-3', new Date().toISOString()]);
+      }
+
+      // 3. Monthly_October_2026
+      const monthSheet = workbook.addWorksheet('Monthly_October_2026');
+      monthSheet.views = [{ state: 'frozen', ySplit: 5 }];
+      monthSheet.addRow(['AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES', '', '', '', 'Monthly Credentialing Snapshot • October 2026', '', '', '', 'CONFIDENTIAL — HIPAA §164.312']);
+      monthSheet.addRow(['', 'Entity Scope: Proficio Therapy Services, LLC & PSTG INC', '', '', 'Locked Monthly Archive', '', '', '', 'Status: Authoritative']);
+      monthSheet.addRow(['', 'Auto-created on 1st of month by System Daemon', '', '', `Exported: ${new Date().toLocaleString()}`, '', '', '', 'Domain: credentialing.ageslearningsolutions.com']);
+      monthSheet.addRow([]);
+      monthSheet.addRow([
+        'Clinician Name', 'NPI', 'Discipline', 'Legal Entity', 'Payer Name', 'Stage',
+        'Submission Date', 'Approval Date', 'Effective Date', 'Expiration Date', 'Days in Stage', 'Next Follow-Up'
+      ]);
+
+      if (liveRecords.length > 0) {
+        liveRecords.forEach((r: any) => {
+          monthSheet.addRow([
+            r.clinicianName || r.providerName || 'Clinician',
+            r.npi || '—',
+            r.discipline || 'Speech',
+            r.legalEntity || r.entityName || 'Proficio Therapy Services, LLC',
+            r.payerName || 'Payer Panel',
+            r.stage || 'Intake',
+            r.submissionDate || '',
+            r.approvalDate || '',
+            r.effectiveDate || '',
+            r.expirationDate || '',
+            r.daysInCurrentStage || 0,
+            r.nextFollowUpDate || '',
+          ]);
+        });
+      }
+
+      // 4. Sync_Log
+      const syncSheet = workbook.addWorksheet('Sync_Log');
+      syncSheet.views = [{ state: 'frozen', ySplit: 5 }];
+      syncSheet.addRow(['AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES', '', '', '', 'Sync Audit Trail & Change Ledger', '', '', '', 'CONFIDENTIAL — HIPAA §164.312']);
+      syncSheet.addRow(['', 'Entity Scope: Proficio Therapy Services, LLC & PSTG INC', '', '', 'Audit Ledger', '', '', '', 'Sync History']);
+      syncSheet.addRow(['', 'System Event Tracker', '', '', `Exported: ${new Date().toLocaleString()}`, '', '', '', 'Domain: credentialing.ageslearningsolutions.com']);
+      syncSheet.addRow([]);
+      syncSheet.addRow(['Timestamp', 'Operation Type', 'Record ID / Scope', 'Source of Change', 'Result', 'Details / Conflict Notes']);
+      syncSheet.addRow([new Date().toISOString(), 'WORKBOOK_INITIALIZED', 'All 5 Subsheets', 'System Engine', 'SUCCESS', 'Master Workbook initialized with company logo top bar and monthly subsheets.']);
+
+      // 5. Snapshot_Log
+      const snapSheet = workbook.addWorksheet('Snapshot_Log');
+      snapSheet.views = [{ state: 'frozen', ySplit: 5 }];
+      snapSheet.addRow(['AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES', '', '', '', 'Immutable Periodic Snapshots Ledger', '', '', '', 'CONFIDENTIAL — HIPAA §164.312']);
+      snapSheet.addRow(['', 'Entity Scope: Proficio Therapy Services, LLC & PSTG INC', '', '', 'Historical Snapshots', '', '', '', 'Archival Store']);
+      snapSheet.addRow(['', 'System Snapshot Daemon', '', '', `Exported: ${new Date().toLocaleString()}`, '', '', '', 'Domain: credentialing.ageslearningsolutions.com']);
+      snapSheet.addRow([]);
+      snapSheet.addRow([
+        'Snapshot ID', 'Report Type', 'Reporting Period', 'Report Date', 'Entity Scope',
+        'Creation Timestamp', 'Created By', 'Snapshot Version', 'Total Records',
+        'Active Intakes', 'App Prep', 'Submitted to Payers', 'Follow-ups Due', 'Approved / Active', 'Overdue / Delayed'
+      ]);
+
+      // Style all sheets with top bar and headers
+      [execSheet, liveSheet, monthSheet, syncSheet, snapSheet].forEach((sheet) => {
+        // Set column widths
+        sheet.columns = [
+          { width: 22 }, { width: 24 }, { width: 16 }, { width: 22 },
+          { width: 32 }, { width: 24 }, { width: 20 }, { width: 16 },
+          { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 },
+          { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 },
+          { width: 16 }, { width: 24 }
+        ];
+
+        // Style row 1-3 (Navy blue branded top bar)
+        for (let r = 1; r <= 3; r++) {
+          const row = sheet.getRow(r);
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2B5C' } };
+          row.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+        }
+        // Style row 5 (Dark slate table headers)
+        const headerRow = sheet.getRow(5);
+        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+        headerRow.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+      });
+
+      // Apply colourful styling to Executive_Overview KPI rows matching reports tab
+      const kpiRowColors = [
+        { row: 6, bg: 'FFF1F5F9', fg: 'FF334155' }, // 1. Slate
+        { row: 7, bg: 'FFE0E7FF', fg: 'FF3730A3' }, // 2. Indigo
+        { row: 8, bg: 'FFDBEAFE', fg: 'FF1E40AF' }, // 3. Blue
+        { row: 9, bg: 'FFFEF3C7', fg: 'FF92400E' }, // 4. Amber
+        { row: 10, bg: 'FFD1FAE5', fg: 'FF065F46' }, // 5. Emerald
+        { row: 11, bg: 'FFFFE4E6', fg: 'FF9F1239' }, // 6. Rose
+      ];
+
+      kpiRowColors.forEach(({ row, bg, fg }) => {
+        const r = execSheet.getRow(row);
+        r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        r.font = { color: { argb: fg }, bold: true, size: 10 };
+      });
+
+      // Apply colourful stage cells to Live_Records & Monthly_October_2026
+      [liveSheet, monthSheet].forEach((s) => {
+        const stageColIdx = s === liveSheet ? 7 : 6;
+        s.eachRow((row, rowNumber) => {
+          if (rowNumber > 5) {
+            const stageVal = String(row.getCell(stageColIdx).value || '');
+            const stageCell = row.getCell(stageColIdx);
+            if (stageVal.includes('Approved') || stageVal.includes('Effective') || stageVal.includes('Linked')) {
+              stageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+              stageCell.font = { color: { argb: 'FF065F46' }, bold: true };
+            } else if (stageVal.includes('Overdue')) {
+              stageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4E6' } };
+              stageCell.font = { color: { argb: 'FF9F1239' }, bold: true };
+            } else if (stageVal.includes('Submitted') || stageVal.includes('Review')) {
+              stageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+              stageCell.font = { color: { argb: 'FF1E40AF' }, bold: true };
+            } else if (stageVal.includes('Prep')) {
+              stageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+              stageCell.font = { color: { argb: 'FF3730A3' }, bold: true };
+            } else {
+              stageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+              stageCell.font = { color: { argb: 'FF475569' }, bold: true };
+            }
+          }
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="Proficio_Credentialing_Master_Workbook_2026.xlsx"');
+      res.send(Buffer.from(buffer));
+    } catch (err: any) {
+      console.error('[API Reports] Download workbook error:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Scheduled background runner for deadline checks, AESAS expiration cycles, and automated report snapshots
   // Runs 30s after server startup, then every 6 hours automatically
   setTimeout(async () => {

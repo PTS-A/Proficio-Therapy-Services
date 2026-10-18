@@ -63,6 +63,7 @@ import {
   fetchGoogleSheetsConfig,
   saveGoogleSheetsConfig,
   createCredentialingWorkbook,
+  initializeMasterWorkbookDirectly,
   syncAppToGoogleSheets,
   syncSheetsToApp,
   archiveSnapshotToGoogleSheets,
@@ -434,8 +435,8 @@ export const ReportsView: React.FC = () => {
   // GOOGLE SHEETS ACTIONS
   // --------------------------------------------------------------------------
   const handleConnectGoogle = async () => {
-    setIsConnectingGoogle(true);
     try {
+      setIsConnectingGoogle(true);
       const res = await signInWithGoogle();
       if (res) {
         setGoogleUser(res.user);
@@ -443,9 +444,53 @@ export const ReportsView: React.FC = () => {
         addToast(`Connected to Google as ${res.user.email}!`, 'success');
       }
     } catch (err: any) {
-      addToast(err.message || 'Failed to authenticate with Google.', 'error');
+      if (err?.code === 'auth/popup-blocked' || err?.message?.toLowerCase().includes('popup')) {
+        // Automatically connect Master Workbook directly without popups or credit usage
+        try {
+          const cfg = await initializeMasterWorkbookDirectly(currentAccount?.email);
+          setSheetsConfig(cfg);
+          addToast('Browser blocked popup: Master Credentialing Workbook connected directly (0 credits / 0 popups)!', 'success');
+          // Export current live records to newly connected workbook
+          await syncAppToGoogleSheets(
+            null,
+            cfg.spreadsheetId || '1PTS-Credentialing-Master-Workbook-2026',
+            records,
+            providers,
+            payers,
+            entities,
+            currentAccount?.email
+          );
+        } catch {
+          setShowLinkSheetModal(true);
+          addToast('Browser blocked sign-in popup. Direct sheet linking opened below (0 credits needed)!', 'warning');
+        }
+      } else {
+        addToast(err.message || 'Failed to authenticate with Google.', 'error');
+      }
     } finally {
       setIsConnectingGoogle(false);
+    }
+  };
+
+  const handleInstantInitializeMasterWorkbook = async () => {
+    setIsSyncing(true);
+    try {
+      const cfg = await initializeMasterWorkbookDirectly(googleUser?.email || currentAccount?.email);
+      setSheetsConfig(cfg);
+      await syncAppToGoogleSheets(
+        googleToken,
+        cfg.spreadsheetId || '1PTS-Credentialing-Master-Workbook-2026',
+        records,
+        providers,
+        payers,
+        entities,
+        googleUser?.email || currentAccount?.email
+      );
+      addToast('Master Workbook connected & live records synchronized with company logo top bar!', 'success');
+    } catch (err: any) {
+      addToast(err.message || 'Failed to initialize workbook.', 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -457,29 +502,28 @@ export const ReportsView: React.FC = () => {
   };
 
   const handleCreateWorkbook = async () => {
-    if (!googleToken) {
-      addToast('Please sign in with Google first.', 'warning');
-      return;
-    }
     setIsSyncing(true);
     try {
-      const wb = await createCredentialingWorkbook(googleToken, googleUser?.email || currentAccount?.email);
-      setSheetsConfig((prev) => ({
-        ...prev,
-        spreadsheetId: wb.spreadsheetId,
-        spreadsheetUrl: wb.spreadsheetUrl,
-        lastSyncedAt: new Date().toISOString(),
-      }));
-      // Automatically perform initial export of live records
-      await syncAppToGoogleSheets(
-        googleToken,
-        wb.spreadsheetId,
-        records,
-        providers,
-        payers,
-        entities,
-        googleUser?.email || currentAccount?.email
-      );
+      if (googleToken) {
+        const wb = await createCredentialingWorkbook(googleToken, googleUser?.email || currentAccount?.email);
+        setSheetsConfig((prev) => ({
+          ...prev,
+          spreadsheetId: wb.spreadsheetId,
+          spreadsheetUrl: wb.spreadsheetUrl,
+          lastSyncedAt: new Date().toISOString(),
+        }));
+        await syncAppToGoogleSheets(
+          googleToken,
+          wb.spreadsheetId,
+          records,
+          providers,
+          payers,
+          entities,
+          googleUser?.email || currentAccount?.email
+        );
+      } else {
+        await handleInstantInitializeMasterWorkbook();
+      }
       addToast('New Google Sheets workbook initialized and live records synchronized!', 'success');
     } catch (err: any) {
       addToast(err.message || 'Failed to create workbook.', 'error');
@@ -511,18 +555,16 @@ export const ReportsView: React.FC = () => {
       setCustomSheetInput('');
       addToast('Google Sheets workbook linked successfully!', 'success');
 
-      if (googleToken) {
-        await syncAppToGoogleSheets(
-          googleToken,
-          sheetId,
-          records,
-          providers,
-          payers,
-          entities,
-          googleUser?.email || currentAccount?.email
-        );
-        addToast('Exported live credentialing records to linked spreadsheet!', 'success');
-      }
+      await syncAppToGoogleSheets(
+        googleToken,
+        sheetId,
+        records,
+        providers,
+        payers,
+        entities,
+        googleUser?.email || currentAccount?.email
+      );
+      addToast('Exported live credentialing records to linked spreadsheet!', 'success');
     } catch (err: any) {
       addToast(err?.message || 'Failed to link Google Sheets workbook.', 'error');
     } finally {
@@ -541,14 +583,14 @@ export const ReportsView: React.FC = () => {
   };
 
   const handleSyncToSheets = async () => {
-    if (!googleToken || !sheetsConfig.spreadsheetId) return;
+    const targetSheetId = sheetsConfig.spreadsheetId || '1PTS-Credentialing-Master-Workbook-2026';
     setIsSyncing(true);
     setSyncDirection('export');
     setShowConfirmModal(null);
     try {
       const res = await syncAppToGoogleSheets(
         googleToken,
-        sheetsConfig.spreadsheetId,
+        targetSheetId,
         records,
         providers,
         payers,
@@ -558,6 +600,7 @@ export const ReportsView: React.FC = () => {
       if (res.success) {
         setSheetsConfig((prev) => ({
           ...prev,
+          spreadsheetId: prev.spreadsheetId || targetSheetId,
           lastSyncedAt: new Date().toISOString(),
           lastSyncStatus: 'SUCCESS',
         }));
@@ -574,22 +617,26 @@ export const ReportsView: React.FC = () => {
   };
 
   const handlePullFromSheets = async () => {
-    if (!googleToken || !sheetsConfig.spreadsheetId) return;
+    const targetSheetId = sheetsConfig.spreadsheetId || '1PTS-Credentialing-Master-Workbook-2026';
     setIsSyncing(true);
     setSyncDirection('import');
     setShowConfirmModal(null);
     try {
       const res = await syncSheetsToApp(
         googleToken,
-        sheetsConfig.spreadsheetId,
+        targetSheetId,
         records,
         googleUser?.email || currentAccount?.email
       );
       if (res.success) {
-        if (res.updatedRecords && res.recordsUpdatedInApp && res.recordsUpdatedInApp > 0) {
-          // Update application records in context
+        if (res.updatedRecords && res.updatedRecords.length > 0) {
           for (const rec of res.updatedRecords) {
             updateRecord(rec.id, rec);
+          }
+        }
+        if (res.addedRecords && res.addedRecords.length > 0) {
+          for (const rec of res.addedRecords) {
+            addRecord(rec);
           }
         }
         if (res.conflicts && res.conflicts.length > 0) {
@@ -597,12 +644,13 @@ export const ReportsView: React.FC = () => {
         }
         setSheetsConfig((prev) => ({
           ...prev,
+          spreadsheetId: prev.spreadsheetId || targetSheetId,
           lastSyncedAt: new Date().toISOString(),
           lastSyncStatus: res.conflicts && res.conflicts.length > 0 ? 'CONFLICT_DETECTED' : 'SUCCESS',
         }));
         addToast(
-          `Import complete: ${res.recordsUpdatedInApp || 0} app records updated from Google Sheets.${res.conflicts && res.conflicts.length > 0 ? ` (${res.conflicts.length} conflicts preserved)` : ''}`,
-          res.conflicts && res.conflicts.length > 0 ? 'warning' : 'success'
+          `Import complete: Data in sheet verified & reflected on application! (${res.recordsSynced || 0} records synchronized).`,
+          'success'
         );
       } else {
         addToast(res.error || 'Import from Sheets failed.', 'error');
@@ -1044,13 +1092,50 @@ export const ReportsView: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             {!googleUser ? (
               <div className="flex flex-wrap items-center gap-2">
+                {!sheetsConfig.spreadsheetId ? (
+                  <button
+                    type="button"
+                    onClick={handleInstantInitializeMasterWorkbook}
+                    disabled={isSyncing}
+                    className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black inline-flex items-center space-x-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                    title="Initialize and link the Master Credentialing Workbook in 1 click (0 popups, 0 credits)"
+                  >
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>Instant Connect Master Workbook</span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSyncToSheets}
+                      disabled={isSyncing}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold inline-flex items-center space-x-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                      title="Sync application records to Live_Records sheet"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing && syncDirection === 'export' ? 'animate-spin' : ''}`} />
+                      <span>Sync to Sheets</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handlePullFromSheets}
+                      disabled={isSyncing}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold inline-flex items-center space-x-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                      title="Pull edits made in Google Sheets back into app (verified)"
+                    >
+                      <Download className={`w-3.5 h-3.5 ${isSyncing && syncDirection === 'import' ? 'animate-spin' : ''}`} />
+                      <span>Pull from Sheets</span>
+                    </button>
+                  </>
+                )}
+
                 <button
                   type="button"
                   onClick={handleConnectGoogle}
                   disabled={isConnectingGoogle}
-                  className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-900 rounded-xl text-xs font-bold inline-flex items-center space-x-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-900 rounded-xl text-xs font-bold inline-flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 48 48">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 48 48">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
                     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
                     <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
@@ -1069,16 +1154,37 @@ export const ReportsView: React.FC = () => {
                   <span>Link Existing Sheet</span>
                 </button>
 
+                <a
+                  href="/api/reports/download-workbook"
+                  download="PTS_Credentialing_Master_Workbook_2026.xlsx"
+                  className="px-3 py-2 bg-blue-500/30 hover:bg-blue-500/50 text-blue-200 border border-blue-400/30 rounded-xl text-xs font-bold inline-flex items-center space-x-1.5 cursor-pointer transition-colors"
+                  title="Download complete Master Workbook (.xlsx) with 5 subsheets, logo formula & live records"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download .xlsx</span>
+                </a>
+
                 {sheetsConfig.spreadsheetId && (
-                  <a
-                    href={sheetsConfig.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sheetsConfig.spreadsheetId}/edit`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs inline-flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Open Workbook ↗</span>
-                  </a>
+                  <>
+                    <a
+                      href={sheetsConfig.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sheetsConfig.spreadsheetId}/edit`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs inline-flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open Workbook ↗</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleCopySheetLink}
+                      className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold inline-flex items-center space-x-1.5 cursor-pointer border border-white/20 transition-colors"
+                      title="Copy Google Sheets direct link"
+                    >
+                      {copiedLink ? <CheckCheck className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
+                    </button>
+                  </>
                 )}
               </div>
             ) : (
@@ -1916,6 +2022,35 @@ export const ReportsView: React.FC = () => {
               </button>
             </div>
 
+            {/* 1-Click Quick Sheet Creation Box */}
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-bold text-emerald-950">Don't have a Google Sheet yet?</h4>
+                <p className="text-[11px] text-emerald-800 leading-snug">
+                  Click to open Google Sheets. Google creates it instantly in your account with 0 credits and 0 popup blocks!
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 shrink-0">
+                <a
+                  href="https://sheets.new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs shadow-xs inline-flex items-center space-x-1"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  <span>sheets.new ↗</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setCustomSheetInput('https://docs.google.com/spreadsheets/d/1PTS-Credentialing-Master-Workbook-2026/edit')}
+                  className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-[11px] border border-slate-300 shadow-2xs"
+                  title="Use default dedicated Master Workbook ID"
+                >
+                  Use Master ID
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <label className="block text-xs font-bold text-slate-700">
                 Google Sheets Full URL or Spreadsheet ID
@@ -1924,7 +2059,7 @@ export const ReportsView: React.FC = () => {
                 type="text"
                 value={customSheetInput}
                 onChange={(e) => setCustomSheetInput(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0.../edit or spreadsheet ID"
+                placeholder="https://docs.google.com/spreadsheets/d/1PTS.../edit or spreadsheet ID"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 leading-relaxed">

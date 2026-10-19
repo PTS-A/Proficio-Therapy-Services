@@ -2330,7 +2330,7 @@ async function startServer() {
   app.post(['/api/reports/initialize-workbook', '/api/reports/initialize-workbook/'], async (req, res) => {
     try {
       const { initializeMasterWorkbook } = await import('./server/reportEngine');
-      const config = await initializeMasterWorkbook(req.body?.userEmail);
+      const config = await initializeMasterWorkbook(req.body?.sheetUrlOrId, req.body?.userEmail);
       res.json({ success: true, config });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

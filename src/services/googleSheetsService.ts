@@ -67,7 +67,7 @@ export interface GoogleSheetsConfig {
   createdAt?: string;
   lastSyncedAt?: string | null;
   lastSyncDirection?: 'app_to_sheets' | 'sheets_to_app' | 'two_way';
-  lastSyncStatus?: 'SUCCESS' | 'ERROR' | 'PENDING' | 'CONFLICT_DETECTED';
+  lastSyncStatus?: 'SUCCESS' | 'ERROR' | 'PENDING' | 'PENDING_LINK' | 'NOT_CONFIGURED' | 'CONFLICT_DETECTED';
   lastSyncMessage?: string;
 }
 
@@ -269,12 +269,25 @@ export const saveGoogleSheetsConfig = async (config: Partial<GoogleSheetsConfig>
 /**
  * Initializes and links the Master Credentialing Workbook directly (0 popups, 0 credits)
  */
-export const initializeMasterWorkbookDirectly = async (userEmail?: string): Promise<GoogleSheetsConfig> => {
+export const initializeMasterWorkbookDirectly = async (
+  sheetUrlOrId?: string,
+  userEmail?: string
+): Promise<GoogleSheetsConfig> => {
+  let targetSheetUrlOrId = sheetUrlOrId;
+  let targetEmail = userEmail;
+
+  // Defensive check: If first argument looks like an email address (e.g. user@domain.com) and doesn't contain a URL path,
+  // it was passed as the email argument
+  if (targetSheetUrlOrId && targetSheetUrlOrId.includes('@') && !targetSheetUrlOrId.includes('/')) {
+    targetEmail = targetSheetUrlOrId;
+    targetSheetUrlOrId = undefined;
+  }
+
   try {
     const res = await safeFetchJson<{ success: boolean; config: GoogleSheetsConfig }>('/api/reports/initialize-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userEmail }),
+      body: JSON.stringify({ sheetUrlOrId: targetSheetUrlOrId, userEmail: targetEmail }),
     });
     if (res.success && res.data?.config) {
       localStorage.setItem('pts_google_sheets_config', JSON.stringify(res.data.config));
@@ -284,16 +297,33 @@ export const initializeMasterWorkbookDirectly = async (userEmail?: string): Prom
     console.warn('[GoogleSheetsService] Fallback initializing workbook locally:', err);
   }
 
+  let sheetId: string | null = null;
+  let sheetUrl: string | null = null;
+  if (targetSheetUrlOrId && targetSheetUrlOrId.trim()) {
+    const clean = targetSheetUrlOrId.trim();
+    const match = clean.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) {
+      sheetId = match[1];
+    } else if (clean.length > 20) {
+      sheetId = clean;
+    }
+    if (sheetId) {
+      sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+    }
+  }
+
   const currentYear = new Date().getFullYear();
   const fallbackConfig: GoogleSheetsConfig = {
-    spreadsheetId: '1PTS-Credentialing-Master-Workbook-2026',
-    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1PTS-Credentialing-Master-Workbook-2026/edit',
+    spreadsheetId: sheetId,
+    spreadsheetUrl: sheetUrl,
     sheetTitle: `Proficio Therapy Services — Credentialing Master Workbook (${currentYear})`,
     createdAt: new Date().toISOString(),
-    lastSyncedAt: new Date().toISOString(),
+    lastSyncedAt: sheetId ? new Date().toISOString() : null,
     lastSyncDirection: 'two_way',
-    lastSyncStatus: 'SUCCESS',
-    lastSyncMessage: 'Master Workbook directly initialized with company logo top bar and monthly subsheets.',
+    lastSyncStatus: sheetId ? 'SUCCESS' : 'PENDING_LINK',
+    lastSyncMessage: sheetId
+      ? 'Master Workbook linked with company logo top bar and monthly subsheets.'
+      : 'Ready to link your Google Sheet. Click "Create Sheet (sheets.new)" to open a new sheet, then paste its link.',
   };
   localStorage.setItem('pts_google_sheets_config', JSON.stringify(fallbackConfig));
   return fallbackConfig;
@@ -438,6 +468,127 @@ export const getBrandedTopBarValues = (
     ],
     ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''] // Row 4 spacer
   ];
+};
+
+/**
+ * Prepares ready-to-paste TSV formatted data for Google Sheets
+ * When pasted into cell A1 of a new Google Sheet (e.g. from sheets.new),
+ * it immediately renders the company logo formula, executive header, and all records!
+ */
+export const generateClipboardFormattedTsv = (
+  records: CredentialingRecord[],
+  providers: Provider[],
+  payers: Payer[],
+  entities: LegalEntity[]
+): string => {
+  const lines: string[] = [];
+  const timestamp = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+  // Row 1: Logo formula & Header
+  lines.push([
+    COMPANY_LOGO_SHEET_FORMULA,
+    'AGES LEARNING SOLUTIONS & PROFICIO THERAPY SERVICES',
+    '',
+    '',
+    'Executive Credentialing Management System',
+    '',
+    '',
+    '',
+    'CONFIDENTIAL — HIPAA §164.312',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    ''
+  ].join('\t'));
+
+  // Row 2: Entity Scope
+  lines.push([
+    '',
+    'Entity Scope: Proficio Therapy Services, LLC & PSTG INC',
+    '',
+    '',
+    'Subsheet: Live_Records',
+    '',
+    '',
+    '',
+    'Two-Way Synchronized Application Master',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    ''
+  ].join('\t'));
+
+  // Row 3: Metadata
+  lines.push([
+    '',
+    'Master Spreadsheet Architecture • 5 Subsheets',
+    '',
+    '',
+    `Exported: ${timestamp}`,
+    '',
+    '',
+    '',
+    'Domain: https://credentialing.ageslearningsolutions.com/',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    ''
+  ].join('\t'));
+
+  // Row 4: Spacer
+  lines.push(new Array(18).fill('').join('\t'));
+
+  // Row 5: Headers
+  lines.push(LIVE_RECORDS_HEADERS.join('\t'));
+
+  // Row 6..N: Records
+  records.forEach((r) => {
+    const prov = providers.find((p) => p.id === r.providerId);
+    const pay = payers.find((p) => p.id === r.payerId);
+    const ent = entities.find((e) => e.id === r.entityId);
+
+    const provName = prov ? ((prov as any).fullName || `${prov.firstName} ${prov.lastName}`) : (r as any).providerName || 'Clinician';
+    const entName = ent?.dba || ent?.legalName || (r as any).entityName || 'Proficio Therapy Services, LLC';
+    const payName = pay?.name || (r as any).payerName || 'Payer Panel';
+
+    lines.push([
+      r.id,
+      provName,
+      prov?.npi || (r as any).npi || '',
+      r.discipline || 'Speech',
+      entName,
+      payName,
+      r.stage || 'Intake',
+      r.submissionDate || '',
+      r.approvalDate || '',
+      r.effectiveDate || '',
+      r.expirationDate || '',
+      r.daysInCurrentStage || 0,
+      r.nextFollowUpDate || '',
+      r.intakeDate || '',
+      r.providerId || '',
+      r.entityId || '',
+      r.payerId || '',
+      r.updatedAt || new Date().toISOString(),
+    ].join('\t'));
+  });
+
+  return lines.join('\n');
 };
 
 /**
@@ -1120,6 +1271,52 @@ export const syncAppToGoogleSheets = async (
 };
 
 /**
+ * Robust CSV parser that handles quotes, escaped characters, and newlines
+ */
+export const parseCsvRows = (csvText: string): string[][] => {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentVal = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
+    const nextChar = csvText[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        currentVal += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      currentRow.push(currentVal.trim());
+      currentVal = '';
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+      currentRow.push(currentVal.trim());
+      if (currentRow.length > 0 && currentRow.some((c) => c !== '')) {
+        rows.push(currentRow);
+      }
+      currentRow = [];
+      currentVal = '';
+    } else {
+      currentVal += char;
+    }
+  }
+  if (currentVal || currentRow.length > 0) {
+    currentRow.push(currentVal.trim());
+    if (currentRow.some((c) => c !== '')) {
+      rows.push(currentRow);
+    }
+  }
+  return rows;
+};
+
+/**
  * Pulls edits made directly in Google Sheets (Live_Records) and applies them back to application
  * Ensures data in the sheet is accurately reflected on the application!
  */
@@ -1133,15 +1330,35 @@ export const syncSheetsToApp = async (
     const timestamp = new Date().toISOString();
     let rawRows: any[][] = [];
 
+    // 1. If Google OAuth token is available, read directly via Google Sheets API v4
     if (token) {
       try {
         rawRows = await getSheetValues(token, spreadsheetId, 'Live_Records!A6:R1000');
       } catch (err) {
-        console.warn('[GoogleSheetsService] Could not read directly from Google Sheets API, checking server sync:', err);
+        console.warn('[GoogleSheetsService] Could not read directly from Google Sheets API, checking alternative:', err);
       }
     }
 
-    // If token not present or direct read returned empty, check server sync data
+    // 2. If token absent or returned empty, attempt to read via public Google Sheets CSV export (0 credits, 0 OAuth)
+    if ((!rawRows || rawRows.length === 0) && spreadsheetId && spreadsheetId.length > 20 && !spreadsheetId.startsWith('1PTS-')) {
+      try {
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Live_Records`;
+        const resp = await fetch(csvUrl);
+        if (resp.ok) {
+          const csvText = await resp.text();
+          const parsed = parseCsvRows(csvText);
+          if (parsed && parsed.length >= 6) {
+            // Rows 1-5 are logo formula top bar & headers; Row 6 onwards is live records
+            rawRows = parsed.slice(5);
+            console.log(`[GoogleSheetsService] Successfully parsed ${rawRows.length} rows directly from Google Sheet CSV export.`);
+          }
+        }
+      } catch (csvErr) {
+        console.warn('[GoogleSheetsService] Public CSV fetch skipped:', csvErr);
+      }
+    }
+
+    // 3. Fallback: Check server sync engine cache
     if (!rawRows || rawRows.length === 0) {
       const serverRes = await safeFetchJson<{ success: boolean; data?: any; records?: any[] }>('/api/reports/sheet-data');
       if (serverRes.success && (serverRes.data?.data?.records || serverRes.data?.records)) {

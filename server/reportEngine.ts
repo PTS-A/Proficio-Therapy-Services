@@ -386,8 +386,8 @@ export async function getMasterWorkbookSyncData(): Promise<MasterSheetSyncPayloa
   } catch (e) {}
 
   return {
-    spreadsheetId: '1PTS-Credentialing-Master-Workbook-2026',
-    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1PTS-Credentialing-Master-Workbook-2026/edit',
+    spreadsheetId: null,
+    spreadsheetUrl: null,
     records: [],
     lastSyncedAt: new Date().toISOString(),
     lastSyncDirection: 'app_to_sheets',
@@ -411,20 +411,22 @@ export async function saveMasterWorkbookSyncData(payload: Partial<MasterSheetSyn
     console.warn('[ReportEngine] Failed to write sync data file:', e);
   }
 
-  // Also update report_config.json
-  await saveReportConfig({
-    spreadsheetId: updated.spreadsheetId,
-    spreadsheetUrl: updated.spreadsheetUrl,
-    lastSyncedAt: updated.lastSyncedAt,
-    lastSyncDirection: updated.lastSyncDirection,
-    lastSyncStatus: 'SUCCESS',
-    lastSyncMessage: `Synchronized ${updated.records.length} records.`,
-  });
+  // Also update report_config.json if a valid spreadsheet ID exists
+  if (updated.spreadsheetId) {
+    await saveReportConfig({
+      spreadsheetId: updated.spreadsheetId,
+      spreadsheetUrl: updated.spreadsheetUrl,
+      lastSyncedAt: updated.lastSyncedAt,
+      lastSyncDirection: updated.lastSyncDirection,
+      lastSyncStatus: 'SUCCESS',
+      lastSyncMessage: `Synchronized ${updated.records.length} records.`,
+    });
+  }
 
   return updated;
 }
 
-export async function initializeMasterWorkbook(userEmail?: string): Promise<StoredReportConfig> {
+export async function initializeMasterWorkbook(sheetUrlOrId?: string, userEmail?: string): Promise<StoredReportConfig> {
   const currentYear = new Date().getFullYear();
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -432,8 +434,22 @@ export async function initializeMasterWorkbook(userEmail?: string): Promise<Stor
   ];
   const currentMonthName = monthNames[new Date().getMonth()];
   const currentMonthSheetTitle = `Monthly_${currentMonthName}_${currentYear}`;
-  const spreadsheetId = '1PTS-Credentialing-Master-Workbook-2026';
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+  
+  let spreadsheetId: string | null = null;
+  let spreadsheetUrl: string | null = null;
+
+  if (sheetUrlOrId && sheetUrlOrId.trim()) {
+    let clean = sheetUrlOrId.trim();
+    const match = clean.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) {
+      spreadsheetId = match[1];
+    } else if (clean.length > 20) {
+      spreadsheetId = clean;
+    }
+    if (spreadsheetId) {
+      spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+    }
+  }
 
   const config = await saveReportConfig({
     spreadsheetId,
@@ -442,10 +458,13 @@ export async function initializeMasterWorkbook(userEmail?: string): Promise<Stor
     createdAt: new Date().toISOString(),
     lastSyncedAt: new Date().toISOString(),
     lastSyncDirection: 'two_way',
-    lastSyncStatus: 'SUCCESS',
-    lastSyncMessage: `Directly initialized Master Workbook with company logo top bar and subsheets: Executive_Overview, Live_Records, ${currentMonthSheetTitle}, Sync_Log, Snapshot_Log.`,
+    lastSyncStatus: spreadsheetId ? 'SUCCESS' : 'PENDING_LINK',
+    lastSyncMessage: spreadsheetId
+      ? `Linked Master Workbook with company logo top bar and subsheets: Executive_Overview, Live_Records, ${currentMonthSheetTitle}, Sync_Log, Snapshot_Log.`
+      : 'Ready to link your Google Sheet. Paste your Google Sheet URL or click sheets.new to link.',
   });
 
   return config;
 }
+
 

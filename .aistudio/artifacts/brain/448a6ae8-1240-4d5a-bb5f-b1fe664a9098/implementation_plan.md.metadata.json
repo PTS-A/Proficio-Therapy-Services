@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan to attach the user's provided Weekly and Monthly Google Sheets directly to the application, remove manual OAuth sign-in popups, and integrate a unified Sheets management bar in the Reports view with branded layouts, logo formula, and two-way sync options.",
+  "updatedAt": "2026-10-20T11:02:26.924579989Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

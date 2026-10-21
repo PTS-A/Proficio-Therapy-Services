@@ -34,6 +34,7 @@ export interface DedicatedSheetConfig {
   lastSyncedAt?: string | null;
   lastSyncStatus?: string;
   lastSyncMessage?: string;
+  webhookUrl?: string | null;
 }
 
 export interface StoredReportConfig {
@@ -47,6 +48,9 @@ export interface StoredReportConfig {
   lastSyncMessage?: string;
   weeklySheet?: DedicatedSheetConfig;
   monthlySheet?: DedicatedSheetConfig;
+  weeklyWebhookUrl?: string | null;
+  monthlyWebhookUrl?: string | null;
+  defaultWebhookUrl?: string | null;
 }
 
 export interface StoredSnapshot {

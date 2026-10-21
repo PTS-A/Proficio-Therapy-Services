@@ -1,62 +1,72 @@
-# Dedicated Weekly & Monthly Google Sheets Integration
+# Automated Google Sheets Sync & Multi-Month Subsheet Architecture
 
-Integrate the user's two dedicated Google Sheets directly into the credentialing system (Weekly: `1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8`, Monthly: `1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg`), remove friction from OAuth sign-in popups and manual attachment forms, and provide a unified dual-sheet management bar in the Reports view.
+Directly synchronize live credentialing database records into your designated Weekly (`1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8`) and Monthly (`1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg`) Google Sheets, implementing the exact multi-tab structure from your reference templates (`1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw` and `1gN_yYaNDtxps8_VEYvn0O83SmolKIsgiT_W3cVhIIT8`) with zero manual copy-paste.
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The two Google Sheets provided by the user are now the official, permanent endpoints for weekly and monthly reports. Manual Google sign-in popups and link input modals will be replaced by direct 1-click sync and open actions.
+> Template data will NOT be imported. The live database records currently in the system will completely replace all sheet rows while adopting the exact multi-tab layout and formulas from your reference templates. All manual copy-paste is removed in favor of 1-click automated synchronization.
 
-- **Weekly Report Sheet**: Attached permanently to `https://docs.google.com/spreadsheets/d/1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8/edit`.
-- **Monthly Report Sheet**: Attached permanently to `https://docs.google.com/spreadsheets/d/1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg/edit`.
-- **Authentication & Attachment Friction**: All manual Google sign-in buttons (`signInWithPopup`), domain restriction warnings, and manual URL input modals are removed from the default workflow. Both sheets are attached automatically.
-- **Branded Layout & Data Formatting**: Both sheets will be formatted with the official Proficio Therapy Services dark-navy top bar, live `=IMAGE(...)` company logo formula in row 1, color-coded stage status badges (#d1fae5 for Approved, #fef3c7 for Submitted, #fee2e2 for Delayed), and complete clinician roster records.
-- **Permission Strategy**: Configured for immediate synchronization under "Anyone with link" and prepared for future organizational restriction with 1-click formatted clipboard sync as a fail-safe.
+- **Destination Sheets (Permanently Linked)**:
+  - **Weekly Report Workbook**: `https://docs.google.com/spreadsheets/d/1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8/edit`
+  - **Monthly Report Workbook**: `https://docs.google.com/spreadsheets/d/1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg/edit`
+- **Reference Templates (Structural Blueprint Only)**:
+  - **Weekly Template**: `https://docs.google.com/spreadsheets/d/1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw/edit`
+  - **Monthly Template**: `https://docs.google.com/spreadsheets/d/1gN_yYaNDtxps8_VEYvn0O83SmolKIsgiT_W3cVhIIT8/edit`
+- **Multi-Tab Architecture Generated in Each Workbook**:
+  1. **`About`**: Purpose, Family of Companies breakdown (AGES Learning Solutions, Proficio Speech Therapy Group, Child's Play Therapy Services), workbook contents index, data dictionary, and HIPAA §164.312 classification. Prepared by Joel Mathew Reji.
+  2. **`Dashboard`**: Formula-driven KPI summary cards, stage breakdown, practice entity metrics, discipline breakdown, and payer distributions.
+  3. **`Weekly Report` / `Monthly Report`**: Full 19-column master register with stage color-coding (#d1fae5 Approved, #fef3c7 Submitted, #fee2e2 Overdue/Delayed) populated directly from the live application database.
+  4. **Dynamic Active Month Subsheets (`[Month Year]`)**: Automatically generated for each month with active follow-ups/reviews in the database (e.g. `Oct 2026`, `Jun 2026`, `Jul 2026`).
+  5. **`No Follow-Up`**: Dedicated queue sheet for Approved/Linked records with no follow-up scheduled.
+- **Automated Direct Synchronization Engine (Zero Copy-Paste)**:
+  - You deploy a lightweight, pre-configured Google Apps Script Web App bound to your target spreadsheets (setup takes ~60 seconds via `Extensions > Apps Script`).
+  - Clicking **"Auto-Sync to Google Sheets"** pushes the full multi-tab JSON payload directly from the software into your sheets, writing all subsheets, formulas, and formatting in the background.
 
 ---
 
 ### 1. Overview & Core Concept
 
-- **What It Delivers**: Direct, native attachment of the user's two Google Sheets into the Reports dashboard. A single, unified Google Sheets command bar at the top of the Reports view gives one-click access to open, sync, and copy formatted data for both Weekly Status and Monthly Review reporting.
-- **Target Audience**: Credentialing coordinators, operations directors, and executive leadership who need instant visibility across weekly operational cadences and monthly payer enrollment milestones.
-- **Key Value**: Zero sign-in errors, zero popup blocks, zero manual copying of sheet IDs, and immediate access to cleanly branded Google Sheets with company logo and live status colors.
+- **What It Delivers**: Replaces manual clipboard operations with an automated pipeline. Live credentialing records in the software are structured into your official 5+ tab format and published directly into your Google Sheets on demand or on schedule.
+- **Target Persona**: Joel Mathew Reji and Credentialing Operations leads who need the Google Sheets to stay 100% synchronized with live database state without tedious copy-paste.
+- **Key Value**: Zero data-entry errors, dynamic month subsheets reflecting actual operational queues, and total structural fidelity to your reference templates.
 
 ---
 
 ### 2. User Experience & Visual Design
 
-- **Unified Sheets Bar in Reports View**:
-  - Replaces the generic single-sheet banner with an executive dual-card command bar.
-  - **Left Station — Weekly Status Workbook**:
-    - Status badge: `Attached & Active` (Emerald)
-    - Action 1: `Open Weekly Sheet ↗` (direct link to `1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8`)
-    - Action 2: `Sync Weekly Records` (triggers direct export of weekly cadence data)
-    - Action 3: `Copy Weekly Data` (copies ready-to-paste TSV with logo formula and weekly records)
-  - **Right Station — Monthly Review Workbook**:
-    - Status badge: `Attached & Active` (Blue)
-    - Action 1: `Open Monthly Sheet ↗` (direct link to `1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg`)
-    - Action 2: `Sync Monthly Records` (triggers direct export of monthly review snapshot)
-    - Action 3: `Copy Monthly Data` (copies ready-to-paste TSV with logo formula, KPI cards, and monthly records)
-  - **Universal Download**: Quick button to download complete multi-tab `.xlsx` workbook containing both Weekly and Monthly sheets.
-- **Master Workbook (Live Sheet) In-App View**:
-  - Updates the in-app interactive spreadsheet viewer with dedicated sub-sheet tabs for `Weekly_Cadence` and `Monthly_Review`, allowing users to inspect both datasets directly inside the software without leaving the tab.
-- **Visual Palette & Typography**:
-  - Header: Deep Navy (`#0f2b5c`) with crisp white typography and logo emblem.
-  - KPI & Stage Statuses: Pastel fills with high-contrast text conforming to WCAG AA (Approved: `#d1fae5` / `#065f46`, In Review: `#fef3c7` / `#92400e`, Overdue: `#fee2e2` / `#991b1b`).
-  - Numbers: Strictly tabular monospace (`tabular-nums font-mono`) for exact alignment.
+- **Unified Google Sheets Command Bar**:
+  - Located at the top of the **Reports** view.
+  - **Weekly Station**:
+    - Title: `Weekly Status Workbook`
+    - Target: `1Iw3o7...Lx8`
+    - Actions: `Open Weekly Sheet ↗`, `1-Click Auto-Sync`, `Webhook Settings`
+  - **Monthly Station**:
+    - Title: `Monthly Review Workbook`
+    - Target: `1x1EJw...rZg`
+    - Actions: `Open Monthly Sheet ↗`, `1-Click Auto-Sync`, `Webhook Settings`
+  - **Live Sheet View**: Switches to in-app multi-tab viewer.
+  - **Download .xlsx**: Universal multi-tab Excel download matching the template structure.
+- **In-App Interactive Spreadsheet Viewer**:
+  - Tab navigation matching Google Sheets: `About` | `Dashboard` | `Weekly/Monthly Report` | `Oct 2026` | `Jun 2026` | `No Follow-Up`.
+  - Formatted navy top bar with company logo and live stage status badges.
+- **1-Click Webhook Setup Modal**:
+  - Provides a single copyable Google Apps Script file (`Code.gs`) that handles creating/updating tabs, setting cell formulas, and formatting colors.
+  - Input field to save your Webhook URL with instant connection test.
 
 ---
 
 ### 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Dual Pre-Configured Endpoints vs. Single Sheet**:
-  - *Chosen Approach*: Store both `weeklySheet` and `monthlySheet` explicitly in the system configuration (`report_config.json` and client state).
-  - *Why*: The user maintains distinct operational rhythms for weekly follow-up reviews and monthly executive summaries; separating them into dedicated workbooks prevents clutter and data collisions.
-- **Decision 2: Removal of OAuth Sign-In Friction**:
-  - *Chosen Approach*: Completely bypass `signInWithPopup` and domain authorization checks by treating the user's provided URLs as pre-authorized application endpoints.
-  - *Why*: Eliminates `auth/unauthorized-domain` and `auth/popup-blocked` errors permanently.
-- **Decision 3: Two-Tier Data Sync (Direct API / GViz + 1-Click Clipboard)**:
-  - *Chosen Approach*: Implement direct sheet sync when permissions allow (`Anyone with link`), with an instant "Copy Ready-to-Paste Formatted Data" clipboard feature that guarantees 100% data integrity even if the sheet becomes restricted to organization email in the future.
+- **Decision 1: Direct Apps Script Webhook vs. In-Browser Manual Copy-Paste**:
+  - *Chosen Approach*: Apps Script Webhook endpoint.
+  - *Why*: Eliminates the manual copy-paste friction you identified while avoiding OAuth domain restrictions in preview environments.
+- **Decision 2: Dynamic Follow-Up Month Subsheets vs. Static 12 Months**:
+  - *Chosen Approach*: Scan live records and dynamically generate subsheets only for active months (e.g. `Oct 2026`, `Jun 2026`), plus `No Follow-Up`.
+  - *Why*: Exactly reflects your template design and ensures coordinators only see relevant monthly follow-up queues.
+- **Decision 3: Replacing Template Sample Data with Database Records**:
+  - *Chosen Approach*: The application database records replace all row data on sync.
+  - *Why*: Ensures the sheet is an exact reflection of the software database at all times.
 
 ---
 
@@ -67,50 +77,38 @@ Integrate the user's two dedicated Google Sheets directly into the credentialing
 │                        Reports Dashboard View                          │
 │                                                                        │
 │   ┌────────────────────────────────────────────────────────────────┐   │
-│   │           Unified Sheets Bar (Attached Workbooks)              │   │
+│   │        Unified Sheets Command Bar (Auto-Sync Webhook)          │   │
 │   │                                                                │   │
 │   │   [Weekly Workbook: 1Iw3o7...Lx8]    [Monthly: 1x1EJw...rZg]   │   │
 │   │    • Open Weekly Sheet ↗              • Open Monthly Sheet ↗   │   │
-│   │    • Sync Weekly Records              • Sync Monthly Records   │   │
-│   │    • Copy Weekly TSV                  • Copy Monthly TSV       │   │
+│   │    • 1-Click Auto-Sync                • 1-Click Auto-Sync      │   │
+│   │    • Status: Connected                • Status: Connected      │   │
 │   └────────────────────────────────────────────────────────────────┘   │
 │                                                                        │
-│   ┌─────────────────┐ ┌──────────────────┐ ┌───────────────────────┐   │
-│   │ Weekly Tab View │ │ Monthly Tab View │ │ Master Sheet Live Tab │   │
-│   └─────────────────┘ └──────────────────┘ └───────────────────────┘   │
+│   ┌───────┐ ┌───────────┐ ┌───────────────┐ ┌──────────┐ ┌───────────┐ │
+│   │ About │ │ Dashboard │ │ Weekly Report │ │ Oct 2026 │ │ No Follow │ │
+│   └───────┘ └───────────┘ └───────────────┘ └──────────┘ └───────────┘ │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │
+                                    │ Automated POST Payload
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   Data Formatting & Service Engine                     │
+│             Google Apps Script Webhook Engine (/exec POST)             │
 │                                                                        │
-│   • generateWeeklySheetTsv()   -> Branded Navy Bar + Weekly Records    │
-│   • generateMonthlySheetTsv()  -> Branded Navy Bar + Monthly Review    │
-│   • report_config.json         -> Persisted weekly & monthly IDs       │
-│   • /api/reports/sync-sheets   -> Direct push / download endpoints     │
+│   1. Generates "About" tab with entity scopes & Joel Mathew Reji meta  │
+│   2. Generates "Dashboard" tab with KPI cards & stage breakdowns       │
+│   3. Populates "Weekly/Monthly Report" with live database records      │
+│   4. Partitions records into active Month Subsheets (Oct 2026, etc.)   │
+│   5. Populates "No Follow-Up" queue for unassigned/approved records    │
+│   6. Applies #d1fae5 / #fef3c7 / #fee2e2 stage colors & column widths │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Direct Spreadsheet Write
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│              Live Google Sheets (Weekly & Monthly Workbooks)           │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Configuration Schema (`report_config.json`)**:
-  ```json
-  {
-    "weeklySheet": {
-      "spreadsheetId": "1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8",
-      "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8/edit",
-      "title": "Proficio Therapy Services — Weekly Credentialing Status Workbook",
-      "lastSyncedAt": null
-    },
-    "monthlySheet": {
-      "spreadsheetId": "1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg",
-      "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg/edit",
-      "title": "Proficio Therapy Services — Monthly Credentialing Review Workbook",
-      "lastSyncedAt": null
-    }
-  }
-  ```
-- **Event Handlers & Interactivity**:
-  - `handleOpenWeeklySheet`: Opens the weekly sheet in a new tab.
-  - `handleOpenMonthlySheet`: Opens the monthly sheet in a new tab.
-  - `handleCopyWeeklyData`: Copies formatted weekly TSV (including `=IMAGE("...")` formula in cell A1 and all records).
-  - `handleCopyMonthlyData`: Copies formatted monthly TSV (including `=IMAGE("...")` formula and monthly breakdown).
-  - `handleSyncWeeklySheet` / `handleSyncMonthlySheet`: Syncs data directly and updates timestamp.
+- **Payload Structure**:
+  - Tab definitions, header metadata, KPI summary objects, row data mapped to the 19 standard columns, and styling parameters.
+- **Fallback Capability**:
+  - If the Webhook is not yet configured, the system provides 1-click clipboard and multi-tab `.xlsx` download to prevent workflow interruption.

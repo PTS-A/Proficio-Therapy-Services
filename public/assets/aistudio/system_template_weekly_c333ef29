@@ -1,0 +1,59 @@
+,,,,,
+,,,Weekly Credentialing Status Workbook,,
+,,,,,
+,,,Weekly status report • AGES Learning Solutions & Proficio Therapy Services,,
+,,,CONFIDENTIAL — HIPAA §164.312,,
+,,,,,
+,,,,,
+,,,,,
+,,,,,
+,ABOUT THIS WORKBOOK,,,,
+,Purpose,"Consolidated clinician–payer credentialing status reporting across the Proficio Therapy family of companies, based on the weekly status export.",,,
+,Organization,"Proficio Therapy Services — Family of Companies (ABA, Speech and OT practices)",,,
+,Reporting Period,Week 3 • Current Year 2026,,,
+,Exported,"Oct 20, 2026, 4:52 PM",,,
+,Entity Scope,"Proficio Therapy Services, LLC & PSTG INC",,,
+,Data Source,Two-Way Synchronized Application Master (Google Sheets export: Weekly_Report.xlsx),,,
+,Sheet ID,1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8,,,
+,Classification,CONFIDENTIAL — HIPAA §164.312,,,
+,Total Records,127,,,
+,Prepared By,Joel Mathew Reji,,,
+,,,,,
+,FAMILY OF COMPANIES,,,,
+,Legal Entity,Practice,Description,Entity ID,Records
+,AGES Learning Solutions (A.G.E.S.),ABA Practice,Applied Behavior Analysis,ent-1,97
+,Proficio Speech Therapy Group Inc.,Speech Practice,Speech-language therapy,ent-pstg-inc,10
+,"Child's Play Therapy Services, PC",OT Practice,Occupational therapy,ent-3,20
+,,,,,
+,WORKBOOK CONTENTS,,,,
+,Sheet,Description,,,Records
+,About,"This page — overview, entities, contents and data dictionary",,,—
+,Dashboard,"KPI cards, stage / entity / discipline / month / payer breakdowns and charts (all formula-driven)",,,—
+,Weekly Report,Full weekly credentialing status register with filters and stage colour-coding,,,127
+,Jun 2026,Follow-up queue — Next Follow-Up in June 2026,,,4
+,Jul 2026,Follow-up queue — Next Follow-Up in July 2026,,,2
+,Oct 2026,Follow-up queue — Next Follow-Up in October 2026,,,40
+,No Follow-Up,Linked and Approved records with no follow-up date set,,,81
+,,,,,
+,DATA DICTIONARY,,,,
+,Record ID,Unique application identifier (APP-YYYY-NNNN),,,
+,Clinician Name,Clinician the application belongs to; one clinician can have several payer applications,,,
+,NPI,"National Provider Identifier; ""—"" where not yet captured",,,
+,Discipline,"ABA, Speech or OT",,,
+,Legal Entity,Practice entity that submits the application,,,
+,Payer Name,Insurance payer / health plan,,,
+,Stage (Col G),"Current pipeline stage: Intake, Linked, Application Submitted, Approved or Overdue",,,
+,Submission / Approval / Effective / Expiration Date,"Application lifecycle dates; ""—"" where not yet recorded",,,
+,Days in Stage,Days the record has been in its current stage,,,
+,Next Follow-Up,"Scheduled follow-up date; ""—"" when none is set",,,
+,Intake Date,Date the record entered the pipeline,,,
+,Stage Classification,Stage label repeated for classification reporting,,,
+,Entity ID / Payer ID,System identifiers for the entity and payer,,,
+,Last Synchronized,Timestamp (UTC) of the last two-way sync with the master sheet,,,
+,Follow-Up Month,"Added in this workbook — month of Next Follow-Up, or ""None""; drives the month sheets",,,
+,,,,,
+,NOTES,,,,
+,"•  Every count in this workbook is calculated from the row data. The summary line printed in the original export (e.g. ""Follow-ups Due: 120"") does not reconcile with the rows, so it was replaced with live formulas.",,,,
+,•  Month sheets are filtered snapshots of the Weekly Report. Re-filter or re-export if the source data changes.,,,,
+,,,,,
+,Documented and created by Joel Mathew Reji,,,,

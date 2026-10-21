@@ -1,26 +1,29 @@
 {
   "weeklySheet": {
-    "spreadsheetId": "1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8",
-    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8/edit",
+    "spreadsheetId": "1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw/edit",
     "sheetTitle": "Proficio Therapy Services — Weekly Credentialing Status Workbook",
     "lastSyncedAt": "2026-10-20T04:00:00.000Z",
     "lastSyncStatus": "SUCCESS",
     "lastSyncMessage": "Weekly Google Sheet attached directly with company logo formula and live records."
   },
   "monthlySheet": {
-    "spreadsheetId": "1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg",
-    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg/edit",
+    "spreadsheetId": "1gN_yYaNDtxps8_VEYvn0O83SmolKIsgiT_W3cVhIIT8",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1gN_yYaNDtxps8_VEYvn0O83SmolKIsgiT_W3cVhIIT8/edit",
     "sheetTitle": "Proficio Therapy Services — Monthly Credentialing Review Workbook",
     "lastSyncedAt": "2026-10-20T04:00:00.000Z",
     "lastSyncStatus": "SUCCESS",
     "lastSyncMessage": "Monthly Google Sheet attached directly with company logo formula and executive review metrics."
   },
-  "spreadsheetId": "1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8",
-  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8/edit",
+  "spreadsheetId": "1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw",
+  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw/edit",
   "sheetTitle": "Proficio Therapy Services — Credentialing Master Workbook (2026)",
   "createdAt": "2026-10-18T12:00:00.000Z",
   "lastSyncedAt": "2026-10-20T04:00:00.000Z",
   "lastSyncDirection": "two_way",
   "lastSyncStatus": "SUCCESS",
-  "lastSyncMessage": "Weekly and Monthly workbooks attached directly. 0 popups, 0 sign-in required."
+  "lastSyncMessage": "Weekly and Monthly workbooks attached directly. Automated 1-Click Sync enabled.",
+  "weeklyWebhookUrl": null,
+  "monthlyWebhookUrl": null,
+  "defaultWebhookUrl": null
 }

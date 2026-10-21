@@ -34,10 +34,15 @@ import { safeFetchJson } from '../utils/safeFetch';
 const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const firebaseAuth = getAuth(firebaseApp);
 
-// Configure Google Auth Provider with Workspace Sheets & Drive scopes
+export const GOOGLE_WORKSPACE_SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+];
+
+// Configure Google Auth Provider with Workspace Sheets scope
 const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+GOOGLE_WORKSPACE_SCOPES.forEach((scope) => {
+  googleProvider.addScope(scope);
+});
 googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
@@ -67,22 +72,23 @@ export interface DedicatedSheetItem {
   lastSyncedAt?: string | null;
   lastSyncStatus?: 'SUCCESS' | 'ERROR' | 'PENDING' | 'ATTACHED';
   lastSyncMessage?: string;
+  webhookUrl?: string | null;
 }
 
 export const USER_ATTACHED_WEEKLY_SHEET: DedicatedSheetItem = {
-  spreadsheetId: '1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8',
-  spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1Iw3o7DNPxCkA5ZBaGoJ9w0a4FuExzz6uF9RwKjCoLx8/edit',
+  spreadsheetId: '1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw',
+  spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1tQu_HAFaUi8uePJIvkuBJ70Xw6e4AZecoFMBSHZ8eXw/edit?usp=sharing',
   sheetTitle: 'Proficio Therapy Services — Weekly Credentialing Status Workbook',
   lastSyncStatus: 'ATTACHED',
-  lastSyncMessage: 'Attached directly for weekly reporting (0 popups, 0 sign-in required).',
+  lastSyncMessage: 'Attached directly for weekly reporting with dynamic active month subsheets.',
 };
 
 export const USER_ATTACHED_MONTHLY_SHEET: DedicatedSheetItem = {
-  spreadsheetId: '1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg',
-  spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1x1EJw6VaUJZq5pfxw_ew7LDRab3qolVclrbhstC1rZg/edit',
+  spreadsheetId: '1gN_yYaNDtxps8_VEYvn0O83SmolKIsgiT_W3cVhIIT8',
+  spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1gN_yYaNDtxps8_VEYvn0O83SmolKIsgiT_W3cVhIIT8/edit?usp=sharing',
   sheetTitle: 'Proficio Therapy Services — Monthly Credentialing Review Workbook',
   lastSyncStatus: 'ATTACHED',
-  lastSyncMessage: 'Attached directly for monthly reporting (0 popups, 0 sign-in required).',
+  lastSyncMessage: 'Attached directly for monthly reporting with dynamic active month subsheets.',
 };
 
 export interface GoogleSheetsConfig {
@@ -96,6 +102,9 @@ export interface GoogleSheetsConfig {
   lastSyncMessage?: string;
   weeklySheet?: DedicatedSheetItem;
   monthlySheet?: DedicatedSheetItem;
+  weeklyWebhookUrl?: string | null;
+  monthlyWebhookUrl?: string | null;
+  defaultWebhookUrl?: string | null;
 }
 
 export interface ReportSnapshot {
@@ -2059,3 +2068,358 @@ export const saveReportSnapshot = async (
 
   return savedSnapshot;
 };
+
+/**
+ * Dispatches an automated 1-click sync to Google Sheets via Google Apps Script Webhook.
+ * Pushes all subsheets: About, Dashboard, Master Register, Active Month Subsheets, and No Follow-Up.
+ */
+export const syncToGoogleSheetsViaWebhook = async (
+  reportType: 'weekly' | 'monthly',
+  records: CredentialingRecord[],
+  providers: Provider[],
+  payers: Payer[],
+  entities: LegalEntity[],
+  webhookUrl?: string,
+  userEmail?: string
+): Promise<{
+  success: boolean;
+  mode: 'webhook_executed' | 'webhook_needed' | 'webhook_error';
+  message: string;
+  data?: any;
+  error?: string;
+  payload?: any;
+}> => {
+  const { buildMultiTabSheetsPayload } = await import('./googleSheetsSyncPayload');
+  const targetId = reportType === 'weekly'
+    ? USER_ATTACHED_WEEKLY_SHEET.spreadsheetId
+    : USER_ATTACHED_MONTHLY_SHEET.spreadsheetId;
+
+  const payload = buildMultiTabSheetsPayload(records, providers, payers, entities, reportType, targetId);
+
+  try {
+    const res = await safeFetchJson<{
+      success: boolean;
+      mode: 'webhook_executed' | 'webhook_needed' | 'webhook_error';
+      message: string;
+      data?: any;
+      error?: string;
+    }>('/api/reports/auto-sync-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reportType,
+        webhookUrl,
+        payload,
+        records,
+        userEmail: userEmail || 'Joel Mathew Reji',
+      }),
+    });
+
+    if (res.success && res.data) {
+      return {
+        ...res.data,
+        payload,
+      };
+    }
+
+    return {
+      success: false,
+      mode: 'webhook_error',
+      message: res.error || 'Auto-sync server request failed.',
+      payload,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      mode: 'webhook_error',
+      message: err.message || 'Auto-sync error occurred.',
+      payload,
+    };
+  }
+};
+
+/**
+ * Pings Google Apps Script Webhook to test connectivity
+ */
+export const testWebhookConnection = async (
+  webhookUrl: string,
+  reportType: 'weekly' | 'monthly' = 'weekly'
+): Promise<{ success: boolean; message: string; details?: any; error?: string }> => {
+  try {
+    const res = await safeFetchJson<{
+      success: boolean;
+      message: string;
+      details?: any;
+      error?: string;
+    }>('/api/reports/test-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhookUrl, reportType }),
+    });
+
+    if (res.success && res.data?.success) {
+      return {
+        success: true,
+        message: res.data.message || 'Webhook is active and responding!',
+        details: res.data.details,
+      };
+    }
+
+    return {
+      success: false,
+      message: res.data?.error || res.error || 'Could not verify Webhook connection.',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Error testing Webhook connection.',
+    };
+  }
+};
+
+/**
+ * Direct push of all subsheets (About, Dashboard, Master Register, Active Month Subsheets, No Follow-Up)
+ * directly into the user's Google Sheet via Google Sheets REST API v4 using active OAuth access token.
+ */
+export const directPushAllSubsheetsViaGoogleApi = async (
+  token: string,
+  reportType: 'weekly' | 'monthly',
+  records: CredentialingRecord[],
+  providers: Provider[],
+  payers: Payer[],
+  entities: LegalEntity[],
+  targetSpreadsheetId?: string,
+  userEmail?: string
+): Promise<{
+  success: boolean;
+  message: string;
+  tabsUpdated?: string[];
+  recordsSynced?: number;
+  spreadsheetUrl?: string;
+  error?: string;
+}> => {
+  const spreadsheetId = targetSpreadsheetId || (
+    reportType === 'weekly'
+      ? USER_ATTACHED_WEEKLY_SHEET.spreadsheetId
+      : USER_ATTACHED_MONTHLY_SHEET.spreadsheetId
+  );
+
+  const { buildMultiTabSheetsPayload } = await import('./googleSheetsSyncPayload');
+  const payload = buildMultiTabSheetsPayload(records, providers, payers, entities, reportType, spreadsheetId);
+
+  try {
+    // 1. Fetch existing sheets
+    const metaRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (!metaRes.ok) {
+      if (metaRes.status === 401) {
+        throw new Error('Google authentication expired or invalid. Please sign in with Google again to refresh your connection.');
+      }
+      if (metaRes.status === 403) {
+        throw new Error(`Permission Denied (403): Your signed-in Google account does not have Edit permissions on spreadsheet "${spreadsheetId}". Please grant Editor access to this account in Google Sheets Share settings.`);
+      }
+      if (metaRes.status === 404) {
+        throw new Error(`Spreadsheet not found (404): Could not find Google Spreadsheet with ID "${spreadsheetId}".`);
+      }
+      const errBody = await metaRes.text();
+      throw new Error(`Google Sheets API error (${metaRes.status}): ${errBody}`);
+    }
+
+    const meta = await metaRes.json();
+    const existingSheets: any[] = meta.sheets || [];
+    const existingTitles = new Set(existingSheets.map((s: any) => s.properties?.title));
+
+    const masterSheetTitle = reportType === 'weekly' ? 'Weekly Report' : 'Monthly Report';
+    const tabsToCreate: string[] = [];
+
+    if (!existingTitles.has('About')) tabsToCreate.push('About');
+    if (!existingTitles.has('Dashboard')) tabsToCreate.push('Dashboard');
+    if (!existingTitles.has(masterSheetTitle)) tabsToCreate.push(masterSheetTitle);
+
+    payload.monthSubsheets.forEach((m) => {
+      if (!existingTitles.has(m.tabName)) {
+        tabsToCreate.push(m.tabName);
+      }
+    });
+
+    if (!existingTitles.has('No Follow-Up')) tabsToCreate.push('No Follow-Up');
+    if (!existingTitles.has('Sync_Log')) tabsToCreate.push('Sync_Log');
+
+    // 2. Create missing sheets via batchUpdate
+    if (tabsToCreate.length > 0) {
+      const addRequests = tabsToCreate.map((title) => ({
+        addSheet: {
+          properties: {
+            title,
+            gridProperties: {
+              frozenRowCount: title === 'About' ? 0 : 5,
+              rowCount: 100,
+              columnCount: 20,
+            },
+          },
+        },
+      }));
+
+      const addRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requests: addRequests }),
+      });
+      if (!addRes.ok) {
+        const addErr = await addRes.text();
+        console.warn('[GoogleSheetsService] Add sheets batchUpdate notice:', addErr);
+      }
+    }
+
+    // 2b. Clear obsolete content in pre-existing tabs so stale rows from templates are removed
+    const preExistingTabsToClear = [
+      'About',
+      'Dashboard',
+      masterSheetTitle,
+      ...payload.monthSubsheets.map((m) => m.tabName),
+      'No Follow-Up',
+    ].filter((t) => existingTitles.has(t));
+
+    if (preExistingTabsToClear.length > 0) {
+      try {
+        await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchClear`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ranges: preExistingTabsToClear.map((t) => `'${t}'!A1:Z500`),
+            }),
+          }
+        );
+      } catch (clearErr) {
+        console.warn('[GoogleSheetsService] Non-fatal clear notice:', clearErr);
+      }
+    }
+
+    // 3. Prepare value updates batch
+    const valueUpdates: Array<{ range: string; values: any[][] }> = [];
+
+    // About
+    if (payload.aboutRows && payload.aboutRows.length > 0) {
+      valueUpdates.push({
+        range: `'About'!A1:F${payload.aboutRows.length}`,
+        values: payload.aboutRows,
+      });
+    }
+
+    // Dashboard
+    if (payload.dashboardRows && payload.dashboardRows.length > 0) {
+      valueUpdates.push({
+        range: `'Dashboard'!A1:G${payload.dashboardRows.length}`,
+        values: payload.dashboardRows,
+      });
+    }
+
+    // Master
+    if (payload.masterRows && payload.masterRows.length > 0) {
+      valueUpdates.push({
+        range: `'${masterSheetTitle}'!A1:S${payload.masterRows.length}`,
+        values: payload.masterRows,
+      });
+    }
+
+    // Month Subsheets
+    payload.monthSubsheets.forEach((m) => {
+      if (m.rows && m.rows.length > 0) {
+        valueUpdates.push({
+          range: `'${m.tabName}'!A1:S${m.rows.length}`,
+          values: m.rows,
+        });
+      }
+    });
+
+    // No Follow-Up
+    if (payload.noFollowUpRows && payload.noFollowUpRows.length > 0) {
+      valueUpdates.push({
+        range: `'No Follow-Up'!A1:S${payload.noFollowUpRows.length}`,
+        values: payload.noFollowUpRows,
+      });
+    }
+
+    // Sync Log
+    const timestamp = new Date().toISOString();
+    valueUpdates.push({
+      range: `'Sync_Log'!A1:F2`,
+      values: [
+        ['Timestamp', 'Operation Type', 'Record Scope', 'Authorized User', 'Result', 'Details'],
+        [
+          timestamp,
+          'DIRECT_GOOGLE_API_SYNC',
+          `${records.length} records • ${payload.monthSubsheets.length} active month subsheets`,
+          userEmail || 'Proficio Authorized Account',
+          'SUCCESS',
+          `Direct Google Sheets API sync succeeded. Updated About, Dashboard, ${masterSheetTitle}, and ${payload.monthSubsheets.length} active month subsheets.`,
+        ],
+      ],
+    });
+
+    // 4. Execute values batchUpdate
+    const updateRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          valueInputOption: 'USER_ENTERED',
+          data: valueUpdates,
+        }),
+      }
+    );
+
+    if (!updateRes.ok) {
+      const errText = await updateRes.text();
+      throw new Error(`Google Sheets values update failed (${updateRes.status}): ${errText}`);
+    }
+
+    const tabsUpdated = [
+      'About',
+      'Dashboard',
+      masterSheetTitle,
+      ...payload.monthSubsheets.map((m) => m.tabName),
+      'No Follow-Up',
+      'Sync_Log',
+    ];
+
+    await saveGoogleSheetsConfig({
+      lastSyncedAt: timestamp,
+      lastSyncDirection: 'app_to_sheets',
+      lastSyncStatus: 'SUCCESS',
+      lastSyncMessage: `Direct API sync updated ${tabsUpdated.length} subsheets including active month tabs.`,
+    });
+
+    return {
+      success: true,
+      message: `Successfully synchronized ${records.length} records across ${tabsUpdated.length} subsheets directly to your Google Sheet!`,
+      tabsUpdated,
+      recordsSynced: records.length,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    };
+  } catch (err: any) {
+    console.error('[GoogleSheetsService] directPushAllSubsheetsViaGoogleApi error:', err);
+    return {
+      success: false,
+      message: err.message || 'Direct Google Sheets API sync failed.',
+      error: err.message,
+    };
+  }
+};
+
+

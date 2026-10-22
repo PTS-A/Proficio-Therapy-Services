@@ -23,6 +23,7 @@ export const APPROVED_WHITELIST_DOMAINS = [
 
 async function startServer() {
   const app = express();
+  app.set('trust proxy', 1);
 
   const cwdDist = path.join(process.cwd(), 'dist');
   const localDist = typeof __dirname !== 'undefined' ? __dirname : cwdDist;
@@ -921,7 +922,9 @@ async function startServer() {
     // SECURITY: Only expose the public anonymous key to browser client scripts.
     // Privileged service-role / secret keys must NEVER be exposed in frontend HTML responses.
     const clientAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '';
-    const targetOriginUrl = ENABLE_CUSTOM_DOMAIN_REDIRECT ? CUSTOM_PRODUCTION_SSO_DOMAIN : '';
+    const hostHeader = (req.get('host') || '').toLowerCase();
+    const isCustomDomain = hostHeader.includes('credentialing.ageslearningsolutions.com') || hostHeader.includes('ageslearningsolutions.com');
+    const targetOriginUrl = isCustomDomain ? 'https://credentialing.ageslearningsolutions.com' : (ENABLE_CUSTOM_DOMAIN_REDIRECT ? CUSTOM_PRODUCTION_SSO_DOMAIN : '');
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
@@ -1466,9 +1469,14 @@ async function startServer() {
   // Get Supabase Google OAuth Authorization URL
   app.post('/api/auth/google/url', async (req, res) => {
     try {
-      const defaultHost = ENABLE_CUSTOM_DOMAIN_REDIRECT
-        ? CUSTOM_PRODUCTION_SSO_DOMAIN
-        : `${req.protocol}://${req.get('host')}`;
+      const hostHeader = (req.get('host') || '').toLowerCase();
+      const isCustomDomain = hostHeader.includes('credentialing.ageslearningsolutions.com') || hostHeader.includes('ageslearningsolutions.com');
+      const proto = isCustomDomain ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol || 'https');
+      const defaultHost = isCustomDomain
+        ? 'https://credentialing.ageslearningsolutions.com'
+        : (ENABLE_CUSTOM_DOMAIN_REDIRECT
+          ? CUSTOM_PRODUCTION_SSO_DOMAIN
+          : `${proto}://${req.get('host')}`);
       const redirectUrl = req.body?.redirectUrl || `${defaultHost}/auth/callback`;
       const { createClient } = await import('@supabase/supabase-js');
       const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://uqaiotacheqjvfbanxtp.supabase.co';

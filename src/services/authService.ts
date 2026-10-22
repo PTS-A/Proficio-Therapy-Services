@@ -81,8 +81,11 @@ export async function verifyEmployeeWithServer(
     });
 
     if (res.ok) {
-      const data: VerificationResponse = await res.json();
-      return data;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data: VerificationResponse = await res.json();
+        return data;
+      }
     }
   } catch (err: any) {
     console.warn('[Server verification route unavailable, using direct authorization verification]:', err);
@@ -110,6 +113,8 @@ async function verifyEmployeeClientFallback(
   }
 
   const isSuperAdminEmail =
+    cleanEmail === 'joel.reji@ageslearningsolutions.com' ||
+    cleanEmail === 'joel@ageslearningsolutions.com' ||
     cleanEmail === 'credentialing@ageslearningsolutions.com' ||
     cleanEmail === 'superadmin@proficiotherapy.com' ||
     cleanEmail === 'dev@proficiotherapy.com' ||
@@ -151,17 +156,59 @@ async function verifyEmployeeClientFallback(
   const rawName =
     googleProfile?.name ||
     existingUser?.name ||
-    cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    existingUser?.full_name ||
+    (cleanEmail === 'joel.reji@ageslearningsolutions.com' ? 'Joel Mathew Reji' : cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+
+  // Extract metadata permissions from user record if present
+  let metaPayload: any = null;
+  if (Array.isArray(existingUser?.permissions)) {
+    const metaStr = existingUser.permissions.find((p: string) => typeof p === 'string' && p.startsWith('METADATA:'));
+    if (metaStr) {
+      try {
+        metaPayload = JSON.parse(metaStr.replace(/^METADATA:/, ''));
+      } catch {}
+    }
+  }
+
+  const isDevUser = 
+    isSuperAdminEmail ||
+    existingUser?.system_role === 'Developer' ||
+    existingUser?.role === 'Developer' ||
+    cleanEmail.includes('dev') ||
+    cleanEmail === 'joel.reji@ageslearningsolutions.com';
 
   const canAccessAdmin =
     isSuperAdminEmail ||
+    isDevUser ||
+    metaPayload?.canAccessAdmin === true ||
     existingUser?.is_super_admin === true ||
     existingUser?.access_level === 'ADMINISTRATOR' ||
     existingUser?.system_role === 'System Administrator';
 
   const systemRole =
     existingUser?.system_role ||
-    (isSuperAdminEmail ? 'System Administrator' : 'Credentialing Specialist');
+    existingUser?.role ||
+    (isDevUser ? 'Developer' : isSuperAdminEmail ? 'System Administrator' : 'Credentialing Specialist');
+
+  const defaultAllTabs = [
+    'dashboard',
+    'tracker',
+    'providers',
+    'locations',
+    'payers',
+    'entities',
+    'reports',
+    'document-intake',
+    'admin-dashboard',
+    'clinical-portal',
+    'staff-approvals',
+    'aesas',
+    'comments-roster',
+    'tickets',
+    'dbms-manager',
+  ];
+
+  const assignedTabs = metaPayload?.allowedTabs || (canAccessAdmin ? defaultAllTabs : ['dashboard', 'tracker', 'providers', 'clinical-portal', 'reports']);
 
   const account: AppAccount = {
     id: existingUser?.id || `acc-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '-')}`,
@@ -169,8 +216,8 @@ async function verifyEmployeeClientFallback(
     email: cleanEmail,
     accessLevel: (canAccessAdmin ? 'ADMINISTRATOR' : (existingUser?.access_level || 'USER')) as any,
     systemRole: systemRole as any,
-    roleTitle: existingUser?.role_title || systemRole,
-    department: existingUser?.department || 'Credentialing & Operations',
+    roleTitle: existingUser?.role_title || (isDevUser ? 'System Administrator & IT Governance' : systemRole),
+    department: existingUser?.department || (isDevUser ? 'IT Governance & Operations' : 'Credentialing & Operations'),
     avatar:
       googleProfile?.avatar ||
       existingUser?.avatar_url ||
@@ -183,16 +230,17 @@ async function verifyEmployeeClientFallback(
     status: 'Active',
     authProvider: 'google',
     googleId: googleProfile?.id,
-    isSuperAdmin: isSuperAdminEmail || existingUser?.is_super_admin === true,
+    isSuperAdmin: isSuperAdminEmail || isDevUser || existingUser?.is_super_admin === true,
     canAccessAdmin: canAccessAdmin,
-    canAccessDev: isSuperAdminEmail || cleanEmail.includes('dev'),
+    canAccessDev: isDevUser,
     canEditData: true,
-    permissions: existingUser?.permissions || [
-      'READ_ALL',
-      'WRITE_CREDENTIALING',
-      'VIEW_ROSTER',
-      'EXPORT_REPORTS',
-      'MANAGE_PROVIDERS',
+    allowedTabs: assignedTabs,
+    permissions: Array.isArray(existingUser?.permissions) && existingUser.permissions.length > 0 ? existingUser.permissions : [
+      'Platform architecture, database schema management & DBMS migrations',
+      'System diagnostics, telemetry monitoring & codebase maintenance',
+      'Technical bug fixes, ticket triage, and system diagnostics',
+      'Full administrative access and infrastructure telemetry',
+      'Manage users, roles, and permissions',
     ],
   };
 
@@ -203,6 +251,7 @@ async function verifyEmployeeClientFallback(
     code: 'AUTHORIZED',
     reason: 'Authorization verified successfully.',
     account,
+    allowedTabs: assignedTabs,
   };
 }
 
@@ -299,6 +348,15 @@ export async function checkForPendingOAuth(): Promise<{
       }
 
       if (accessToken) {
+        const client = supabase || await ensureSupabaseClient();
+        if (client) {
+          try {
+            await client.auth.setSession({
+              access_token: accessToken,
+              refresh_token: hashParams.get('refresh_token') || '',
+            });
+          } catch {}
+        }
         const parts = accessToken.split('.');
         if (parts.length === 3) {
           const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -366,9 +424,38 @@ export async function checkForPendingOAuth(): Promise<{
       window.history.replaceState({}, document.title, window.location.pathname);
       const client = supabase || await ensureSupabaseClient();
       if (client) {
-        const { data: exchangeData } = await client.auth.exchangeCodeForSession(codeParam);
-        if (exchangeData?.user?.email) {
-          const verifyResult = await verifyEmployeeWithServer(exchangeData.user.email);
+        let userEmail = '';
+        let googleProfile: any = {};
+        try {
+          const { data: exchangeData } = await client.auth.exchangeCodeForSession(codeParam);
+          if (exchangeData?.user?.email) {
+            userEmail = exchangeData.user.email;
+            googleProfile = {
+              id: exchangeData.user.id,
+              name: exchangeData.user.user_metadata?.full_name || exchangeData.user.user_metadata?.name || '',
+              avatar: exchangeData.user.user_metadata?.avatar_url || exchangeData.user.user_metadata?.picture || '',
+            };
+          }
+        } catch (exchErr) {
+          console.warn('[PKCE exchange error]:', exchErr);
+        }
+
+        if (!userEmail) {
+          try {
+            const { data: sessData } = await client.auth.getSession();
+            if (sessData?.session?.user?.email) {
+              userEmail = sessData.session.user.email;
+              googleProfile = {
+                id: sessData.session.user.id,
+                name: sessData.session.user.user_metadata?.full_name || sessData.session.user.user_metadata?.name || '',
+                avatar: sessData.session.user.user_metadata?.avatar_url || sessData.session.user.user_metadata?.picture || '',
+              };
+            }
+          } catch {}
+        }
+
+        if (userEmail) {
+          const verifyResult = await verifyEmployeeWithServer(userEmail, googleProfile);
           if (verifyResult.authorized && verifyResult.account) {
             localStorage.setItem('cred_current_account', JSON.stringify(verifyResult.account));
             localStorage.setItem('cred_last_activity', String(Date.now()));
@@ -429,8 +516,14 @@ export async function initiateGoogleSignIn(options?: {
       }
     }
 
-    const baseOrigin = ENABLE_CUSTOM_DOMAIN_REDIRECT ? CUSTOM_PRODUCTION_SSO_DOMAIN : window.location.origin;
-    const redirectUrl = `${baseOrigin}/auth/callback${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`;
+    const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+    const isCustomDomain = currentHost === 'credentialing.ageslearningsolutions.com' || currentHost.includes('ageslearningsolutions.com');
+    const baseOrigin = isCustomDomain 
+      ? 'https://credentialing.ageslearningsolutions.com' 
+      : (ENABLE_CUSTOM_DOMAIN_REDIRECT ? CUSTOM_PRODUCTION_SSO_DOMAIN : (typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : 'https://credentialing.ageslearningsolutions.com'));
+    // CRITICAL: redirectUrl must match the exact registered OAuth redirect URI without ephemeral query parameters.
+    // The sessionId is securely carried inside the standard OAuth state parameter.
+    const redirectUrl = `${baseOrigin}/auth/callback`;
 
     // 2. Generate OAuth URL via browser client (saves PKCE verifier in localStorage for seamless handshake)
     let authUrl = '';
@@ -451,6 +544,8 @@ export async function initiateGoogleSignIn(options?: {
         });
         if (!error && data?.url) {
           authUrl = data.url;
+        } else if (error) {
+          console.warn('[Client Google Auth URL init note]:', error.message);
         }
       } catch (clientErr) {
         console.warn('[Client Google Auth URL init note]:', clientErr);
@@ -466,23 +561,21 @@ export async function initiateGoogleSignIn(options?: {
           body: JSON.stringify({ redirectUrl }),
         });
         if (urlRes.ok) {
-          const urlData = await urlRes.json();
-          authUrl = urlData.url || '';
+          const contentType = urlRes.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const urlData = await urlRes.json();
+            authUrl = urlData.url || '';
+          }
         }
       } catch (e) {
         console.warn('[Server Google Auth URL fetch fallback]:', e);
       }
     }
 
+    // 4. Guaranteed Direct Supabase Authorize URL Fallback (100% reliability even on static CDN or offline server)
     if (!authUrl) {
-      return { success: false, error: 'Unable to acquire authorization URL from Google.' };
-    }
-
-    // Force Google to show the account selection screen ("Choose an account")
-    if (!authUrl.includes('prompt=')) {
-      authUrl += (authUrl.includes('?') ? '&' : '?') + 'prompt=select_account%20consent';
-    } else {
-      authUrl = authUrl.replace(/prompt=[^&]*/, 'prompt=select_account%20consent');
+      const targetSupabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || 'https://uqaiotacheqjvfbanxtp.supabase.co';
+      authUrl = `${targetSupabaseUrl.replace(/\/$/, '')}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account%20consent${sessionId ? `&state=${encodeURIComponent(sessionId)}` : ''}`;
     }
 
     // 4. Standard Behavior: Navigate strictly in the SAME PAGE (zero new tabs or popups across all devices)

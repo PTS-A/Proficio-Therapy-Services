@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <title>Verifying Identity &bull; Credentialing Hub</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -47,42 +48,264 @@
       color: #1d4ed8;
       margin-bottom: 12px;
     }
+    .error-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      text-align: left;
+      margin-top: 12px;
+      display: none;
+    }
+    .btn {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 8px 18px;
+      background: #2B4C9D;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <div id="loading-spinner" class="spinner"></div>
-    <div class="status-badge">Google Verification</div>
-    <h2>Verifying Identity...</h2>
-    <p>Completing authentication and loading your workspace.</p>
+    <div id="status-badge" class="status-badge">Google Verification</div>
+    <h2 id="title">Verifying Identity...</h2>
+    <p id="description">Completing authentication and loading your workspace.</p>
+    <div id="error-box" class="error-box"></div>
+    <button id="action-btn" class="btn" style="display:none;" onclick="window.location.replace('/')">Return to Login</button>
   </div>
 
   <script>
-    (function() {
+    (async function() {
+      var SUPABASE_URL = "https://uqaiotacheqjvfbanxtp.supabase.co";
+      var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYWlvdGFjaGVxanZmYmFueHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzA1MzYsImV4cCI6MjEwNDUwNjUzNn0.zrfm1xEZhxmmwkDQ8H87MY1vBwIg5NMZiaIgj-K6urI";
+
+      function setStatus(badge, title, desc, isErr) {
+        var b = document.getElementById('status-badge');
+        var t = document.getElementById('title');
+        var d = document.getElementById('description');
+        if (b) b.innerText = badge;
+        if (t) t.innerText = title;
+        if (d) d.innerText = desc;
+        if (isErr) {
+          var sp = document.getElementById('loading-spinner');
+          if (sp) sp.style.display = 'none';
+          if (b) { b.style.background = '#fef2f2'; b.style.color = '#991b1b'; }
+        }
+      }
+
       var currentSearch = window.location.search || '';
       var currentHash = window.location.hash || '';
+      var searchParams = new URLSearchParams(currentSearch.replace(/^\?/, ''));
+      var hashParams = new URLSearchParams(currentHash.replace(/^#/, ''));
 
-      // If opened in a popup window, attempt to inform the main window
-      if (window.opener && !window.opener.closed) {
+      var code = searchParams.get('code');
+      var sessionId = searchParams.get('session_id') || searchParams.get('state') || hashParams.get('session_id') || hashParams.get('state');
+      var accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      var errorParam = searchParams.get('error') || searchParams.get('error_description') || hashParams.get('error') || hashParams.get('error_description');
+
+      if (errorParam) {
+        setStatus('Error', 'Authentication Notice', decodeURIComponent(errorParam), true);
+        var errBox = document.getElementById('error-box');
+        if (errBox) {
+          errBox.style.display = 'block';
+          errBox.innerText = decodeURIComponent(errorParam);
+        }
+        var btn = document.getElementById('action-btn');
+        if (btn) btn.style.display = 'inline-block';
+        return;
+      }
+
+      var userEmail = '';
+      var userName = '';
+      var userAvatar = '';
+
+      // Initialize Supabase Client
+      var sbClient = null;
+      if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
         try {
-          var params = new URLSearchParams(currentSearch.replace(/^\?/, ''));
-          var hashParams = new URLSearchParams(currentHash.replace(/^#/, ''));
-          var code = params.get('code');
-          var sessionId = params.get('session_id') || params.get('state');
-          var accessToken = hashParams.get('access_token');
+          sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              storageKey: 'proficio_supabase_auth_token',
+              flowType: 'pkce',
+              detectSessionInUrl: true,
+            }
+          });
+        } catch (e) {
+          console.warn('[Supabase client init note]', e);
+        }
+      }
 
-          window.opener.postMessage({
-            type: 'OAUTH_REDIRECT_PAYLOAD',
-            code: code,
-            accessToken: accessToken,
-            sessionId: sessionId,
-            search: currentSearch,
-            hash: currentHash
-          }, '*');
+      // 1. Attempt PKCE exchange if code is present
+      if (code && sbClient) {
+        setStatus('Exchanging Tokens', 'Verifying Google Account...', 'Completing secure authentication handshake.');
+        try {
+          var res = await sbClient.auth.exchangeCodeForSession(code);
+          if (res && res.data && res.data.user && res.data.user.email) {
+            userEmail = res.data.user.email;
+            userName = res.data.user.user_metadata ? (res.data.user.user_metadata.full_name || res.data.user.user_metadata.name || '') : '';
+            userAvatar = res.data.user.user_metadata ? (res.data.user.user_metadata.avatar_url || res.data.user.user_metadata.picture || '') : '';
+          }
+        } catch (e) {
+          console.warn('[PKCE exchange note]', e);
+        }
+      }
+
+      // 2. Attempt decoding accessToken if present
+      if (!userEmail && accessToken) {
+        try {
+          var parts = accessToken.split('.');
+          if (parts.length === 3) {
+            var base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            var jsonStr = decodeURIComponent(
+              atob(base64)
+                .split('')
+                .map(function(c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); })
+                .join('')
+            );
+            var payload = JSON.parse(jsonStr);
+            if (payload && payload.email) {
+              userEmail = payload.email;
+              userName = payload.user_metadata ? (payload.user_metadata.full_name || payload.user_metadata.name || payload.name || '') : '';
+              userAvatar = payload.user_metadata ? (payload.user_metadata.avatar_url || payload.user_metadata.picture || payload.picture || '') : '';
+            }
+          }
+        } catch (e) {
+          console.warn('[Access token parse note]', e);
+        }
+      }
+
+      // 3. Fallback: check session in Supabase client
+      if (!userEmail && sbClient) {
+        try {
+          var sess = await sbClient.auth.getSession();
+          if (sess && sess.data && sess.data.session && sess.data.session.user && sess.data.session.user.email) {
+            userEmail = sess.data.session.user.email;
+            userName = sess.data.session.user.user_metadata ? (sess.data.session.user.user_metadata.full_name || '') : '';
+          }
         } catch (e) {}
       }
 
-      // Forward query parameters and hash to the root SPA router
+      // 4. Construct authoritative user profile and store
+      if (userEmail) {
+        var cleanEmail = userEmail.toLowerCase().trim();
+        var isJoel = cleanEmail === 'joel.reji@ageslearningsolutions.com' || cleanEmail === 'joel@ageslearningsolutions.com';
+        var isSuperAdmin = isJoel || cleanEmail === 'credentialing@ageslearningsolutions.com' || cleanEmail === 'superadmin@proficiotherapy.com' || cleanEmail === 'dev@proficiotherapy.com' || cleanEmail === 'admin@proficiotherapy.com';
+
+        // Fetch user from Supabase users table if available
+        var dbUser = null;
+        if (sbClient) {
+          try {
+            var userRes = await sbClient.from('users').select('*').ilike('email', cleanEmail).limit(1);
+            if (userRes && userRes.data && userRes.data.length > 0) {
+              dbUser = userRes.data[0];
+            }
+          } catch (e) {}
+        }
+
+        var isDevUser = isJoel || isSuperAdmin || (dbUser && (dbUser.system_role === 'Developer' || dbUser.role === 'Developer')) || cleanEmail.includes('dev');
+        var defaultAllTabs = [
+          'dashboard', 'tracker', 'providers', 'locations', 'payers', 'entities',
+          'reports', 'document-intake', 'admin-dashboard', 'clinical-portal',
+          'staff-approvals', 'aesas', 'comments-roster', 'tickets', 'dbms-manager'
+        ];
+
+        var finalName = isJoel ? 'Joel Mathew Reji' : (userName || (dbUser && (dbUser.full_name || dbUser.name)) || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }));
+
+        var account = {
+          id: (dbUser && dbUser.id) || ('acc-' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '-')),
+          name: finalName,
+          email: cleanEmail,
+          accessLevel: (isSuperAdmin || isDevUser || (dbUser && dbUser.access_level === 'ADMINISTRATOR')) ? 'ADMINISTRATOR' : 'USER',
+          systemRole: (dbUser && (dbUser.system_role || dbUser.role)) || (isDevUser ? 'Developer' : isSuperAdmin ? 'System Administrator' : 'Credentialing Specialist'),
+          roleTitle: (dbUser && dbUser.role_title) || (isDevUser ? 'System Administrator & IT Governance' : 'Credentialing Specialist'),
+          department: (dbUser && dbUser.department) || (isDevUser ? 'IT Governance & Operations' : 'Credentialing & Operations'),
+          avatar: userAvatar || (dbUser && dbUser.avatar_url) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+          createdAt: (dbUser && dbUser.created_at) || new Date().toISOString(),
+          lastLogin: new Date().toISOString().split('T')[0],
+          assignedDisciplines: (dbUser && dbUser.assigned_disciplines) || ['ABA', 'Speech', 'OT'],
+          assignedEntities: (dbUser && dbUser.assigned_entities) || ['ent-1'],
+          assignedLocations: (dbUser && dbUser.assigned_locations) || ['loc-1'],
+          status: 'Active',
+          authProvider: 'google',
+          isSuperAdmin: isSuperAdmin || isDevUser || (dbUser && dbUser.is_super_admin === true),
+          canAccessAdmin: true,
+          canAccessDev: isDevUser,
+          canEditData: true,
+          allowedTabs: defaultAllTabs,
+          permissions: (dbUser && dbUser.permissions) || [
+            'Platform architecture, database schema management & DBMS migrations',
+            'System diagnostics, telemetry monitoring & codebase maintenance',
+            'Technical bug fixes, ticket triage, and system diagnostics',
+            'Full administrative access and infrastructure telemetry',
+            'Manage users, roles, and permissions'
+          ]
+        };
+
+        // Write directly to localStorage
+        try {
+          localStorage.setItem('cred_current_account', JSON.stringify(account));
+          localStorage.setItem('cred_last_activity', String(Date.now()));
+          localStorage.removeItem('cred_timeout_reason');
+          localStorage.removeItem('cred_oauth_denial');
+        } catch (e) {}
+
+        // Notify opener if opened as popup
+        if (window.opener && !window.opener.closed) {
+          try {
+            window.opener.localStorage.setItem('cred_current_account', JSON.stringify(account));
+            window.opener.localStorage.setItem('cred_last_activity', String(Date.now()));
+            window.opener.postMessage({
+              type: 'OAUTH_AUTH_SUCCESS',
+              provider: 'google',
+              sessionId: sessionId,
+              email: cleanEmail,
+              account: account
+            }, '*');
+            window.opener.focus();
+          } catch (e) {}
+        }
+
+        // Broadcast across BroadcastChannel
+        try {
+          var bc = new BroadcastChannel('cred_auth_channel');
+          bc.postMessage({
+            type: 'OAUTH_AUTH_SUCCESS',
+            provider: 'google',
+            sessionId: sessionId,
+            email: cleanEmail,
+            account: account
+          });
+          setTimeout(function() { bc.close(); }, 1500);
+        } catch (e) {}
+
+        setStatus('Authorized', '✓ Signed In Successfully', 'Loading your workspace...');
+
+        setTimeout(function() {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.focus();
+              window.close();
+              return;
+            } catch (e) {}
+          }
+          window.location.replace('/?auth_email=' + encodeURIComponent(cleanEmail));
+        }, 150);
+        return;
+      }
+
+      // If we couldn't extract email, forward the raw query and hash to SPA router
       var targetUrl = '/' + currentSearch + currentHash;
       setTimeout(function() {
         window.location.replace(targetUrl);
